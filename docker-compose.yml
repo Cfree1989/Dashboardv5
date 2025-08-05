@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://fablab_user:fablab@localhost:5432/3d_print_system
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=785c1e2dc777280ed4ae125f876662ec3ec798fb9f1fe8f
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=3d_print_system
+      - POSTGRES_USER=fablab_user
+      - POSTGRES_PASSWORD=fablab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: python -m rq worker --url redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data: 

@@ -1,0 +1,76 @@
+flowchart TD
+    %% Job Lifecycle Workflow for 3D Print Management System
+    
+    START([Student Submits<br/>3D Model File]) --> UPLOADED
+    
+    UPLOADED[📤 UPLOADED<br/>storage/Uploaded/<br/>Awaiting Staff Review]
+    
+    UPLOADED --> |Staff Reviews| APPROVE{Staff Decision}
+    APPROVE --> |✅ Approve| PENDING
+    APPROVE --> |❌ Reject| REJECTED
+    UPLOADED --> |Admin Action| DELETE[🗑️ DELETE<br/>Permanent Removal]
+    
+    PENDING[⏳ PENDING<br/>storage/Pending/<br/>Awaiting Student Confirmation]
+    
+    PENDING --> |Student Confirms| READY
+    PENDING --> |Token Expires| EXPIRED{Handle Expired}
+    EXPIRED --> |Resend Email| PENDING
+    EXPIRED --> |Manual Confirm| READY
+    EXPIRED --> |Student Ignores| STALE[⚠️ Stale Job<br/>Visual Flag on Dashboard]
+    
+    READY[✅ READYTOPRINT<br/>storage/ReadyToPrint/<br/>Ready for Production]
+    
+    READY --> |Staff Starts Print| PRINTING
+    
+    PRINTING[🖨️ PRINTING<br/>storage/Printing/<br/>Currently Being Printed]
+    
+    PRINTING --> |Print Succeeds| COMPLETED
+    PRINTING --> |Print Fails| FAILED{Handle Failure}
+    FAILED --> |Lab Error| READY
+    FAILED --> |Student Error| PRINTING
+    
+    COMPLETED[✅ COMPLETED<br/>storage/Completed/<br/>Awaiting Pickup & Payment]
+    
+    COMPLETED --> |Student Pays & Picks Up| PAIDPICKEDUP
+    
+    PAIDPICKEDUP[💰 PAIDPICKEDUP<br/>storage/PaidPickedUp/<br/>Process Complete]
+    
+    REJECTED[❌ REJECTED<br/>storage/Uploaded/<br/>Staff Declined Submission]
+    
+    %% Archival Process
+    PAIDPICKEDUP --> |After 90 Days| ARCHIVE_ELIGIBLE{Eligible for<br/>Archival}
+    REJECTED --> |After 90 Days| ARCHIVE_ELIGIBLE
+    ARCHIVE_ELIGIBLE --> |Admin Triggers| ARCHIVED
+    
+    ARCHIVED[📦 ARCHIVED<br/>storage/Archived/<br/>Long-term Storage]
+    ARCHIVED --> |After 1 Year| PRUNE_ELIGIBLE{Eligible for<br/>Permanent Deletion}
+    PRUNE_ELIGIBLE --> |Admin Triggers| DELETED[🗑️ PERMANENTLY<br/>DELETED]
+    
+    %% Revert Actions (Limited)
+    COMPLETED -.-> |Staff Revert<br/>Recent Action| PRINTING
+    PAIDPICKEDUP -.-> |Staff Revert<br/>Recent Action| COMPLETED
+    
+    %% File Operations Notes
+    UPLOADED --> |Files| FUPLOAD[original_file.stl<br/>metadata.json]
+    PENDING --> |Files| FPENDING[authoritative_file<br/>metadata.json<br/>original preserved]
+    READY --> |Files| FREADY[authoritative_file<br/>metadata.json] 
+    
+    %% Admin Override Paths
+    PENDING -.-> |Admin Override| READY
+    READY -.-> |Admin Override| PRINTING
+    PRINTING -.-> |Admin Override| COMPLETED
+    
+    %% Styling
+    classDef active fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef waiting fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef processing fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef final fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef admin fill:#fafafa,stroke:#616161,stroke-width:1px,stroke-dasharray: 5 5
+    
+    class UPLOADED,READY active
+    class PENDING,STALE waiting
+    class PRINTING processing
+    class COMPLETED,PAIDPICKEDUP,ARCHIVED final
+    class REJECTED,DELETE,DELETED error
+    class FUPLOAD,FPENDING,FREADY admin

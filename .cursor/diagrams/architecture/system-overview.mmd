@@ -1,0 +1,78 @@
+graph TB
+    %% 3D Print Management System Architecture
+    
+    subgraph "Student Interface"
+        SWB[Student Web Browser]
+        SForm[Submission Form]
+        SConf[Email Confirmation]
+    end
+    
+    subgraph "Staff Interface" 
+        WS1[Workstation 1<br/>Staff Browser]
+        WS2[Workstation 2<br/>Staff Browser]
+        DASH[Dashboard Interface]
+        PROTO[Protocol Handler<br/>SlicerOpener.exe]
+        SLICER[Slicer Software<br/>PrusaSlicer/PreForm]
+    end
+    
+    subgraph "Application Layer"
+        FE[Next.js Frontend<br/>Port 3000]
+        API[Flask API<br/>Port 5000]
+        WORKER[RQ Background Worker]
+    end
+    
+    subgraph "Data Layer"
+        DB[(PostgreSQL Database<br/>Jobs, Events, Staff)]
+        REDIS[(Redis<br/>Task Queue)]
+        FILES[Network Storage<br/>Job Files by Status]
+    end
+    
+    subgraph "External Services"
+        SMTP[Email Server<br/>Office 365 SMTP]
+        NET[University Network]
+    end
+    
+    %% Student Flow
+    SWB --> FE
+    FE --> SForm
+    SForm --> API
+    API --> SConf
+    SConf --> SMTP
+    
+    %% Staff Flow
+    WS1 --> FE
+    WS2 --> FE
+    FE --> DASH
+    DASH --> API
+    WS1 --> PROTO
+    WS2 --> PROTO
+    PROTO --> FILES
+    PROTO --> SLICER
+    
+    %% Backend Connections
+    FE --> API
+    API --> DB
+    API --> REDIS
+    API --> FILES
+    WORKER --> REDIS
+    WORKER --> SMTP
+    WORKER --> FILES
+    
+    %% File System
+    FILES --> |"Status Directories"|SUBDIRS["Uploaded/<br/>Pending/<br/>ReadyToPrint/<br/>Printing/<br/>Completed/<br/>PaidPickedUp/<br/>Archived/"]
+    
+    %% Network Infrastructure
+    NET --> FE
+    NET --> API
+    NET --> FILES
+    
+    %% Styling
+    classDef frontend fill:#e1f5fe
+    classDef backend fill:#f3e5f5  
+    classDef data fill:#fff3e0
+    classDef external fill:#e8f5e8
+    
+    class FE,DASH,SForm,SConf frontend
+    class API,WORKER backend
+    class DB,REDIS,FILES,SUBDIRS data
+    class SMTP,NET external

@@ -1,0 +1,41 @@
+# Staff Workflow Audit Questions
+
+## Authentication & Staff Identity Management
+
+1. How will you handle staff turnover - what's the process when a staff member leaves or a new one joins?
+
+2. What happens if a staff member forgets to select their name from the attribution dropdown when performing actions?
+
+3. If multiple staff work on the same job across shifts, how will you maintain accountability and track who did what?
+
+## File Management & System Integrity
+
+4. If a staff member moves files manually outside the system (via Windows Explorer/File Manager), how will the system detect and recover from this inconsistency?
+
+5. What safeguards exist if the SlicerOpener protocol handler installation fails or gets corrupted on a workstation?
+
+6. How will you ensure staff consistently select the correct authoritative file during the approval process?
+
+## Job Status Transitions & Handoffs
+
+7. What mechanisms prevent a job from being "forgotten" in a particular status when shifts change?
+
+8. If a student confirms a print job after hours, what ensures staff will notice it needs to be moved to printing when they return?
+
+9. What happens if a staff member leaves mid-shift with partially processed jobs?
+
+## Error Recovery & Exception Handling
+
+10. How are print failures tracked and communicated between shifts?
+
+11. What's your contingency plan if the staff workstation password leaks to students?
+
+12. If a staff member makes a mistake (wrong status, wrong file, etc.), how easily can they recover without admin intervention?
+
+## Training & Compliance
+
+13. What ongoing training mechanisms will ensure new staff understand both the technical system and the underlying workflow principles?
+
+14. How will you identify which staff members need additional training based on error patterns?
+
+15. What visual cues or guardrails exist to prevent common workflow mistakes?
