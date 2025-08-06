@@ -42,5 +42,9 @@ def create_app():
     app.register_blueprint(submit.bp)
     app.register_blueprint(payment.bp)
     app.register_blueprint(analytics.bp)
+
+    # Initialize seed command
+    from . import seed
+    seed.init_app(app)
     
-    return app 
+    return app

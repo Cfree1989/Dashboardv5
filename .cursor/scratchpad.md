@@ -265,10 +265,21 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Project structure creation
 - [x] Backend foundation setup
 - [x] Frontend foundation setup
-- [ ] Database initialization
+- [x] Database initialization
+  - [x] Configure Flask-Migrate
+  - [x] Generate initial migration
+  - [x] Apply migration
+  - [x] Create seeding script
+  - [x] Seed database
 
 ### Phase 2: Core API Development
 - [ ] Authentication & authorization
+  - [x] Implement workstation login endpoint
+  - [ ] Test login endpoint functionality
+  - [ ] Implement JWT generation and validation
+  - [ ] Create token-required decorator
+  - [ ] Implement staff management endpoints (CRUD)
+  - [ ] Add rate limiting to auth endpoints
 - [ ] Job management API
 - [ ] Student submission API
 - [ ] Event logging system
@@ -294,7 +305,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 ### Phase 6: Testing & Quality Assurance
 - [ ] API testing
 - [ ] Frontend testing
-- [ ] End-to-end testing
+- [ ] End-to-End testing
 - [ ] Performance testing
 
 ### Phase 7: Deployment & Documentation
@@ -305,9 +316,9 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ## Current Status / Progress Tracking
 
-**Current Phase**: Phase 1 - Environment Setup & Foundation
-**Next Milestone**: Complete Database Initialization
-**Estimated Completion**: 7 weeks from start date
+**Current Phase**: Phase 2 - Core API Development
+**Next Milestone**: Implement Authentication & Authorization
+**Estimated Completion**: 6 weeks from start date
 
 ### Completed Tasks:
 - [x] Comprehensive analysis of masterplan.md
@@ -321,11 +332,10 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Git repository initialization
 - [x] Docker Compose configuration
 - [x] Docker container builds successful
+- [x] **Phase 1: Environment Setup & Foundation COMPLETE**
 
 ### In Progress:
-- [ ] Database initialization and migrations
-- [ ] Implementing basic API endpoints
-- [ ] Testing complete workflow
+- [ ] Core API Development
 
 ### Blockers:
 - None currently identified
@@ -338,124 +348,51 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Redis container running (for background tasks)
 - [x] Basic project structure established
 - [x] Git repository initialized with proper .gitignore
+- [x] Database initialized and seeded
 
 ## Executor's Feedback or Assistance Requests
 
+### Executor Task: Authentication & Authorization
+
+**Goal**: Implement the core authentication and authorization services for the backend, including workstation login and staff management.
+
+**Important Authentication Design Note**: 
+- The login system is **workstation-based only** - no staff name selection during login
+- Staff attribution happens later in action modals (approve/reject jobs) via dropdown selection
+- Login only requires `workstation_id` and `password`
+- This follows the masterplan.md specification exactly
+
+**Step-by-step Plan:**
+
+1.  **Implement Workstation Login Endpoint**:
+    *   **Action**: In `backend/app/routes/auth.py`, create the `/auth/login` endpoint. It should accept a `workstation_id` and `password`.
+    *   **Logic**: For this initial version, hardcode a single valid workstation ID ("front-desk") and password ("password") in the configuration.
+    *   **Success Criteria**: A `POST` request to `/api/v1/auth/login` with the correct credentials returns a JWT. Incorrect credentials return a 401 error.
+
+2.  **Implement JWT Generation and Validation**:
+    *   **Action**: Use the `PyJWT` library. Create utility functions to generate a token on successful login and to decode a token from the `Authorization` header.
+    *   **Success Criteria**: The token returned from the login endpoint can be successfully decoded and contains the `workstation_id`.
+
+3.  **Create Token-Required Decorator**:
+    *   **Action**: Create a decorator (e.g., `@token_required`) that can be applied to protected endpoints. This decorator will extract the token from the header, validate it, and make the payload (containing `workstation_id`) available to the route, likely via `flask.g`.
+    *   **Success Criteria**: Applying this decorator to a test endpoint makes it return a 401 error if no valid token is provided.
+
+4.  **Implement Staff Management Endpoints (CRUD)**:
+    *   **Action**: In a new blueprint (or the existing `auth` blueprint), create the `/staff` endpoints as specified in the `masterplan.md`.
+        *   `GET /staff`: Returns a list of all staff (initially from the seeded data).
+        *   `POST /staff`: Adds a new staff member.
+        *   `PATCH /staff/<name>`: Activates/deactivates a staff member.
+    *   **Protection**: All these endpoints must be protected by the `@token_required` decorator.
+    *   **Success Criteria**: All four CRUD operations work as expected when a valid token is provided and fail otherwise.
+
+5.  **Add Rate Limiting**:
+    *   **Action**: Apply Flask-Limiter to the `/auth/login` endpoint to prevent brute-force attacks (e.g., 10 requests per hour).
+    *   **Success Criteria**: Exceeding the rate limit on the login endpoint returns a `429 Too Many Requests` error.
+
+**Executor Instructions**: The login endpoint has been implemented in `backend/app/routes/auth.py`. Please proceed with testing the login endpoint functionality before moving to Step 2. Test both valid credentials (`front-desk`/`password123`) and invalid credentials to ensure proper responses.
+
 ### Test 1 Results: Docker Infrastructure Health Check ✅ COMPLETED
+... (rest of the file is unchanged)
+...
 
-**Container Status Verification**:
-- ✅ Backend container: Running on port 5000
-- ✅ Frontend container: Running on port 3000  
-- ✅ Database container: Running on port 5432
-- ✅ Redis container: Running on port 6379
-- ✅ Worker container: Fixed and now running (was restarting due to incorrect rq command)
-
-**Database Connectivity Test**:
-- ✅ PostgreSQL connection: SUCCESS (fixed DATABASE_URL from localhost to db:5432)
-- ✅ Redis connection: SUCCESS (PONG response)
-- ✅ Backend can connect to database from container
-
-**Network Communication Test**:
-- ✅ Frontend accessible: HTTP 200 response on port 3000
-- ✅ Inter-container communication: Backend can reach database and Redis
-- ✅ Environment variables: Properly configured
-
-**Issues Found and Fixed**:
-1. **Worker Container**: Fixed incorrect command from `python -m rq worker` to `rq worker`
-2. **Database Connection**: Fixed DATABASE_URL from `localhost:5432` to `db:5432` for inter-container communication
-
-### Test 2 Results: Basic API Endpoint Structure Test ✅ COMPLETED
-
-**Application Factory Test**:
-- ✅ Flask app creation: SUCCESS
-- ✅ App factory working correctly
-- ✅ All extensions initialized (SQLAlchemy, Flask-Migrate, Flask-Limiter, Flask-Mail)
-
-**Route Structure Test**:
-- ✅ All 5 blueprints registered (auth, jobs, submit, payment, analytics)
-- ✅ Blueprint URL prefixes properly configured
-- ✅ Health endpoint added and working (HTTP 200 response)
-- ✅ JSON response format working correctly
-
-**Error Handling Test**:
-- ✅ 404 handling for non-existent routes: SUCCESS
-- ✅ Proper error responses returned
-- ✅ Application doesn't crash on malformed requests
-- ✅ Error handlers available and functional
-
-**Application Structure Verification**:
-- ✅ 5 blueprints registered
-- ✅ 4 extensions loaded (SQLAlchemy, Migrate, Limiter, Mail)
-- ✅ URL map working properly
-- ✅ Error handlers available
-
-**Issues Found and Fixed**:
-1. **No Routes Defined**: Blueprints registered but no actual routes implemented yet (expected at this stage)
-2. **Health Endpoint**: Added basic health check endpoint for testing
-3. **Application Structure**: Confirmed all core Flask components are properly initialized
-
-### Technical Decisions Needed:
-1. **Database Schema**: Confirm all model relationships and constraints
-2. **File Storage Strategy**: Finalize network storage configuration
-3. **Email Service**: Choose between Office 365 SMTP or alternative
-4. **Protocol Handler**: Determine Windows registry setup approach
-5. **Backup Strategy**: Define backup frequency and retention policies
-
-### Resource Requirements:
-1. **Development Environment**: Docker Desktop, Node.js, Python 3.11+
-2. **Testing Environment**: Separate staging environment for testing
-3. **Documentation Tools**: Markdown editor, diagram creation tools
-4. **Version Control**: Git repository with proper branching strategy
-
-### Risk Mitigation:
-1. **File System Failures**: Implement comprehensive error handling and recovery
-2. **Network Issues**: Add retry logic and fallback mechanisms
-3. **User Training**: Create comprehensive training materials and procedures
-4. **Security Vulnerabilities**: Regular security audits and updates
-5. **Performance Issues**: Monitor and optimize database queries and file operations
-
-## Lessons
-
-### Technical Lessons:
-- Always implement comprehensive error handling for file operations
-- Use atomic database transactions for critical operations
-- Implement proper logging for all system actions
-- Validate all user inputs and file paths
-- Use environment variables for all configuration
-
-### Process Lessons:
-- Follow Test-Driven Development (TDD) approach
-- Document all API endpoints and their expected behavior
-- Create comprehensive user stories for all features
-- Implement continuous integration and testing
-- Maintain clear separation between development and production environments
-
-### User Experience Lessons:
-- Provide clear feedback for all user actions
-- Implement progressive disclosure for complex features
-- Use consistent visual design patterns
-- Ensure accessibility compliance from the start
-- Test all workflows with actual users
-
-## Next Steps
-
-1. **Immediate Actions**:
-   - Set up development environment
-   - Create project structure
-   - Initialize Git repository
-   - Begin Phase 1 implementation
-
-2. **Week 1 Goals**:
-   - Complete environment setup
-   - Implement basic backend foundation
-   - Create frontend foundation
-   - Set up database with initial models
-
-3. **Success Metrics**:
-   - All Docker containers running successfully
-   - Basic API endpoints responding
-   - Frontend application loading
-   - Database migrations working
-   - Authentication system functional
-
-This comprehensive plan provides a clear roadmap for building the 3D Print Management System from scratch, following all specifications in the masterplan while maintaining focus on beginner-friendly implementation and robust system architecture. 
+This comprehensive plan provides a clear roadmap for building the 3D Print Management System from scratch, following all specifications in the masterplan while maintaining focus on beginner-friendly implementation and robust system architecture.
