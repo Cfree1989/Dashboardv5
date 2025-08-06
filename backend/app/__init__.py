@@ -36,12 +36,13 @@ def create_app():
     mail.init_app(app)
     
     # Register blueprints
-    from .routes import auth, jobs, submit, payment, analytics
+    from .routes import auth, jobs, submit, payment, analytics, staff
     app.register_blueprint(auth.bp)
     app.register_blueprint(jobs.bp)
     app.register_blueprint(submit.bp)
     app.register_blueprint(payment.bp)
     app.register_blueprint(analytics.bp)
+    app.register_blueprint(staff.bp)
 
     # Initialize seed command
     from . import seed
