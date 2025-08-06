@@ -43,6 +43,8 @@ export default function SubmissionForm() {
   const [colorError, setColorError] = useState('');
   const [printerError, setPrinterError] = useState('');
   const [minChargeError, setMinChargeError] = useState('');
+  const [scalingConfirmed, setScalingConfirmed] = useState(false);
+  const [scalingError, setScalingError] = useState('');
 
   React.useEffect(() => {
     if (printMethod) {
@@ -84,7 +86,7 @@ export default function SubmissionForm() {
     // Clear previous errors
     setFirstNameError(''); setLastNameError(''); setDisciplineError('');
     setClassNumberError(''); setPrintMethodError(''); setColorError('');
-    setPrinterError(''); setMinChargeError('');
+    setPrinterError(''); setMinChargeError(''); setScalingError('');
     setEmailError(''); // reuse existing state
     setSubmitError('');
     let firstErrorField: string | null = null;
@@ -139,6 +141,11 @@ export default function SubmissionForm() {
     if (!minChargeConsent) {
       setMinChargeError('You must acknowledge the minimum charge');
       if (!firstErrorField) firstErrorField = 'minChargeConsent';
+    }
+    // Validate scaling confirmation
+    if (!scalingConfirmed) {
+      setScalingError('You must confirm that you have scaled your model correctly');
+      if (!firstErrorField) firstErrorField = 'scalingConfirmed';
     }
     // Validate file
     if (!file) {
@@ -308,9 +315,21 @@ export default function SubmissionForm() {
         </ul>
         <p className="mt-2">
           Ensure your model's dimensions are within the specified limits for the printer you plan to use.
-          If exporting as .STL or .OBJ you MUST scale it down in millimeters BEFORE exporting. If you do not the scale will not work correctly.
         </p>
-      </div>
+        <div className="flex items-start mt-3" id="scalingConfirmed">
+          <input
+            id="scalingConfirmed"
+            type="checkbox"
+            checked={scalingConfirmed}
+            onChange={e => setScalingConfirmed(e.target.checked)}
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded mt-0.5"
+          />
+          <label htmlFor="scalingConfirmed" className="ml-2 block text-sm text-gray-700">
+            If exporting as .STL or .OBJ you MUST scale it down in millimeters BEFORE exporting. If you do not the scale will not work correctly. Have you done this?
+          </label>
+        </div>
+        {scalingError && <p className="text-red-600 text-sm mt-1 ml-6">{scalingError}</p>}
+        </div>
       <div>
         <label htmlFor="printer" className="block text-sm font-medium text-gray-700">Which printer do you think your model fits on?</label>
         <select

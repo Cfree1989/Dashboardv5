@@ -409,11 +409,12 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ### Phase 3: Frontend Core Features
 - [x] Student submission interface
-- [x] **UI/UX Refinement (Submission Form) - IN PROGRESS**
+- [x] **UI/UX Refinement (Submission Form) - COMPLETE**
   - [x] Update submission form layout and styling to match mockup
   - [ ] Restructure student name field (single full name) — cancelled (retaining separate fields)
   - [x] Add print method descriptions
   - [x] Add printer dimensions information section (moved above printer selection)
+  - [x] Added scaling confirmation checkbox for STL/OBJ files
   - [x] Update form validation and error handling
   - [x] Polish visual design and responsiveness
 - [x] Staff dashboard foundation (layout, page stub, and JobList created)
