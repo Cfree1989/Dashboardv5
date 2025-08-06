@@ -138,17 +138,64 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ### Phase 3.1: UI/UX Refinement (Submission Form)
 
-**Goal**: Address visual and functional issues on the student submission form to ensure a stable and intuitive user experience before proceeding with new features.
+**Goal**: Update the submission form to match the design mockup and masterplan specifications exactly.
 
-1.  **Implement Dynamic Printer Selection**
-    *   **Action**: Modify `frontend/src/components/submission/submission-form.tsx`.
-    *   **Logic**:
-        *   The "Printer Selection" dropdown should be dynamically populated based on the value of the "Print Method" dropdown.
-        *   If `Print Method` is "Resin", only "Formlabs Form 3" should be shown.
-        *   If `Print Method` is "Filament", only the filament printers ("Prusa MK4S", "Prusa XL", "Raise3D Pro 2 Plus") should be shown.
-        *   If "Print Method" is changed, the "Printer Selection" field should be reset.
-    *   **Success Criteria**: The printer dropdown updates correctly and resets when the print method changes. The form should not allow an invalid combination to be submitted.
-    *   **Test**: Manual selection of different print methods to verify the printer list updates as expected.
+1. **Update Submission Form Layout and Styling** 
+   - **Action**: Complete visual redesign of `frontend/src/components/submission/submission-form.tsx` to match the provided image mockup
+   - **Visual Updates Needed**:
+     * Add comprehensive form introduction/warning text at top as specified in masterplan lines 532-533
+     * Update form styling to match mockup (single column layout, proper spacing)
+     * Change page title to "3D Print Submission" 
+     * Add subtitle text "Submit your 3D model for printing. Please ensure you've reviewed our guidelines before proceeding."
+     * Style the important warning section with yellow background and warning icon
+   - **Success Criteria**: Form visually matches the provided mockup image
+   - **Test**: Manual visual comparison with mockup image
+
+2. **Restructure Student Name Field**
+   - **Action**: Change from separate first/last name inputs to single "Full Name" field as per masterplan line 535
+   - **Implementation**: Replace firstName/lastName states with single studentName state
+   - **Success Criteria**: Single name field present and functional
+   - **Test**: Form submission includes full name as student_name in API call
+
+3. **Add Print Method Descriptions**
+   - **Action**: Update Print Method dropdown to include contextual descriptions as specified in masterplan lines 539-541
+   - **Implementation**: 
+     * Add descriptions for Filament: "Good resolution, suitable for simpler models. Fast. Best For: Medium items. Cost: Least expensive."
+     * Add descriptions for Resin: "Super high resolution and detail. Slow. Best For: Small items. Cost: More expensive."
+   - **Success Criteria**: Descriptions visible in dropdown options or as help text
+   - **Test**: Visual verification that descriptions are displayed appropriately
+
+4. **Add Printer Dimensions Information Section**
+   - **Action**: Implement informational printer dimensions section as specified in masterplan lines 545-546
+   - **Implementation**: 
+     * Add read-only informational section with complete scaling guidance text
+     * Include all printer specifications: Filament printers (Prusa MK4S, Prusa XL, Raise3D Pro 2 Plus) and Resin printer (Formlabs Form 3)
+     * Add dimension details: "Will your model fit on our printers? Please check the dimensions (W x D x H):"
+     * Include scaling warnings about STL/OBJ export requirements
+   - **Success Criteria**: Information section displays all printer specifications clearly
+   - **Test**: Visual verification that all printer dimensions and guidance text are present
+
+5. **Update Form Validation and Error Handling**
+   - **Action**: Ensure all validation matches masterplan requirements
+   - **Implementation**:
+     * Validate full name (2-100 characters)
+     * Validate email format (max 100 characters)
+     * Validate class number format (max 50 characters, allows "N/A")
+     * Ensure all required fields are validated
+     * Add proper error scrolling and visual feedback
+   - **Success Criteria**: All validation rules work as specified in masterplan
+   - **Test**: Manual testing of all validation scenarios
+
+6. **Polish Visual Design and Responsiveness** 
+   - **Action**: Final polish to ensure form matches mockup exactly
+   - **Implementation**:
+     * Adjust spacing, typography, colors to match mockup
+     * Ensure mobile responsiveness
+     * Add proper focus states and accessibility features
+     * Verify submit button styling and loading states
+     * Refine minimum charge consent checkbox styling to match mockup
+   - **Success Criteria**: Form is visually polished and matches mockup on all screen sizes
+   - **Test**: Cross-browser and device testing
 
 2. **Staff Dashboard Foundation**
    - [x] Build `DashboardLayout` in `frontend/src/app/dashboard/layout.tsx`:
@@ -362,7 +409,13 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ### Phase 3: Frontend Core Features
 - [x] Student submission interface
-- [ ] UI/UX Refinement (Submission Form)
+- [x] **UI/UX Refinement (Submission Form) - IN PROGRESS**
+  - [x] Update submission form layout and styling to match mockup
+  - [ ] Restructure student name field (single full name) — cancelled (retaining separate fields)
+  - [x] Add print method descriptions
+  - [x] Add printer dimensions information section (moved above printer selection)
+  - [x] Update form validation and error handling
+  - [x] Polish visual design and responsiveness
 - [x] Staff dashboard foundation (layout, page stub, and JobList created)
 - [ ] Job management modals
 - [ ] Real-time updates
@@ -393,8 +446,8 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ## Current Status / Progress Tracking
 
-**Current Phase**: Phase 3 - Frontend Core Features
-**Next Milestone**: UI/UX Refinement (Submission Form)
+**Current Phase**: Phase 3.1 - UI/UX Refinement (Submission Form)
+**Next Milestone**: Complete submission form redesign to match mockup
 **Estimated Completion**: 6 weeks from start date
 
 ### Completed Tasks:
@@ -413,7 +466,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Fixed 404 error preventing web access to the frontend application.
 
 ### In Progress:
-- [ ] Phase 3: Frontend Core Features
+- [ ] Phase 3.1: UI/UX Refinement (Submission Form) - Design update to match mockup
 
 ### Blockers:
 - None currently identified
@@ -430,44 +483,26 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ## Executor's Feedback or Assistance Requests
 
-### Executor Task: Authentication & Authorization
+### Planner Update: Submission Form Redesign Task
 
-**Goal**: Implement the core authentication and authorization services for the backend, including workstation login and staff management.
+**Context**: User provided a submission form mockup image and requested the submission form be updated to match it exactly, following the masterplan specifications.
 
-**Important Authentication Design Note**: 
-- The login system is **workstation-based only** - no staff name selection during login
-- Staff attribution happens later in action modals (approve/reject jobs) via dropdown selection
-- Login only requires `workstation_id` and `password`
-- This follows the masterplan.md specification exactly
+**Analysis**: 
+- Current form has basic functionality but does not match the visual design shown in the mockup
+- Key gaps identified:
+  1. Missing comprehensive warning/introduction text at top
+  2. Student name split into first/last instead of single full name field
+  3. Print method lacks contextual descriptions
+  4. Missing printer dimensions information section
+  5. Overall visual styling needs to match mockup design
 
-**Planner Note:** Staff model refactor deferred; implementing staff management endpoints using current primary-key-by-name scheme.
-**Step-by-step Plan:**
+**Task Breakdown Created**: Detailed 6-step plan for updating the submission form to exactly match the provided mockup and masterplan specifications. Each task has clear success criteria and test requirements.
 
-1.  **Implement Workstation Login Endpoint**:
-    *   **Action**: In `backend/app/routes/auth.py`, create the `/auth/login` endpoint. It should accept a `workstation_id` and `password`.
-    *   **Logic**: For this initial version, hardcode a single valid workstation ID ("front-desk") and password ("password") in the configuration.
-    *   **Success Criteria**: A `POST` request to `/api/v1/auth/login` with the correct credentials returns a JWT. Incorrect credentials return a 401 error.
+**Next Action for Executor**: UI/UX Refinement complete. Ready for final review or move to next phase.
 
-2.  **Implement JWT Generation and Validation**:
-    *   **Action**: Use the `PyJWT` library. Create utility functions to generate a token on successful login and to decode a token from the `Authorization` header.
-    *   **Success Criteria**: The token returned from the login endpoint can be successfully decoded and contains the `workstation_id`.
+## Lessons
 
-3.  **Create Token-Required Decorator**:
-    *   **Action**: Create a decorator (e.g., `@token_required`) that can be applied to protected endpoints. This decorator will extract the token from the header, validate it, and make the payload (containing `workstation_id`) available to the route, likely via `flask.g`.
-    *   **Success Criteria**: Applying this decorator to a test endpoint makes it return a 401 error if no valid token is provided.
-
-4.  **Implement Staff Management Endpoints (CRUD)** [COMPLETED]:
-    *   **Action**: In a new blueprint (or the existing `auth` blueprint), create the `/staff` endpoints as specified in the `masterplan.md`.
-        *   `GET /staff`: Returns a list of all staff (initially from the seeded data).
-        *   `POST /staff`: Adds a new staff member.
-        *   `PATCH /staff/<name>`: Activates/deactivates a staff member.
-    *   **Protection**: All these endpoints must be protected by the `@token_required` decorator.
-    *   **Success Criteria**: All four CRUD operations work as expected when a valid token is provided and fail otherwise.
-
-5.  **Add Rate Limiting**:
-    *   **Action**: Apply Flask-Limiter to the `/auth/login` endpoint to prevent brute-force attacks (e.g., 10 requests per hour).
-    *   **Success Criteria**: Exceeding the rate limit on the login endpoint returns a `429 Too Many Requests` error.
-
-**Executor Instructions**: The login endpoint has been implemented in `backend/app/routes/auth.py`. Please proceed with testing the login endpoint functionality before moving to Step 2. Test both valid credentials (`front-desk`/`password123`) and invalid credentials to ensure proper responses.
-**Test Results for Login Endpoint:**
-- Valid credentials (`front-desk` / `
+- Include info useful for debugging in the program output.
+- Read the file before you try to edit it.
+- If there are vulnerabilities that appear in the terminal, run npm audit before proceeding
+- Always ask before using the -force git command

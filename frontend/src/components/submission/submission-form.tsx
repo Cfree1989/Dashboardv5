@@ -34,6 +34,15 @@ export default function SubmissionForm() {
   const [fileError, setFileError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // Validation error states
+  const [firstNameError, setFirstNameError] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
+  const [disciplineError, setDisciplineError] = useState('');
+  const [classNumberError, setClassNumberError] = useState('');
+  const [printMethodError, setPrintMethodError] = useState('');
+  const [colorError, setColorError] = useState('');
+  const [printerError, setPrinterError] = useState('');
+  const [minChargeError, setMinChargeError] = useState('');
 
   React.useEffect(() => {
     if (printMethod) {
@@ -71,10 +80,78 @@ export default function SubmissionForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Prevent submission if validation errors
-    if (emailError || fileError) return;
-    setIsSubmitting(true);
+
+    // Clear previous errors
+    setFirstNameError(''); setLastNameError(''); setDisciplineError('');
+    setClassNumberError(''); setPrintMethodError(''); setColorError('');
+    setPrinterError(''); setMinChargeError('');
+    setEmailError(''); // reuse existing state
     setSubmitError('');
+    let firstErrorField: string | null = null;
+
+    // Validate first name
+    if (firstName.trim().length < 2 || firstName.trim().length > 100) {
+      setFirstNameError('First name must be between 2 and 100 characters');
+      if (!firstErrorField) firstErrorField = 'firstName';
+    }
+    // Validate last name
+    if (lastName.trim().length < 2 || lastName.trim().length > 100) {
+      setLastNameError('Last name must be between 2 and 100 characters');
+      if (!firstErrorField) firstErrorField = 'lastName';
+    }
+    // Validate email
+    if (!studentEmail.trim()) {
+      setEmailError('Email is required');
+      if (!firstErrorField) firstErrorField = 'studentEmail';
+    } else if (!/^\S+@\S+\.\S+$/.test(studentEmail) || studentEmail.length > 100) {
+      setEmailError('Please enter a valid email under 100 characters');
+      if (!firstErrorField) firstErrorField = 'studentEmail';
+    }
+    // Validate discipline
+    if (!discipline) {
+      setDisciplineError('Please select a discipline');
+      if (!firstErrorField) firstErrorField = 'discipline';
+    }
+    // Validate class number
+    if (!classNumber.trim()) {
+      setClassNumberError('Class number is required');
+      if (!firstErrorField) firstErrorField = 'classNumber';
+    } else if (classNumber.length > 50) {
+      setClassNumberError('Class number cannot exceed 50 characters');
+      if (!firstErrorField) firstErrorField = 'classNumber';
+    }
+    // Validate print method
+    if (!printMethod) {
+      setPrintMethodError('Please select a print method');
+      if (!firstErrorField) firstErrorField = 'printMethod';
+    }
+    // Validate color
+    if (!color) {
+      setColorError('Please select a color');
+      if (!firstErrorField) firstErrorField = 'color';
+    }
+    // Validate printer
+    if (!printer) {
+      setPrinterError('Please select a printer');
+      if (!firstErrorField) firstErrorField = 'printer';
+    }
+    // Validate minimum charge consent
+    if (!minChargeConsent) {
+      setMinChargeError('You must acknowledge the minimum charge');
+      if (!firstErrorField) firstErrorField = 'minChargeConsent';
+    }
+    // Validate file
+    if (!file) {
+      setFileError('Please upload a model file');
+      if (!firstErrorField) firstErrorField = 'file';
+    }
+    // If any errors, scroll to first and abort
+    if (firstErrorField) {
+      const el = document.getElementById(firstErrorField);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('student_first_name', firstName);
@@ -104,29 +181,30 @@ export default function SubmissionForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-lg mx-auto">
       <div>
-        <label htmlFor="firstName" className="block text-sm font-medium">First Name</label>
+        <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">First Name</label>
         <input
           id="firstName"
           type="text"
           value={firstName}
           onChange={e => setFirstName(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${firstNameError ? 'border-red-600' : ''}`}
         />
+        {firstNameError && <p className="text-red-600 text-sm mt-1">{firstNameError}</p>}
       </div>
-
       <div>
-        <label htmlFor="lastName" className="block text-sm font-medium">Last Name</label>
+        <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">Last Name</label>
         <input
           id="lastName"
           type="text"
           value={lastName}
           onChange={e => setLastName(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${lastNameError ? 'border-red-600' : ''}`}
         />
+        {lastNameError && <p className="text-red-600 text-sm mt-1">{lastNameError}</p>}
       </div>
       
       <div>
-        <label htmlFor="studentEmail" className="block text-sm font-medium">Student Email</label>
+        <label htmlFor="studentEmail" className="block text-sm font-medium text-gray-700">Student Email</label>
         <input
           id="studentEmail"
           type="email"
@@ -136,7 +214,7 @@ export default function SubmissionForm() {
             const isValid = /^\S+@\S+\.\S+$/.test(studentEmail);
             setEmailError(isValid ? '' : 'Please enter a valid email address');
           }}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${emailError ? 'border-red-600' : ''}`}
         />
         {emailError && (
           <p className="text-red-600 text-sm mt-1">{emailError}</p>
@@ -144,79 +222,113 @@ export default function SubmissionForm() {
       </div>
 
       <div>
-        <label htmlFor="discipline" className="block text-sm font-medium">Discipline</label>
+        <label htmlFor="discipline" className="block text-sm font-medium text-gray-700">Discipline/Major</label>
         <select
           id="discipline"
           value={discipline}
           onChange={e => setDiscipline(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${disciplineError ? 'border-red-600' : ''}`}
         >
           <option value="">Select discipline</option>
           {disciplineOptions.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+        {disciplineError && <p className="text-red-600 text-sm mt-1">{disciplineError}</p>}
       </div>
 
       <div>
-        <label htmlFor="classNumber" className="block text-sm font-medium">Class Number</label>
+        <label htmlFor="classNumber" className="block text-sm font-medium text-gray-700">Class Number (e.g., ARCH 4000 or N/A)</label>
         <input
           id="classNumber"
           type="text"
           value={classNumber}
           onChange={e => setClassNumber(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${classNumberError ? 'border-red-600' : ''}`}
         />
+        {classNumberError && <p className="text-red-600 text-sm mt-1">{classNumberError}</p>}
       </div>
 
       <div>
-        <label htmlFor="printMethod" className="block text-sm font-medium">Print Method</label>
+        <label htmlFor="printMethod" className="block text-sm font-medium text-gray-700">Print Method</label>
         <select
           id="printMethod"
           value={printMethod}
           onChange={e => setPrintMethod(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${printMethodError ? 'border-red-600' : ''}`}
         >
           <option value="">Select print method</option>
           {printMethodOptions.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+        {printMethod && (
+          <p className="text-gray-500 text-sm mt-1">
+            {printMethod === 'Filament'
+              ? 'Good resolution, suitable for simpler models. Fast. Best For: Medium items. Cost: Least expensive.'
+              : 'Super high resolution and detail. Slow. Best For: Small items. Cost: More expensive.'
+            }
+          </p>
+        )}
+        {printMethodError && <p className="text-red-600 text-sm mt-1">{printMethodError}</p>}
       </div>
 
       <div>
-        <label htmlFor="color" className="block text-sm font-medium">Color Preference</label>
+        <label htmlFor="color" className="block text-sm font-medium text-gray-700">Color Preference</label>
         <select
           id="color"
           value={color}
           onChange={e => setColor(e.target.value)}
           disabled={!printMethod}
-          className="mt-1 block w-full border rounded p-2 disabled:opacity-50"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-50 ${colorError ? 'border-red-600' : ''}`}
         >
           <option value="">Select color</option>
           {printMethod && colorOptions[printMethod].map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+        {colorError && <p className="text-red-600 text-sm mt-1">{colorError}</p>}
       </div>
 
+      <div className="bg-gray-50 border border-gray-200 rounded p-4 text-sm text-gray-600 mb-6">
+        <p className="font-medium mb-2">Will your model fit on our printers? Please check the dimensions (W × D × H):</p>
+        <ul className="list-disc ml-5 space-y-1">
+          <li>Filament:
+            <ul className="list-disc ml-5">
+              <li>Prusa MK4S: 9.84" × 8.3" × 8.6" (250 × 210 × 220 mm)</li>
+              <li>Prusa XL: 14.17" × 14.17" × 14.17" (360 × 360 × 360 mm)</li>
+              <li>Raise3D Pro 2 Plus: 12" × 12" × 23.8" (305 × 305 × 605 mm)</li>
+            </ul>
+          </li>
+          <li>Resin:
+            <ul className="list-disc ml-5">
+              <li>Formlabs Form 3: 5.7" × 5.7" × 7.3" (145 × 145 × 175 mm)</li>
+            </ul>
+          </li>
+        </ul>
+        <p className="mt-2">
+          Ensure your model's dimensions are within the specified limits for the printer you plan to use.
+          If exporting as .STL or .OBJ you MUST scale it down in millimeters BEFORE exporting. If you do not the scale will not work correctly.
+        </p>
+      </div>
       <div>
-        <label htmlFor="printer" className="block text-sm font-medium">Printer Selection</label>
+        <label htmlFor="printer" className="block text-sm font-medium text-gray-700">Which printer do you think your model fits on?</label>
         <select
           id="printer"
           value={printer}
           onChange={e => setPrinter(e.target.value)}
           disabled={!printMethod}
-          className="mt-1 block w-full border rounded p-2 disabled:opacity-50"
+          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-50 ${printerError ? 'border-red-600' : ''}`}
         >
           <option value="">Select printer</option>
           {availablePrinters.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
+        {printerError && <p className="text-red-600 text-sm mt-1">{printerError}</p>}
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center" id="minChargeConsent">
         <input
           id="minChargeConsent"
           type="checkbox"
@@ -224,13 +336,14 @@ export default function SubmissionForm() {
           onChange={e => setMinChargeConsent(e.target.checked)}
           className="h-4 w-4 text-blue-600 border-gray-300 rounded"
         />
-        <label htmlFor="minChargeConsent" className="ml-2 block text-sm">
+        <label htmlFor="minChargeConsent" className="ml-2 block text-sm text-gray-700">
           I acknowledge the minimum $3.00 charge
         </label>
       </div>
+      {minChargeError && <p className="text-red-600 text-sm mt-1 ml-6">{minChargeError}</p>}
 
       <div>
-        <label htmlFor="file" className="block text-sm font-medium">File Upload</label>
+        <label htmlFor="file" className="block text-sm font-medium text-gray-700">Upload 3D Model File (.stl, .obj, .3mf)</label>
         <input
           id="file"
           type="file"
@@ -244,6 +357,7 @@ export default function SubmissionForm() {
         {fileError && (
           <p className="text-red-600 text-sm mt-1">{fileError}</p>
         )}
+        <p className="text-gray-500 text-xs mt-1">Accepted formats: .stl, .obj, .3mf (maximum 50MB)</p>
       </div>
 
       {submitError && (
@@ -252,9 +366,9 @@ export default function SubmissionForm() {
       <button
         type="submit"
         disabled={isSubmitting || !!emailError || !!fileError}
-        className="mx-auto block bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        className="w-full bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 text-white font-semibold py-3 rounded-md disabled:opacity-50"
       >
-        {isSubmitting ? 'Submitting...' : 'Submit'}
+        {isSubmitting ? 'Submitting...' : 'Submit Print Job'}
       </button>
     </form>
   );
