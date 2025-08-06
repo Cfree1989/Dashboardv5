@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import JobCard from './job-card.tsx';
 
 interface Job {
   id: string;
@@ -38,7 +39,7 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
       }
     }
     fetchJobs();
-  }, []);
+  }, [filters.status, filters.search, filters.printer, filters.discipline]);
 
   if (loading) return <p>Loading jobs...</p>;
   if (error) return <p className="text-red-600">{error}</p>;
@@ -48,7 +49,7 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
     <ul className="space-y-4">
       {jobs.map(job => (
         <li key={job.id} className="bg-white shadow p-4 rounded">
-          {job.display_name || job.id}
+          <JobCard job={job} />
         </li>
       ))}
     </ul>

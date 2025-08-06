@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 
 const printerOptions = ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus', 'Formlabs Form 3'];
@@ -7,10 +8,25 @@ const disciplineOptions = ['Art', 'Architecture', 'Landscape Architecture', 'Int
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'ARCHIVED'];
 
 export default function DashboardPage() {
-  const [search, setSearch] = useState('');
-  const [printer, setPrinter] = useState('');
-  const [discipline, setDiscipline] = useState('');
-  const [status, setStatus] = useState(statusOptions[0]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const initialPrinter = searchParams.get('printer') || '';
+  const initialDiscipline = searchParams.get('discipline') || '';
+  const initialStatus = searchParams.get('status') || statusOptions[0];
+  const [search, setSearch] = useState(initialSearch);
+  const [printer, setPrinter] = useState(initialPrinter);
+  const [discipline, setDiscipline] = useState(initialDiscipline);
+  const [status, setStatus] = useState(initialStatus);
+  const updateFilters = (filters: {search?: string; printer?: string; discipline?: string; status?: string}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.set('search', filters.search);
+    if (filters.printer) params.set('printer', filters.printer);
+    if (filters.discipline) params.set('discipline', filters.discipline);
+    if (filters.status) params.set('status', filters.status);
+    const query = params.toString();
+    router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`);
+  };
 
   return (
     <div>

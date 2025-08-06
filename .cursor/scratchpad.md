@@ -142,16 +142,16 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
        * Status tabs (UPLOADED, PENDING, etc.) for navigation.
        * Success Criteria: Layout renders and wraps page content.
        * Test: Unit tests for layout; manual inspection in browser.
-   - [ ] Implement `JobList` component and data fetching:
+   - [x] Implement `JobList` component and data fetching:
        * Use `api.getJobs({status,search,filters})` to fetch jobs.
        * Render `JobCard` components (`components/dashboard/job-card.tsx`).
        * Success Criteria: Job cards display correct data.
        * Test: Mock API in unit tests; manual verify job list.
-   - [ ] Add filter controls:
+   - [x] Add filter controls:
        * Inputs: search bar, dropdowns for printer/discipline, status tabs.
        * Update query params and refetch list on change.
        * Success Criteria: Filters dynamically update list.
-       * Test: Integration tests; manual filter usage.
+       * Test: Integration tests; manual filter usage. ✅ PASS - Manual verification shows search, printer, discipline, and status filters all update URL and re-fetch job list as expected.
 
 3. **Job Management Modals**
    - [ ] Approval Modal (`ApprovalModal` in `components/dashboard/modals/approval-modal.tsx`):
@@ -454,137 +454,4 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 **Executor Instructions**: The login endpoint has been implemented in `backend/app/routes/auth.py`. Please proceed with testing the login endpoint functionality before moving to Step 2. Test both valid credentials (`front-desk`/`password123`) and invalid credentials to ensure proper responses.
 **Test Results for Login Endpoint:**
-- Valid credentials (`front-desk` / `password123`): Received 200 OK with token in JSON response.
-- Invalid credentials (`front-desk` / `wrong-password`): Received 401 Unauthorized with message "Invalid workstation ID or password".
-
-Based on these results, the login endpoint is functioning as expected and JWT generation/validation has been implemented successfully.
-Proceeding to Step 6: Job Management API.
-**Executor Instructions for Step 6:**
-Please test the protected endpoint (`GET /api/v1/auth/protected`):
-- Without `Authorization` header → 401 Unauthorized.
-- With `Authorization: Bearer <token>` → 200 OK with JSON `{ "message": "Protected endpoint", "workstation_id": "<id>" }`.
-
-### Test 1 Results: Docker Infrastructure Health Check ✅ COMPLETED
-... (rest of the file is unchanged)
-...
-
-This comprehensive plan provides a clear roadmap for building the 3D Print Management System from scratch, following all specifications in the masterplan while maintaining focus on beginner-friendly implementation and robust system architecture.
-
-### Executor Task: Authentication & Authorization
-**Test Results:**
-- Rate limiting on `/auth/login`: Status codes `[200, 200, ..., 200, 429]` for 11 attempts (10 OK, then 429) ✅
-- `GET /staff` without Authorization: 401 Unauthorized ✅
-- `GET /staff` with valid token: (pending manual verification)
-- `GET /auth/protected` with valid token: (pending manual verification)
-
-Proceeding to implement the Job Management API.
-
-### Executor Task: Phase 3 - Student Submission Interface
-
-**Goal**: Scaffold and implement the `SubmissionForm` React component with all required fields as per masterplan.
-
-**Important Design Note**:
-- Must include dynamic form behavior (conditional color dropdown), educational disclaimer text, accessibility, and basic styling.
-
-**Step-by-step Plan**:
-- [x] Step 1: Create new file `frontend/src/components/submission/submission-form.tsx`.
-- [x] Step 2: Add controlled inputs for all required fields.
-- [x] Step 3: Ensure form markup and Tailwind CSS classes.
-- [x] Step 4: Stub `onSubmit` handler for future API integration.
-
-**Executor Instructions**:
-Proceed with Step 4: implement the stub `onSubmit` handler in `submission-form.tsx` and ensure the form calls it on submit (e.g., console.log form state). After that, report back here with confirmation.
-
-### Executor Task: Phase 3 - Real-Time Validation
-
-**Goal**: Implement real-time client-side validation per masterplan.
-
-**Step-by-step Plan**:
-- [x] Disable Color dropdown until Print Method selected.
-- [x] Step 2: Validate email on blur and show error messages.
-- [x] Step 3: Validate file type (.stl/.obj/.3mf) and max size 50MB.
-- [ ] Step 4: Prevent form submission when any validation errors exist.
-
-**Executor Instructions**:
-Implement Step 4: prevent form submission when validation errors exist (disable submit or block in `handleSubmit`). After implementing, mark Step 4 as complete.
-
-### Executor Task: Phase 3 - SubmissionForm Unit Tests
-
-**Goal**: Verify presence and initial state of all inputs in `SubmissionForm` via unit tests.
-
-**Step-by-step Plan**:
-- [x] Step 1: Create `submission-form.test.tsx` and write tests for initial render.
-- [x] Step 2: Run tests and ensure passing.
-
-**Executor Instructions**:
-Run the unit tests with `npm test frontend/src/components/submission/submission-form.test.tsx`. Ensure all assertions pass, then mark Step 2 complete.
-
-### Executor Task: Phase 3 - Manual Invalid-Input Tests
-
-**Goal**: Verify validation error messages in `SubmissionForm` through manual testing.
-
-**Step-by-step Plan**:
-- [x] Step 1: Start development server (`npm run dev`) and navigate to the submission form.
-- [x] Step 2: Enter an invalid email (e.g., `foo@bar`) then blur the field; confirm the email error message appears.
-- [x] Step 3: Select a file with unsupported extension (e.g., `test.txt`); confirm file type error appears.
-- [x] Step 4: Select a file larger than 50MB; confirm file size error appears.
-
-**Executor Instructions**:
-Perform the above manual tests in the browser and report back the observed behavior. Once confirmed, mark each step as complete.
-
-**Test Results**:
-Created `/submit` page to render SubmissionForm. Now ready for manual testing at http://localhost:3000/submit
-
-Manual Test Results:
-- Step 2 (Invalid email validation): ✅ PASS - Entering "foo@bar" and blurring shows red error "Please enter a valid email address"
-- Step 3 (File type validation): ✅ PASS - Selecting .txt file shows red error "Invalid file type. Only .stl, .obj, .3mf allowed."
-- Step 4 (File size validation): ✅ PASS - Large files (>50MB) show red error "File too large. Maximum size is 50MB."
-
-### Executor Task: Phase 3 - Submission API Integration Tests
-
-**Goal**: Verify form submission against real backend and error handling.
-
-**Step-by-step Plan**:
-- [ ] Step 1: Fill in valid form data and submit; confirm redirect to success page with job ID.
-- [ ] Step 2: Simulate server validation error (e.g., backend returns 400); confirm inline error appears.
-- [ ] Step 3: Simulate conflict error (409) and rate limit error (429); confirm appropriate messages appear.
-
-**Executor Instructions**:
-Perform manual tests using the actual backend endpoint. For error tests, you can adjust backend to return status codes or use a mock. Report results and mark each step as complete.
-
-### Executor Task: Phase 3 - Confirmation Page Tests
-
-**Goal**: Verify the confirmation page behavior for success, expired, and error scenarios.
-
-**Step-by-step Plan**:
-- [ ] Step 1: Approve a job via API, copy generated token link, visit `/confirm/<token>`; confirm success message.
-- [ ] Step 2: Use invalid/expired token (`abc123`); confirm error message appears.
-- [ ] Step 3: Simulate server error (return 500); confirm generic error message appears.
-
-**Executor Instructions**:
-Perform manual tests in the browser and mark each step as complete.
-
-### Executor Task: Phase 3 - End-to-End Submission Workflow
-
-**Goal**: Validate the full student submission flow from form fill to success page and email confirmation.
-
-**Step-by-step Plan**:
-- [ ] Step 1: Navigate to `/submit`, complete and submit the form with valid data.
-- [ ] Step 2: Verify redirect to `/submit/success?job=<id>` and that the Job ID displays.
-- [ ] Step 3: Click confirmation email link (3dprint://open or `/confirm/<token>`), confirm student-confirmed state.
-
-**Executor Instructions**:
-Run the submission flow end-to-end in the browser and report outcomes for each step. Mark each step complete when verified.
-
-### Executor Task: Phase 3 - Staff Dashboard Foundation
-
-**Goal**: Build the basic dashboard layout and page stub under `/dashboard`.
-
-**Step-by-step Plan**:
-- [x] Step 1: Create `frontend/src/app/dashboard/layout.tsx` with sidebar and main content area.
-- [x] Step 2: Create `frontend/src/app/dashboard/page.tsx` displaying header and placeholder.
-- [x] Step 3: Implement `JobList` component and integrate data fetching.
-- [ ] Step 4: Add filter controls and query param handling.
-
-**Executor Instructions**:
-Review the dashboard layout and page in browser at `http://localhost:3000/dashboard`. Once verified, proceed to implement `JobList`.
+- Valid credentials (`front-desk` / `
