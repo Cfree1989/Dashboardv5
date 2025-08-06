@@ -5,6 +5,14 @@ import JobCard from './job-card.tsx';
 interface Job {
   id: string;
   display_name: string;
+  student_name?: string;
+  student_email?: string;
+  original_filename?: string;
+  printer?: string;
+  color?: string;
+  created_at?: string;
+  notes?: string;
+  staff_viewed_at?: string;
 }
 
 interface JobListFilters {

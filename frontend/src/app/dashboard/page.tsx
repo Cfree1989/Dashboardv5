@@ -1,73 +1,85 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 
-const printerOptions = ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus', 'Formlabs Form 3'];
-const disciplineOptions = ['Art', 'Architecture', 'Landscape Architecture', 'Interior Design', 'Engineering', 'Hobby/Personal', 'Other'];
+
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'ARCHIVED'];
 
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialSearch = searchParams.get('search') || '';
-  const initialPrinter = searchParams.get('printer') || '';
-  const initialDiscipline = searchParams.get('discipline') || '';
+  const [soundOn, setSoundOn] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
+  useEffect(() => {
+    setLastUpdated(new Date().toLocaleTimeString());
+  }, []);
+  const refreshPage = () => {
+    setLastUpdated(new Date().toLocaleTimeString());
+    window.location.reload();
+  };
   const initialStatus = searchParams.get('status') || statusOptions[0];
-  const [search, setSearch] = useState(initialSearch);
-  const [printer, setPrinter] = useState(initialPrinter);
-  const [discipline, setDiscipline] = useState(initialDiscipline);
   const [status, setStatus] = useState(initialStatus);
-  const updateFilters = (filters: {search?: string; printer?: string; discipline?: string; status?: string}) => {
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const statusDisplayNames: Record<string, string> = {
+    UPLOADED: 'Uploaded',
+    PENDING: 'Pending',
+    READYTOPRINT: 'Ready to Print',
+    PRINTING: 'Printing',
+    COMPLETED: 'Completed',
+    PAIDPICKEDUP: 'Picked Up',
+    ARCHIVED: 'Archived'
+  };
+  useEffect(() => {
+    async function fetchCounts() {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        statusOptions.map(async (s) => {
+          const params = new URLSearchParams({ status: s });
+          const res = await fetch('/api/v1/jobs?' + params.toString());
+          const data = await res.json();
+          counts[s] = (data.jobs || []).length;
+        })
+      );
+      setStatusCounts(counts);
+    }
+    fetchCounts();
+  }, []);
+  const updateStatus = (newStatus: string) => {
+    setStatus(newStatus);
     const params = new URLSearchParams();
-    if (filters.search) params.set('search', filters.search);
-    if (filters.printer) params.set('printer', filters.printer);
-    if (filters.discipline) params.set('discipline', filters.discipline);
-    if (filters.status) params.set('status', filters.status);
-    const query = params.toString();
-    router.replace(`${window.location.pathname}${query ? `?${query}` : ''}`);
+    params.set('status', newStatus);
+    router.replace(`${window.location.pathname}?${params.toString()}`);
   };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Staff Dashboard</h1>
-      <div className="mb-4 flex space-x-4">
-        <input
-          type="text"
-          placeholder="Search by student name or ID"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border rounded p-2 flex-1"
-        />
-        <select
-          value={printer}
-          onChange={e => setPrinter(e.target.value)}
-          className="border rounded p-2"
-        >
-          <option value="">All Printers</option>
-          {printerOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-        <select
-          value={discipline}
-          onChange={e => setDiscipline(e.target.value)}
-          className="border rounded p-2"
-        >
-          <option value="">All Disciplines</option>
-          {disciplineOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-      <div className="mb-4 flex space-x-2">
+      <header className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">3D Print Job Dashboard</h1>
+        <div className="flex items-center space-x-4">
+          <button onClick={() => setSoundOn(!soundOn)} className="px-3 py-1 border rounded">
+            {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
+          </button>
+          <span className="text-gray-600">Last updated: {lastUpdated}</span>
+          <button onClick={refreshPage} className="px-3 py-1 bg-blue-600 text-white rounded">
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div className="my-8 flex space-x-3">
         {statusOptions.map(s => (
           <button
             key={s}
-            onClick={() => setStatus(s)}
-            className={`px-3 py-1 rounded ${status===s? 'bg-blue-600 text-white':'bg-gray-200'}`}
+            onClick={() => updateStatus(s)}
+            className={`px-6 py-3 rounded-lg text-lg font-medium flex items-center space-x-2 ${status===s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
-            {s}
+            <span>{statusDisplayNames[s]}</span>
+            <span className="bg-gray-300 text-gray-800 text-xs rounded-full px-2 py-0.5">{statusCounts[s] || 0}</span>
           </button>
         ))}
       </div>
-      <JobList filters={{ status, search, printer, discipline }} />
+      <JobList filters={{ status }} />
     </div>
   );
 }
