@@ -280,9 +280,9 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
   - [x] Create token-required decorator
   - [x] Implement staff management endpoints (CRUD)
   - [x] Add rate limiting to auth endpoints
-- [ ] Job management API
-- [ ] Student submission API
-- [ ] Event logging system
+- [x] Job management API
+- [x] Student submission API
+- [x] Event logging system
 
 ### Phase 3: Frontend Core Features
 - [ ] Student submission interface
