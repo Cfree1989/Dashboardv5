@@ -136,6 +136,20 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
        * Success Criteria: student confirmation flow works end-to-end.
        * Test: manual link-click verification at `/confirm/<token>`.
 
+### Phase 3.1: UI/UX Refinement (Submission Form)
+
+**Goal**: Address visual and functional issues on the student submission form to ensure a stable and intuitive user experience before proceeding with new features.
+
+1.  **Implement Dynamic Printer Selection**
+    *   **Action**: Modify `frontend/src/components/submission/submission-form.tsx`.
+    *   **Logic**:
+        *   The "Printer Selection" dropdown should be dynamically populated based on the value of the "Print Method" dropdown.
+        *   If `Print Method` is "Resin", only "Formlabs Form 3" should be shown.
+        *   If `Print Method` is "Filament", only the filament printers ("Prusa MK4S", "Prusa XL", "Raise3D Pro 2 Plus") should be shown.
+        *   If "Print Method" is changed, the "Printer Selection" field should be reset.
+    *   **Success Criteria**: The printer dropdown updates correctly and resets when the print method changes. The form should not allow an invalid combination to be submitted.
+    *   **Test**: Manual selection of different print methods to verify the printer list updates as expected.
+
 2. **Staff Dashboard Foundation**
    - [x] Build `DashboardLayout` in `frontend/src/app/dashboard/layout.tsx`:
        * Header with logo and workstation display.
@@ -348,6 +362,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ### Phase 3: Frontend Core Features
 - [x] Student submission interface
+- [ ] UI/UX Refinement (Submission Form)
 - [x] Staff dashboard foundation (layout, page stub, and JobList created)
 - [ ] Job management modals
 - [ ] Real-time updates
@@ -379,7 +394,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 ## Current Status / Progress Tracking
 
 **Current Phase**: Phase 3 - Frontend Core Features
-**Next Milestone**: Staff dashboard foundation
+**Next Milestone**: UI/UX Refinement (Submission Form)
 **Estimated Completion**: 6 weeks from start date
 
 ### Completed Tasks:
@@ -395,6 +410,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Docker Compose configuration
 - [x] Docker container builds successful
 - [x] **Phase 1: Environment Setup & Foundation COMPLETE**
+- [x] Fixed 404 error preventing web access to the frontend application.
 
 ### In Progress:
 - [ ] Phase 3: Frontend Core Features

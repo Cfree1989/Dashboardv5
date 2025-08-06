@@ -11,17 +11,22 @@ const colorOptions: Record<string, string[]> = {
   ],
   Resin: ['Black','White','Gray','Clear']
 };
-const printerOptions = ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus', 'Formlabs Form 3'];
+const printerOptions: Record<string, string[]> = {
+  Filament: ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus'],
+  Resin: ['Formlabs Form 3']
+};
 
 export default function SubmissionForm() {
   const router = useRouter();
-  const [studentName, setStudentName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [studentEmail, setStudentEmail] = useState('');
   const [discipline, setDiscipline] = useState('');
   const [classNumber, setClassNumber] = useState('');
   const [printMethod, setPrintMethod] = useState('');
   const [color, setColor] = useState('');
   const [printer, setPrinter] = useState('');
+  const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
   const [minChargeConsent, setMinChargeConsent] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -29,6 +34,16 @@ export default function SubmissionForm() {
   const [fileError, setFileError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  React.useEffect(() => {
+    if (printMethod) {
+      setAvailablePrinters(printerOptions[printMethod] || []);
+      setPrinter(''); // Reset printer selection when method changes
+    } else {
+      setAvailablePrinters([]);
+      setPrinter('');
+    }
+  }, [printMethod]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] ?? null;
@@ -62,7 +77,8 @@ export default function SubmissionForm() {
     setSubmitError('');
     try {
       const formData = new FormData();
-      formData.append('student_name', studentName);
+      formData.append('student_first_name', firstName);
+      formData.append('student_last_name', lastName);
       formData.append('student_email', studentEmail);
       formData.append('discipline', discipline);
       formData.append('class_number', classNumber);
@@ -88,16 +104,27 @@ export default function SubmissionForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-lg mx-auto">
       <div>
-        <label htmlFor="studentName" className="block text-sm font-medium">Student Name</label>
+        <label htmlFor="firstName" className="block text-sm font-medium">First Name</label>
         <input
-          id="studentName"
+          id="firstName"
           type="text"
-          value={studentName}
-          onChange={e => setStudentName(e.target.value)}
+          value={firstName}
+          onChange={e => setFirstName(e.target.value)}
           className="mt-1 block w-full border rounded p-2"
         />
       </div>
 
+      <div>
+        <label htmlFor="lastName" className="block text-sm font-medium">Last Name</label>
+        <input
+          id="lastName"
+          type="text"
+          value={lastName}
+          onChange={e => setLastName(e.target.value)}
+          className="mt-1 block w-full border rounded p-2"
+        />
+      </div>
+      
       <div>
         <label htmlFor="studentEmail" className="block text-sm font-medium">Student Email</label>
         <input
@@ -179,10 +206,11 @@ export default function SubmissionForm() {
           id="printer"
           value={printer}
           onChange={e => setPrinter(e.target.value)}
-          className="mt-1 block w-full border rounded p-2"
+          disabled={!printMethod}
+          className="mt-1 block w-full border rounded p-2 disabled:opacity-50"
         >
           <option value="">Select printer</option>
-          {printerOptions.map(opt => (
+          {availablePrinters.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
