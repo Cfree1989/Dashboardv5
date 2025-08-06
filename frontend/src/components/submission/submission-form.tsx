@@ -252,7 +252,7 @@ export default function SubmissionForm() {
       <button
         type="submit"
         disabled={isSubmitting || !!emailError || !!fileError}
-        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        className="mx-auto block bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
       >
         {isSubmitting ? 'Submitting...' : 'Submit'}
       </button>
