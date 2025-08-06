@@ -3,6 +3,10 @@ from app.models import Job, Event, Staff, Payment
 
 app = create_app()
 
+@app.route('/health')
+def health_check():
+    return {'status': 'healthy', 'message': 'Flask application is running'}, 200
+
 @app.shell_context_processor
 def make_shell_context():
     return {

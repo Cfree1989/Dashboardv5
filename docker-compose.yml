@@ -8,7 +8,7 @@ services:
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql://fablab_user:fablab@localhost:5432/3d_print_system
+      - DATABASE_URL=postgresql://fablab_user:fablab@db:5432/3d_print_system
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=785c1e2dc777280ed4ae125f876662ec3ec798fb9f1fe8f
     volumes:
@@ -52,7 +52,7 @@ services:
 
   worker:
     build: ./backend
-    command: python -m rq worker --url redis://redis:6379
+    command: rq worker --url redis://redis:6379
     volumes:
       - ./backend:/app
       - ./storage:/app/storage
