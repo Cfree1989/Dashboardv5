@@ -108,32 +108,95 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 **Success Criteria**: Complete student submission form and basic staff dashboard
 
 1. **Student Submission Interface**
-   - Create comprehensive submission form
-   - Implement real-time validation
-   - Add file upload with progress indicators
-   - Create success/error pages
-   - Add email confirmation handling
+   - [ ] Create `SubmissionForm` component in `frontend/src/components/submission/submission-form.tsx` with required fields:
+       * Student Name (text), Email (email), Discipline (dropdown), Class Number (text), Print Method (dropdown), Color Preference (conditional dropdown), Printer Selection (dropdown), Minimum Charge Consent (boolean), File Upload (file input with progress).
+       * Success Criteria: All inputs render correctly with proper labels.
+       * Test: Unit tests verify presence and initial state of each input.
+   - [ ] Implement real-time client-side validation:
+       * Disable Color dropdown until Print Method selected.
+       * Validate email format on blur; file type/size on selection.
+       * Show error messages and block submission when invalid.
+       * Success Criteria: Invalid fields display errors immediately.
+       * Test: Unit tests for validation rules; manual tests with invalid inputs.
+   - [ ] Integrate API call to `POST /api/v1/submit`:
+       * Display loading indicator during submission.
+       * On 201: capture job ID and trigger redirect.
+       * On 400/409/429: display inline error messages.
+       * Success Criteria: Form submits and handles responses correctly.
+       * Test: Mock API in unit tests; manual form submission scenarios.
+   - [ ] Create success and error pages:
+       * Success Page (`/submit/success?job=<id>`) shows confirmation and instructions.
+       * Error states remain on form with error banners.
+       * Success Criteria: Redirect and error flows function as intended.
+       * Test: Manual verification of redirection and error display.
+   - [ ] Add email confirmation handling:
+       * Create student confirmation page (`frontend/src/app/confirm/[token]/page.tsx`):
+           - Parse `token` parameter from URL.
+           - POST to `/api/v1/confirm/<token>`.
+           - On 200: show success message; on 400/404/410: show error with retry option.
+           - Success Criteria: student confirmation flow works end-to-end.
+           - Test: unit tests & manual link-click verification.
 
 2. **Staff Dashboard Foundation**
-   - Create main dashboard layout
-   - Implement job listing with filtering
-   - Add basic job card components
-   - Create status-based navigation
-   - Add workstation authentication UI
+   - [ ] Build `DashboardLayout` in `frontend/src/app/dashboard/layout.tsx`:
+       * Header with logo and workstation display.
+       * Status tabs (UPLOADED, PENDING, etc.) for navigation.
+       * Success Criteria: Layout renders and wraps page content.
+       * Test: Unit tests for layout; manual inspection in browser.
+   - [ ] Implement `JobList` component and data fetching:
+       * Use `api.getJobs({status,search,filters})` to fetch jobs.
+       * Render `JobCard` components (`components/dashboard/job-card.tsx`).
+       * Success Criteria: Job cards display correct data.
+       * Test: Mock API in unit tests; manual verify job list.
+   - [ ] Add filter controls:
+       * Inputs: search bar, dropdowns for printer/discipline, status tabs.
+       * Update query params and refetch list on change.
+       * Success Criteria: Filters dynamically update list.
+       * Test: Integration tests; manual filter usage.
 
 3. **Job Management Modals**
-   - Create approval modal with file selection
-   - Implement rejection modal with reason selection
-   - Add status change modals
-   - Create notes editing interface
-   - Add staff attribution dropdowns
+   - [ ] Approval Modal (`ApprovalModal` in `components/dashboard/modals/approval-modal.tsx`):
+       * Fetch candidate files via `GET /jobs/<id>/candidate-files`.
+       * Radio list for file selection; inputs for weight and time.
+       * Display calculated cost; staff attribution dropdown.
+       * Success Criteria: Modal opens, inputs validate, submit calls `/jobs/:id/approve`.
+       * Test: Unit tests for modal state; manual approval flow.
+   - [ ] Rejection Modal (`RejectionModal` in `components/dashboard/modals/rejection-modal.tsx`):
+       * Checkbox list of rejection reasons; custom reason textarea.
+       * Staff attribution dropdown.
+       * Success Criteria: Modal validation and submit to `/jobs/:id/reject`.
+       * Test: Unit tests for validation; manual rejection flow.
+   - [ ] Status Change Modals (Printing, Complete, Pickup):
+       * Confirmation dialogs with staff attribution dropdown.
+       * Submit to respective endpoints (`/mark-printing`, `/mark-complete`, `/mark-picked-up`).
+       * Success Criteria: Status updates and UI refresh.
+       * Test: Unit tests; manual status change flows.
+   - [ ] Create notes editing interface:
+       * Inline `notes` textarea in job detail modal.
+       * PATCH `/api/v1/jobs/:id/notes` on save.
+       * Success Criteria: notes persist and display after reload.
+       * Test: unit tests & manual notes edit flow.
 
 4. **Real-time Updates**
-   - Implement auto-refresh functionality
-   - Add sound notification system
-   - Create visual alert indicators
-   - Add job age tracking
-   - Implement staff acknowledgment system
+   - [ ] Create `useAutoRefresh` hook (`frontend/src/lib/hooks/useAutoRefresh.ts`):
+       * Accepts callback and interval (default 45s).
+       * Success Criteria: Callback invoked at each interval.
+       * Test: Unit test for timing; manual observation.
+   - [ ] Audio Notification System:
+       * Integrate `Audio` API to play sound when a new job arrives.
+       * Provide toggle control in UI; persist setting.
+       * Success Criteria: Sound plays on new job; toggle persists across sessions.
+       * Test: Unit test mock Audio; manual audio verification.
+   - [ ] Visual Alert Indicators and Job Age Tracking:
+       * "NEW" pulsing badge for unreviewed jobs in `JobCard`.
+       * Age label color-coded: green <24h, yellow <48h, etc.
+       * Success Criteria: Badges and colors display correctly and update over time.
+       * Test: Storybook snapshots; manual visual test.
+   - [ ] Staff Acknowledgment Action:
+       * Add "Mark as Reviewed" button to `JobCard`.
+       * On click, POST to `/jobs/:id/review` with `reviewed: true`.
+       * Success Criteria: Badge removed and job marked reviewed.
+       * Test: Unit test; manual acknowledgment flow.
 
 ### Phase 4: Advanced Features (Week 4)
 **Success Criteria**: Complete workflow with email notifications and file management
