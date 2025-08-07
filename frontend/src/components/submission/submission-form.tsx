@@ -376,7 +376,6 @@ export default function SubmissionForm() {
         {fileError && (
           <p className="text-red-600 text-sm mt-1">{fileError}</p>
         )}
-        <p className="text-gray-500 text-xs mt-1">Accepted formats: .stl, .obj, .3mf (maximum 50MB)</p>
       </div>
 
       {submitError && (

@@ -465,6 +465,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Docker container builds successful
 - [x] **Phase 1: Environment Setup & Foundation COMPLETE**
 - [x] Fixed 404 error preventing web access to the frontend application.
+- [x] Provided pgAdmin connection instructions and removed default server registration
 
 ### In Progress:
 - [ ] Phase 3.1: UI/UX Refinement (Submission Form) - Design update to match mockup
@@ -482,24 +483,59 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Git repository initialized with proper .gitignore
 - [x] Database initialized and seeded
 
+### Execution Log: Database Connectivity Fix
+- Provided user instructions to configure pgAdmin server connection:
+  * In pgAdmin, right-click on "Servers" and select "Create" > "Server..."
+  * Under the "General" tab, set:
+    - Name: 3D Print System DB
+  * Under the "Connection" tab, set:
+    - Host: localhost
+    - Port: 5432
+    - Maintenance database: 3d_print_system
+    - Username: fablab_user
+    - Password: fablab
+  * Click "Save" to establish the connection and verify that you can see the database objects.
+
 ## Executor's Feedback or Assistance Requests
 
-### Planner Update: Submission Form Redesign Task
+### Critical Issue Analysis: Network Connectivity Problems
 
-**Context**: User provided a submission form mockup image and requested the submission form be updated to match it exactly, following the masterplan specifications.
+**Context**: User reports "Network error, please try again" on form submission and "Failed to load jobs" in dashboard.
 
-**Analysis**: 
-- Current form has basic functionality but does not match the visual design shown in the mockup
-- Key gaps identified:
-  1. Missing comprehensive warning/introduction text at top
-  2. Student name split into first/last instead of single full name field
-  3. Print method lacks contextual descriptions
-  4. Missing printer dimensions information section
-  5. Overall visual styling needs to match mockup design
+**Root Cause Analysis**:
+1. **Backend API is running** - Container up on port 5000
+2. **Frontend is running** - Next.js server accessible on port 3000  
+3. **Authentication required** - Backend `/api/v1/jobs` endpoint requires JWT token (returns "Token is missing")
+4. **API routing issue** - Frontend making calls to `/api/v1/*` but no Next.js API route handler exists
 
-**Task Breakdown Created**: Detailed 6-step plan for updating the submission form to exactly match the provided mockup and masterplan specifications. Each task has clear success criteria and test requirements.
+**Critical Problem Identified**: 
+- Frontend components are calling `/api/v1/submit` and `/api/v1/jobs` directly
+- These calls go to Next.js (port 3000) instead of Flask backend (port 5000)
+- Next.js has no API routes configured, causing network errors
+- Need API proxy configuration or base URL setup to route calls to Flask backend
 
-**Next Action for Executor**: UI/UX Refinement complete. Ready for final review or move to next phase.
+**Impact**: 
+- **BLOCKING** - Core functionality completely broken
+- Student submissions fail entirely
+- Staff dashboard cannot load any data
+- System is non-functional for primary use cases
+
+**Recommendation**: **STOP current work and fix immediately**. This is a fundamental architecture issue that blocks all API-dependent functionality. Cannot proceed with job management modals when basic API communication is broken.
+
+**Next Action Required**: Configure API routing between Next.js frontend and Flask backend.
+
+### Critical Issue Analysis: Database Connectivity Problems - RESOLVED ✅
+**Context**: User updated pgAdmin and PostgreSQL; unable to connect to the database using the default `postgres` user; when Docker is running, authentication fails; when Docker is off, connection times out.
+**Root Cause Analysis**:
+1. The default `postgres` superuser has no password configured in the Docker container; the project uses a custom user `fablab_user` with password `fablab`.
+2. When Docker is running, the Postgres container exposes port 5432 but only recognizes `fablab_user`, not `postgres`.
+3. When Docker is not running, no Postgres server is listening on port 5432, causing connection timeouts.
+**Resolution Applied**:
+- ✅ User successfully configured pgAdmin with correct credentials (`fablab_user`/`fablab`)
+- ✅ Removed conflicting PostgreSQL 17 server registration from pgAdmin
+- ✅ Verified database schema is properly set up with all required tables (alembic_version, event, job, payment, staff)
+- ✅ Confirmed Docker containers are running and database is active
+**Status**: RESOLVED - Database connectivity fully functional
 
 ## Lessons
 
