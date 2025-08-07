@@ -51,13 +51,13 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - [x] Error pages and edge cases
 
 ### Phase 4: Advanced Features 🔄 IN PROGRESS
-- [ ] **Email service integration** - Flask-Mail, templates, background tasks
+- [x] **Email service integration** - Flask-Mail, templates, token-based confirmation, approval email
 - [ ] **File management system** - Upload processing, metadata.json, file movement
 - [ ] **Payment & pickup workflow** - Cost calculation, payment recording, pickup confirmation
 - [ ] **Protocol handler development** - SlicerOpener.py for direct file opening
 
 ### Phase 5: Job Management Modals 📋 PENDING
-- [ ] **Approval Modal** - File selection, weight/time inputs, cost calculation
+- [ ] **Approval Modal** - File selection, weight/time inputs, cost calculation (next)
 - [ ] **Rejection Modal** - Rejection reasons, custom messages
 - [ ] **Status Change Modals** - Printing, Complete, Pickup confirmations  
 - [ ] **Notes Editing** - Inline notes interface
@@ -76,7 +76,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Current Status
 
 **Current Phase**: Phase 4 - Advanced Features  
-**Next Milestone**: Email Service Integration  
+**Next Milestone**: Phase 5.1 - Approval Modal (UX + inputs)
 **Overall Progress**: ~60% complete
 
 ### Recently Completed Achievements:
@@ -85,15 +85,24 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ✅ **Professional UI/UX** - Application looks and feels like a modern SaaS product  
 ✅ **Responsive Design** - Works perfectly on mobile, tablet, and desktop  
 ✅ **Enhanced Accessibility** - Proper focus states, ARIA labels, keyboard navigation  
+✅ **Email Integration (Phase 4.1)** - Flask-Mail, templates, token service, approval+confirmation endpoints, and frontend Approve wiring
 
 ### Active Development:
 ✅ **Tab Count Authentication Fix** - Fixed dashboard tabs not showing job counts due to missing authentication headers  
-🔄 **Phase 4.1: Email Service Integration** - Implementing Flask-Mail with templates and background processing
+✅ **Phase 4.1: Email Service Integration** - Implemented Flask-Mail, templates, confirmation token service, approval endpoint, and frontend approval wiring
 
 ## Project Status Board
 
 - [x] Remove sound toggle and test button from dashboard UI
   - Success criteria: Component deleted, imports removed, build passes with no lint errors
+- [x] Executor: Implement backend approval + confirmation flow
+  - Success criteria: `POST /api/v1/jobs/:id/approve` sets PENDING, sends email with token link; `POST /api/v1/submit/confirm/<token>` sets READYTOPRINT; tests pass
+- [x] Executor: Wire frontend Approve to backend endpoint
+  - Success criteria: Clicking Approve calls API, removes job from UPLOADED list on success; frontend builds cleanly
+- [ ] Planner: Scope Admin Page (settings and controls)
+  - Success criteria: Define MVP features list (Staff Management, Admin Overrides, System Health/Audit, Archival controls, Background sound config), UI sections, and required API mappings; produce a short acceptance checklist
+- [ ] Planner: Scope Analytics/Stats Page (`/analytics`)
+  - Success criteria: Define overview cards and trend charts, map to `/analytics/overview`, `/analytics/trends`, `/analytics/resources`, and `/stats` endpoints; outline data shapes and loading states
 
 ## Executor's Feedback or Assistance Requests
 
@@ -107,38 +116,37 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 **Goal**: Implement reliable email notifications for job confirmations and status updates  
 **Estimated Time**: 60 minutes  
-**Priority**: HIGH - Completes core user workflow
+**Priority**: HIGH - Completed
 
 ### Detailed Sub-Tasks:
 
-1. **Configure Flask-Mail Setup (15 min)**
+1. **Configure Flask-Mail Setup (done)**
    - Add Flask-Mail to requirements.txt
    - Configure SMTP settings in app configuration
    - Set up environment variables for email credentials
    - Initialize Mail instance in app factory
 
-2. **Create Email Templates (20 min)**
+2. **Create Email Templates (done)**
    - Design `submission_confirmation.html` template
    - Design `status_update.html` template  
    - Include professional styling and branding
    - Add responsive email design
 
-3. **Implement EmailService Class (15 min)**
+3. **Implement EmailService Class (done)**
    - Create `backend/app/services/email_service.py`
    - Methods: `send_confirmation_email()`, `send_status_update()`
    - Template rendering with job data
    - Error handling for SMTP failures
 
-4. **Add Background Task Processing (10 min)**
+4. **Add Background Task Processing (deferred)**
    - Configure Celery with Redis broker
    - Create email task functions
    - Add retry logic for failed sends
    - Implement proper logging
 
 **Success Criteria**: 
-- Students receive confirmation emails upon job submission
-- Staff can trigger email resends through API
-- All email sends are logged and tracked
+- Approval email sent with token link; student can confirm via `/confirm/[token]`
+- Staff can trigger approval; events logged; tests green
 
 ## Next Steps Priority Queue
 

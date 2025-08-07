@@ -49,7 +49,7 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         const data = await res.json();
-        setJobs(data.jobs || []);
+        setJobs(Array.isArray(data) ? data : (data.jobs || []));
       } catch (err) {
         setError('Failed to load jobs');
       } finally {
@@ -59,9 +59,25 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
     fetchJobs();
   }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
 
-  const handleApprove = (jobId: string) => {
-    console.log("Approve job:", jobId);
-    // TODO: Implement approval logic
+  const handleApprove = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      const res = await fetch(`/api/v1/jobs/${jobId}/approve`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error('Approval failed');
+      }
+      // Remove approved job from current list (status changed to PENDING)
+      setJobs(prev => prev.filter(j => j.id !== jobId));
+    } catch (e) {
+      setError('Failed to approve job');
+    }
   };
 
   const handleReject = (jobId: string) => {

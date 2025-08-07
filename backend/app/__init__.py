@@ -28,6 +28,9 @@ def create_app():
     app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
     app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
     app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+    # Optional: disable sending in tests if no config is provided
+    if app.config.get('TESTING'):
+        app.config.setdefault('MAIL_SUPPRESS_SEND', True)
     
     # Initialize extensions
     db.init_app(app)

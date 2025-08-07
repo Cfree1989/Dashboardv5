@@ -5,6 +5,8 @@ import os, hashlib, json
 from datetime import datetime
 from uuid import uuid4
 from app.services.event_service import log_event
+from app.services.email_service import send_status_update_email, send_approval_email
+from app.services.token_service import generate_confirmation_token, verify_confirmation_token
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
@@ -58,10 +60,12 @@ def submit_job():
         with open(file_path, 'wb') as out_f:
             out_f.write(file_bytes)
 
-        # Combine separate first and last name fields into student_name
-        first_name = request.form.get('student_first_name')
-        last_name = request.form.get('student_last_name')
-        student_name = f"{first_name or ''} {last_name or ''}".strip()
+        # Determine student name: prefer single field, else combine first/last
+        student_name = request.form.get('student_name')
+        if not student_name:
+            first_name = request.form.get('student_first_name')
+            last_name = request.form.get('student_last_name')
+            student_name = f"{first_name or ''} {last_name or ''}".strip()
 
         # Create metadata JSON
         metadata = {
@@ -71,7 +75,7 @@ def submit_job():
             'class_number': request.form.get('class_number'),
             'printer': request.form.get('printer'),
             'color': request.form.get('color'),
-            'material': request.form.get('print_method'),
+            'material': request.form.get('material') or request.form.get('print_method'),
             'status': 'UPLOADED',
             'created_at': datetime.utcnow().isoformat()
         }
@@ -93,7 +97,7 @@ def submit_job():
             file_hash=file_hash,
             printer=request.form.get('printer'),
             color=request.form.get('color'),
-            material=request.form.get('print_method')
+            material=request.form.get('material') or request.form.get('print_method')
         )
         db.session.add(job)
         db.session.commit()
@@ -101,9 +105,37 @@ def submit_job():
         # Event logging
         log_event(job.id, 'JobCreated', {'original_filename': job.original_filename})
 
+        # Fire-and-forget best-effort notification (optional)
+        try:
+            send_status_update_email(job, 'UPLOADED')
+        except Exception:
+            pass
+
         return jsonify(job.to_dict()), 201
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         print(tb)
         return jsonify({'error': str(e), 'traceback': tb}), 500 
+
+
+@bp.route('/confirm/<token>', methods=['POST'])
+def confirm_job(token: str):
+    try:
+        job_id = verify_confirmation_token(token)
+    except ValueError as ve:
+        reason = str(ve)
+        if reason == 'expired':
+            return jsonify({'message': 'Confirmation link expired', 'reason': 'expired'}), 410
+        return jsonify({'message': 'Invalid confirmation token'}), 400
+
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({'message': 'Job not found'}), 404
+
+    # Transition to READYTOPRINT
+    job.student_confirmed = True
+    job.status = 'READYTOPRINT'
+    db.session.commit()
+    log_event(job.id, 'StudentConfirmed', {'status': job.status})
+    return jsonify(job.to_dict()), 200

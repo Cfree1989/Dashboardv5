@@ -33,11 +33,11 @@ The system will cater primarily to two user roles:
 **Advanced Operational Features**:
 8.  **Enhanced operational dashboard**: Real-time auto-updating **Next.js interface** with comprehensive staff alerting:
     *   **Auto-updating data**: Dashboard refreshes automatically every 45 seconds without manual intervention
-    *   **Sound notifications**: Configurable audio alerts when new jobs are uploaded with browser Audio API and fallback handling
+    *   **Background audio notifications**: A lightweight background sound plays automatically when new jobs are submitted; no on-page toggle. Future configuration will be exposed in the admin settings.
     *   **Visual alert indicators**: Persistent "NEW" badges with pulsing animations for unreviewed jobs until staff acknowledgment
     *   **Job age tracking**: Human-readable time elapsed display ("2d 4h ago") with color-coded prioritization (green < 24h, yellow < 48h, orange < 72h, red > 72h)
     *   **Staff acknowledgment system**: "Mark as Reviewed" functionality to clear visual alerts
-    *   **Debug panel**: Development interface showing current state, sound settings, and system health
+    *   **Debug panel**: Development interface showing current state and system health
     *   **Last updated indicator**: Timestamp showing when dashboard data was last refreshed
 9.  **Multi-computer support**: System can run on up to two staff computers, as long as both use the same shared storage and database.
 10. **Event Logging**: **Immutable event log** tracking all changes with full audit trail tied to the **attributed staff member**.
@@ -73,10 +73,10 @@ The system will cater primarily to two user roles:
     -   **Tailwind CSS**: Utility-first styling with custom animations and themes
     -   **shadcn/ui**: Complete UI component library based on Radix UI primitives
     -   **React Context**: Advanced state management for dashboard data and real-time updates
-    -   **Sound System**: Browser Audio API with fallback handling for notifications
+    -   **Sound System**: Background-only audio using the Browser Audio API; plays on new job submissions without UI toggles. Admin configuration to be added later.
 -   **Advanced Dashboard Features**:
     -   **Real-time Updates**: Auto-refresh every 45 seconds with visual and audio notifications
-    -   **Sound Notifications**: Configurable audio alerts for new job uploads with browser compatibility
+    -   **Sound Notifications**: Background sound plays on new job uploads (no user-facing toggle); future admin page will control enable/disable and volume.
     -   **Visual Alert System**: "NEW" badges and pulsing animations for unreviewed jobs
     -   **Job Age Tracking**: Color-coded time elapsed display with human-readable formatting
     -   **Interactive Modals with User Attribution**: All state-changing modals (approve, reject, etc.) will require the user to select their name from a dropdown before proceeding, ensuring every action is logged with the correct user.
@@ -173,7 +173,7 @@ This project will adhere to simplicity and clarity while building a robust found
 #### 2.4.2 Advanced UX Features
 **Enhanced Operational Dashboard UX**:
     *   **Real-time Updates**: Dashboard data refreshes automatically every 45 seconds without user intervention
-    *   **Audio Feedback**: Sound notifications play when new jobs are uploaded, with user-controlled toggle
+    *   **Audio Feedback**: A background sound plays when new jobs are uploaded (no on-page toggle). Future admin settings will allow configuring this behavior.
     *   **Visual Alert System**: Unreviewed jobs display prominent "NEW" badges with pulsing highlight borders until acknowledged
     *   **Temporal Awareness**: Job age display with human-readable format ("2d 4h ago") and color-coded prioritization
     *   **Staff Acknowledgment**: Clear "Mark as Reviewed" functionality to manage alert states
@@ -193,6 +193,29 @@ This project will adhere to simplicity and clarity while building a robust found
 - Maintain minimum touch target size (44px minimum)
 - Use professional color palette with sufficient contrast ratios
 - Follow responsive design principles for all screen sizes
+
+#### 2.4.4 Admin Dashboard UX
+- **Placement**: Initially a protected "Admin" section within the staff dashboard; can be split into a dedicated `/admin` page in a later iteration.
+- **Access**: Requires valid workstation JWT. Admin actions display explicit confirmation dialogs and show attribution (`staff_name`, `workstation_id`).
+- **Core Sections**:
+  - **Settings**: Background sound configuration (enable/disable, volume); environment banner; basic system info. No per-user toggles.
+  - **Staff Management**: List, add, deactivate/reactivate staff; reflects instantly in attribution dropdowns. Maps to `/staff` endpoints.
+  - **Admin Overrides**: Force unlock, force confirm, change status, mark failed; guarded by confirmations and reason fields. Maps to `/jobs/<id>/admin/*` endpoints.
+  - **Data Management**: Archival and pruning controls with retention days and preview counts. Maps to `/admin/archive` and `/admin/prune`.
+  - **System Health & Integrity**: Start audit, view last report, delete orphaned files. Maps to `/admin/audit/*`.
+  - **Email Tools**: Resend emails with visible cooldowns and rate-limit feedback. Maps to `/jobs/<id>/admin/resend-email`.
+- **UI States**: Loading spinners for long actions, empty-state messages, error banners with retry, success toasts.
+- **Auditability**: All actions log `Event` entries and show last action metadata inline (who/when).
+
+#### 2.4.5 Analytics Dashboard UX
+- **Route**: `/analytics` (App Router page).
+- **Data Sources**: `/analytics/overview`, `/analytics/trends`, `/analytics/resources`, `/stats`, `/stats/detailed`.
+- **Overview Cards**: Total submissions, in-queue by status, average turnaround, storage usage vs. limit, recent rejections.
+- **Trend Charts**: Submissions and approvals over time; printing throughput; average lead time; filters for period (7/30/90 days) and discipline/printer.
+- **Resource Metrics**: Printer utilization (stacked bars by day), material consumption (filament/resin grams), queue age distribution.
+- **Financial Summary**: Revenue totals by period, average ticket size, payment counts; link to export flow.
+- **Filters & Controls**: Days/printer/discipline selectors; server-side filtering mapped to query params.
+- **States**: Loading skeletons, empty-data placeholders, error with retry; last-refreshed timestamp.
 
 
 #### 2.4.1 Required Submission Form Introduction Text
@@ -840,7 +863,7 @@ To ensure system stability and simplify management, the system is designed with 
 **Frontend Components:**
 - **Next.js Application**: Modern App Router architecture with TypeScript, Tailwind CSS, and comprehensive shadcn/ui component library
 - **Authentication Flow**: Simple login form for workstations, JWT storage in browser, and inclusion in subsequent API requests.
-- **Dashboard Interface**: Real-time updating dashboard with sound notifications, visual alerts, job age tracking, and advanced filtering
+- **Dashboard Interface**: Real-time updating dashboard with background-only sound on new submissions, visual alerts, job age tracking, and advanced filtering
 - **Interactive Workflows**: Sophisticated approval/rejection modals, inline notes editing, and comprehensive form validation
 - **Student Submission Interface**: Dynamic form with contextual validation, progressive disclosure, and educational content
 
