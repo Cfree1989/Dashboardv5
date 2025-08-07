@@ -1,5 +1,7 @@
 "use client";
 import React, { useState } from 'react';
+import { formatDistanceToNow } from "date-fns";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } from "lucide-react";
 
 interface Job {
   id: string;
@@ -14,110 +16,140 @@ interface Job {
   staff_viewed_at?: string;
 }
 
-export default function JobCard({ job }: { job: Job }) {
+interface JobCardProps {
+  job: Job;
+  currentStatus?: string;
+  onApprove?: (jobId: string) => void;
+  onReject?: (jobId: string) => void;
+  onMarkReviewed?: (jobId: string) => void;
+}
+
+export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   
-  const getTimeAgo = (dateString?: string) => {
-    if (!dateString) return 'recently';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays > 365) return 'over 1 year ago';
-    if (diffInDays > 30) return `${Math.floor(diffInDays / 30)} months ago`;
-    if (diffInDays > 1) return `${diffInDays} days ago`;
-    return 'recently';
+  const isUnreviewed = !job.staff_viewed_at;
+
+  // Calculate job age and determine color
+  const getAgeColor = (createdAt: string) => {
+    const ageInHours = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60);
+
+    if (ageInHours < 24) return "text-green-600";
+    if (ageInHours < 48) return "text-yellow-600";
+    if (ageInHours < 72) return "text-orange-600";
+    return "text-red-600";
   };
 
+  const ageColor = job.created_at ? getAgeColor(job.created_at) : "text-gray-500";
+
+  // Format time elapsed
+  const timeElapsed = job.created_at ? formatDistanceToNow(new Date(job.created_at), { addSuffix: true }) : 'recently';
+
   return (
-    <div className="relative border border-gray-200 rounded-lg p-4 bg-white">
-      {/* NEW Badge and Mark as Reviewed */}
-      <div className="flex justify-between items-start mb-2">
-        {!job.staff_viewed_at && (
-          <span className="inline-block bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded">
-            NEW
-          </span>
+    <div
+      className={`
+      bg-white rounded-xl shadow-sm border transition-all
+      ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200"}
+    `}
+    >
+      <div className="p-4">
+        {isUnreviewed && (
+          <div className="flex items-center justify-between mb-3">
+            <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
+            <button
+              onClick={() => onMarkReviewed?.(job.id)}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              Mark as Reviewed
+            </button>
+          </div>
         )}
-        {!job.staff_viewed_at && (
-          <button className="text-gray-400 hover:text-gray-600 text-sm flex items-center">
-            👁 Mark as Reviewed
-          </button>
-        )}
-        <span className="text-red-500 text-sm ml-auto">
-          {getTimeAgo(job.created_at)}
-        </span>
-      </div>
 
-      {/* Student Name Title */}
-      <h2 className="text-lg font-bold text-gray-900 mb-1">
-        {job.student_name || job.display_name || job.id}
-      </h2>
-
-      {/* File Name */}
-      <p className="text-gray-700 mb-3">{job.original_filename || 'Unknown file'}</p>
-
-      {/* Student Info Row */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center text-gray-600">
-          <span className="mr-1">👤</span>
-          <span>{job.student_name || 'Unknown'}</span>
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-lg font-semibold text-gray-900 truncate">{job.student_name || job.display_name || job.id}</h3>
+          <span className={`text-sm ${ageColor} font-medium`}>{timeElapsed}</span>
         </div>
-        <div className="flex items-center text-gray-600">
-          <span className="mr-1">📧</span>
-          <span>{job.student_email || 'No email'}</span>
-        </div>
-      </div>
 
-      {/* Printer and Color Row */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex items-center text-gray-600">
-          <span className="mr-1">🖨️</span>
-          <span>{job.printer || 'Not assigned'}</span>
-        </div>
-        <div className="flex items-center text-gray-600">
-          <span className="mr-1">🎨</span>
-          <span>{job.color || 'No color'}</span>
-        </div>
-      </div>
+        <p className="text-gray-600 text-sm mb-3 truncate">{job.original_filename || job.display_name || 'Unknown file'}</p>
 
-      {/* Notes Indicator */}
-      {job.notes && (
-        <div className="mb-3">
-          <span className="text-gray-600 text-sm flex items-center">
-            📝 Has notes
-          </span>
-        </div>
-      )}
-
-      {/* Actions Row */}
-      <div className="flex justify-between items-center">
-        <button 
-          onClick={() => setShowMore(!showMore)}
-          className="text-gray-500 hover:text-gray-700 text-sm"
-        >
-          Show More
-        </button>
-        <div className="flex space-x-2">
-          <button className="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded flex items-center">
-            ✅ Approve
-          </button>
-          <button className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded flex items-center">
-            ❌ Reject
-          </button>
-        </div>
-      </div>
-
-      {/* Expandable Details */}
-      {showMore && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="text-sm text-gray-600 space-y-1">
-            <p><strong>Job ID:</strong> {job.id}</p>
-            {job.notes && <p><strong>Notes:</strong> {job.notes}</p>}
-            <p><strong>Submitted:</strong> {job.created_at ? new Date(job.created_at).toLocaleString() : 'Unknown'}</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="flex items-center text-sm text-gray-500">
+            <User className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.student_name || 'Unknown'}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-500">
+            <Mail className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.student_email || 'No email'}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-500">
+            <Printer className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.printer || 'Not set'}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-500">
+            <Palette className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.color || 'Not set'}</span>
           </div>
         </div>
-      )}
+
+        {/* Notes indicator when collapsed */}
+        {job.notes && !showMore && (
+          <div className="flex items-center text-xs text-gray-500 mt-2">
+            <FileText className="w-3 h-3 mr-1" />
+            <span className="truncate">Has notes</span>
+          </div>
+        )}
+
+        {showMore && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Additional Details</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-gray-500">Job ID:</span>
+                <p className="text-gray-900">{job.id}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Created:</span>
+                <p className="text-gray-900">{job.created_at ? new Date(job.created_at).toLocaleString() : 'Unknown'}</p>
+              </div>
+            </div>
+            {job.notes && (
+              <div className="mt-3">
+                <span className="text-gray-500 text-sm">Notes:</span>
+                <div className="bg-gray-50 p-2 rounded border mt-1">
+                  <p className="whitespace-pre-wrap text-sm text-gray-900">{job.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-4">
+          <button onClick={() => setShowMore(!showMore)} className="text-sm text-gray-500 hover:text-gray-700">
+            {showMore ? "Show Less" : "Show More"}
+          </button>
+
+          <div className="flex space-x-2">
+            {currentStatus === "UPLOADED" && (
+              <>
+                <button
+                  onClick={() => onApprove?.(job.id)}
+                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                >
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Approve
+                </button>
+                <button
+                  onClick={() => onReject?.(job.id)}
+                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
