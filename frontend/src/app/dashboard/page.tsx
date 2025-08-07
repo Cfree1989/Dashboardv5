@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
-import { SoundToggle } from '../../components/dashboard/sound-toggle';
 import { LastUpdated } from '../../components/dashboard/last-updated';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
@@ -12,7 +11,6 @@ const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPL
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [soundOn, setSoundOn] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   useEffect(() => {
@@ -68,7 +66,6 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">3D Print Job Dashboard</h1>
         <div className="flex items-center space-x-4">
-          <SoundToggle soundEnabled={soundOn} onToggle={() => setSoundOn(!soundOn)} />
           <LastUpdated lastUpdated={lastUpdated} />
           <button 
             onClick={refreshPage} 

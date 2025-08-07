@@ -45,7 +45,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const ageColor = job.created_at ? getAgeColor(job.created_at) : "text-gray-500";
 
   // Format time elapsed
-  const timeElapsed = job.created_at ? formatDistanceToNow(new Date(job.created_at), { addSuffix: true }) : 'recently';
+  const timeElapsed = job.created_at ? formatDistanceToNow(new Date(job.created_at)) + ' ago' : 'recently';
 
   const handleApprove = async () => {
     setIsApproving(true);
