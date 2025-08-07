@@ -18,6 +18,8 @@ def test_submit_job_success(client):
     assert resp.status_code == 201
     json = resp.get_json()
     assert json['student_name'] == 'Charlie'
+    # short_id should exist and be short
+    assert 'short_id' in json and isinstance(json['short_id'], str) and 6 <= len(json['short_id']) <= 12
 
 
 def test_submit_missing_file(client):

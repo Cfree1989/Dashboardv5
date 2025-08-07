@@ -67,6 +67,14 @@ def submit_job():
 
         # Generate job ID and standardized filenames
         new_id = uuid4().hex
+        # Generate a human-friendly short id (ensure uniqueness by retrying with more chars if needed)
+        for length in (6, 7, 8, 9, 10, 11, 12):
+            candidate_short = new_id[:length]
+            if not Job.query.filter_by(short_id=candidate_short).first():
+                short_id = candidate_short
+                break
+        else:
+            short_id = new_id[:12]
         ext = file.filename.rsplit('.', 1)[1].lower()
         # Determine student name: prefer single field, else combine first/last
         student_name = request.form.get('student_name')
@@ -83,7 +91,7 @@ def submit_job():
         normalized_color = _normalize_simple_label(raw_color or 'Color')
 
         # Short/simple Job ID
-        simple_id = new_id[:6]
+        simple_id = short_id
         standardized_base = f"{normalized_student}_{normalized_method}_{normalized_color}_{simple_id}"
         standardized_name = f"{standardized_base}.{ext}"
         file_path = os.path.join(storage_dir, standardized_name)
@@ -120,6 +128,7 @@ def submit_job():
         # Persist job record
         job = Job(
             id=new_id,
+            short_id=short_id,
             student_name=student_name,
             student_email=request.form.get('student_email'),
             discipline=request.form.get('discipline'),

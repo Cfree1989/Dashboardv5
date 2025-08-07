@@ -4,6 +4,7 @@ import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } fro
 
 interface Job {
   id: string;
+  short_id?: string;
   display_name?: string;
   student_name?: string;
   student_email?: string;
@@ -140,7 +141,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         )}
 
         <div className="flex justify-between items-start mb-3">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">{job.student_name || job.display_name || (job.id?.slice(0,8) + '…')}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 truncate">{job.student_name || job.display_name || (job.short_id || job.id?.slice(0,8) + '…')}</h3>
           <span className={`text-sm ${ageColor} font-medium`}>{timeElapsed}</span>
         </div>
 
@@ -175,7 +176,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-gray-500">Job ID:</span>
-                <p className="text-gray-900">{job.id?.slice(0,8)}…</p>
+                <p className="text-gray-900">{job.short_id || (job.id?.slice(0,8) + '…')}</p>
               </div>
               <div>
                 <span className="text-gray-500">Created:</span>

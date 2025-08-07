@@ -4,6 +4,7 @@ import uuid
 
 class Job(db.Model):
     id = db.Column(db.String, primary_key=True, default=lambda: uuid.uuid4().hex)
+    short_id = db.Column(db.String(12), unique=True, index=True, nullable=True)
     student_name = db.Column(db.String(100), nullable=False)
     student_email = db.Column(db.String(100), nullable=False)
     discipline = db.Column(db.String(50), nullable=False)
@@ -51,6 +52,7 @@ class Job(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'short_id': self.short_id,
             'student_name': self.student_name,
             'student_email': self.student_email,
             'discipline': self.discipline,
