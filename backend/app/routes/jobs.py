@@ -50,6 +50,19 @@ def get_job_events(job_id):
     events = job.events
     return jsonify([e.to_dict() for e in events]), 200
 
+
+@bp.route('/<job_id>/candidate-files', methods=['GET'])
+@token_required
+def candidate_files(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    # Stub implementation: return at least the originally uploaded filename
+    files = []
+    if job.original_filename:
+        files.append(job.original_filename)
+    return jsonify({ 'files': files }), 200
+
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
 def delete_job(job_id):

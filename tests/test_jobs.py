@@ -168,3 +168,40 @@ def test_review_toggle_persists_and_logs_event(client, token, app):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data['staff_viewed_at'] is None
+
+    # Verify events include JobReviewed and JobReviewCleared
+    resp_events = client.get(
+        f'/api/v1/jobs/{job.id}/events',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp_events.status_code == 200
+    events = [e['event_type'] for e in resp_events.get_json()]
+    assert 'JobReviewed' in events
+    assert 'JobReviewCleared' in events
+
+
+def test_review_status_guard(client, token, app):
+    job = create_job(app)
+    # Move job to non-UPLOADED status
+    with app.app_context():
+        job.status = 'PENDING'
+        db.session.commit()
+    client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers={'Authorization': f'Bearer {token}'})
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/review',
+        json={'reviewed': True, 'staff_name': 'Reviewer'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+
+def test_candidate_files_stub_returns_original_filename(client, token, app):
+    job = create_job(app)
+    resp = client.get(
+        f'/api/v1/jobs/{job.id}/candidate-files',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert 'files' in data
+    assert job.original_filename in data['files']

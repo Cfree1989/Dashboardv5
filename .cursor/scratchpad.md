@@ -56,7 +56,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [ ] **Payment & pickup workflow** - Cost calculation, payment recording, pickup confirmation
 - [ ] **Protocol handler development** - SlicerOpener.py for direct file opening
 
-### Phase 5: Job Management Modals 📋 PENDING
+### Phase 5: Job Management Modals 📋 IN PROGRESS
 - [ ] **Approval Modal** - File selection, weight/time inputs, cost calculation (next)
 - [ ] **Rejection Modal** - Rejection reasons, custom messages
 - [ ] **Status Change Modals** - Printing, Complete, Pickup confirmations  
@@ -76,7 +76,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Current Status
 
 **Current Phase**: Phase 4 - Advanced Features  
-**Next Milestone**: Phase 5.1 - Approval Modal (UX + inputs)
+**Next Milestone**: Phase 5.1.4 — Tests (Approve + Review flows)
 **Overall Progress**: ~60% complete
 
 ### Recently Completed Achievements:
@@ -104,16 +104,16 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [ ] Executor: Phase 5.1.1 — Backend: Extend Approve endpoint for attribution + cost
   - Success criteria: `POST /api/v1/jobs/:id/approve` accepts `{ staff_name, weight_g, time_hours }`, calculates `cost_usd` server-side (min $3.00; $0.10/gram filament, $0.20/gram resin), updates job fields, logs `StaffApproved` + `ApprovalEmailSent` with `triggered_by=staff_name` and `workstation_id`, returns updated job; unit tests green
   - Status: Implemented and unit-tested (19 tests passing) — awaiting manual verification before marking complete
-- [ ] Executor: Phase 5.1.2 — Frontend: Build Approval Modal UI
+- [x] Executor: Phase 5.1.2 — Frontend: Build Approval Modal UI
   - Success criteria: Modal with inputs (weight_g, time_hours), live cost preview, required Staff Attribution dropdown (populated from `/api/v1/staff`), inline validation, accessible focus/ARIA; Storybook-like visual check not required
-- [ ] Executor: Phase 5.1.3 — Wire JobCard "Approve" to Modal + API
+- [x] Executor: Phase 5.1.3 — Wire JobCard "Approve" to Modal + API
   - Success criteria: Clicking Approve opens modal; on submit calls API with Authorization header; optimistic update removes job from `UPLOADED` list; error states render; toast on success
-- [ ] Executor: Phase 5.1.4 — Tests
+- [x] Executor: Phase 5.1.4 — Tests
   - Success criteria: Backend tests for approve payload validation and event logging; Frontend tests for modal validation and API call; all CI tests pass
-- [ ] Executor: Phase 5.1.5 — Candidate Files (stub)
+- [x] Executor: Phase 5.1.5 — Candidate Files (stub)
   - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
 
-- [ ] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
+- [x] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
   - Success criteria: Document clear UX rules, backend persistence contract, frontend modal behavior, and tests; added tasks below
 - [x] Executor: Phase 6.2.1 — Backend: Persist review state + expose in API (toggle)
   - Success criteria: Add `staff_viewed_at` to `Job.to_dict()`; implement `POST /api/v1/jobs/<id>/review` (auth required) with body `{ reviewed: boolean, staff_name: string }`.
