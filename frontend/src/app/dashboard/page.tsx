@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
+import { SoundToggle } from '../../components/dashboard/sound-toggle';
+import { LastUpdated } from '../../components/dashboard/last-updated';
 
 
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'ARCHIVED'];
@@ -57,22 +59,26 @@ export default function DashboardPage() {
   };
 
   return (
-    <div>
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">3D Print Job</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">3D Print Job Dashboard</h1>
         <div className="flex items-center space-x-4">
-          <button onClick={() => setSoundOn(!soundOn)} className="px-3 py-1 border rounded">
-            {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
-          </button>
-          <span className="text-gray-600">Last updated: {lastUpdated}</span>
-          <button onClick={refreshPage} className="px-3 py-1 bg-blue-600 text-white rounded">
+          <SoundToggle soundEnabled={soundOn} onToggle={() => setSoundOn(!soundOn)} />
+          <LastUpdated lastUpdated={lastUpdated} />
+          <button 
+            onClick={refreshPage} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
             Refresh
           </button>
-          <button onClick={logout} className="px-3 py-1 bg-red-600 text-white rounded">
+          <button 
+            onClick={logout} 
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
             Logout
           </button>
         </div>
-      </header>
+      </div>
 
       <div className="my-8 flex space-x-3">
         {statusOptions.map(s => (

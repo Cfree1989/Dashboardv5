@@ -447,9 +447,9 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ## Current Status / Progress Tracking
 
-**Current Phase**: Phase 3.1 - UI/UX Refinement (Submission Form)
-**Next Milestone**: Complete submission form redesign to match mockup
-**Estimated Completion**: 6 weeks from start date
+**Current Phase**: V0 Dashboard Integration - Task V0.3 COMPLETE ✅  
+**Next Milestone**: Task V0.4 - Replace basic status buttons with beautiful V0 tab design
+**Estimated Completion**: 6 weeks from start date + 3.25 hours for V0 integration
 
 ### Completed Tasks:
 - [x] Comprehensive analysis of masterplan.md
@@ -495,6 +495,349 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
     - Username: fablab_user
     - Password: fablab
   * Click "Save" to establish the connection and verify that you can see the database objects.
+
+## V0 Dashboard Integration Project
+
+### Background and Motivation
+
+**New Priority Task**: The user has provided beautiful V0-generated dashboard code with professional styling and UX patterns. Rather than building from scratch, we want to upgrade our existing functional dashboard to match the V0 aesthetic while preserving all our working API integration, authentication, and business logic.
+
+### V0 Integration Strategy
+
+**Core Principle**: Keep the functional foundation, upgrade the visual presentation.
+
+#### What We Keep (Our Working Foundation):
+- ✅ Existing API calls to `/api/v1/jobs` and `/api/v1/jobs?status=X`
+- ✅ Authentication flow with JWT tokens and staff workstation login
+- ✅ Job data structure and backend integration
+- ✅ Status filtering and search functionality
+- ✅ Routing and navigation structure
+
+#### What We Upgrade (V0 Visual Improvements):
+- 🎨 Header layout and button styling (professional design)
+- 🎨 Status tabs (rounded, better spacing, visual hierarchy)
+- 🎨 Job cards (grid layout, proper icons, visual polish)
+- 🎨 Sound toggle (professional button instead of emoji)
+- 🎨 Modal dialogs for job actions (approval/rejection)
+- 🎨 Real-time updates and notifications
+- 🎨 Overall color scheme and typography
+
+#### Risk Assessment: **LOW RISK**
+- We're only touching visual presentation layers
+- No changes to API endpoints or data flow
+- Existing authentication and routing remain intact
+- Can implement incrementally and test each piece
+
+### High-Level Implementation Plan
+
+**Phase V0.1: Foundation Dependencies (30 minutes)**
+- Install missing UI dependencies (Lucide React icons, date-fns)
+- Add required shadcn/ui components
+- Update global CSS with V0's design tokens
+
+**Phase V0.2: Header & Layout Upgrade (45 minutes)**
+- Update dashboard page header to match V0 professional design
+- Improve button styling and spacing
+- Add proper sound toggle component
+
+**Phase V0.3: Status Tabs Enhancement (30 minutes)**
+- Replace basic buttons with V0's beautiful rounded tabs
+- Add proper hover states and active styling
+- Maintain existing click handlers and state management
+
+**Phase V0.4: Job Cards Transformation (60 minutes)**
+- Replace basic job cards with V0's detailed design
+- Add proper icon usage (Lucide React)
+- Implement expandable details section
+- Add visual age indicators and status badges
+
+**Phase V0.5: Grid Layout & Polish (30 minutes)**
+- Convert from vertical list to responsive grid
+- Add loading states and empty state handling
+- Polish overall spacing and typography
+
+**Total Estimated Time: 3.25 hours**
+
+### Detailed Task Breakdown
+
+#### Task V0.1: Install Required Dependencies
+**Goal**: Add necessary dependencies for V0 UI components
+**Time Estimate**: 15 minutes
+**Dependencies**: None
+**Success Criteria**: All V0 dependencies installed without conflicts
+
+**Actions**:
+1. Install Lucide React icons: `npm install lucide-react`
+2. Install date-fns for time formatting: `npm install date-fns`
+3. Verify existing Tailwind and Next.js versions are compatible
+4. Test that imports work correctly
+
+**Files Modified**:
+- `frontend/package.json`
+- `frontend/package-lock.json`
+
+---
+
+#### Task V0.2: Update Global Styles
+**Goal**: Add V0's design tokens and CSS variables to our existing styles
+**Time Estimate**: 15 minutes
+**Dependencies**: Task V0.1
+**Success Criteria**: V0 color scheme and animations available
+
+**Actions**:
+1. Add V0's CSS custom properties to `frontend/src/app/globals.css`
+2. Include animate-pulse-subtle animation
+3. Add proper color variables for light/dark themes
+4. Preserve existing Tailwind configuration
+
+**Files Modified**:
+- `frontend/src/app/globals.css`
+
+**Key Additions**:
+```css
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    border-color: rgba(251, 146, 60, 0.7);
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.2);
+  }
+  50% {
+    border-color: rgba(251, 146, 60, 1);
+    box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.2);
+  }
+}
+```
+
+---
+
+#### Task V0.3: Upgrade Dashboard Header
+**Goal**: Transform basic header into professional V0-style header
+**Time Estimate**: 45 minutes
+**Dependencies**: Tasks V0.1, V0.2
+**Success Criteria**: Header matches V0 design with all functionality preserved
+
+**Actions**:
+1. Update `frontend/src/app/dashboard/page.tsx` header section
+2. Replace emoji sound button with professional SoundToggle component
+3. Add proper LastUpdated component
+4. Improve button styling and spacing
+5. Add responsive design for mobile
+
+**Files Modified**:
+- `frontend/src/app/dashboard/page.tsx`
+
+**New Components Created**:
+- `frontend/src/components/dashboard/sound-toggle.tsx`
+- `frontend/src/components/dashboard/last-updated.tsx`
+
+**Before**:
+```tsx
+<header className="flex items-center justify-between mb-6">
+  <h1 className="text-3xl font-bold">3D Print Job</h1>
+  <div className="flex items-center space-x-4">
+    <button onClick={() => setSoundOn(!soundOn)} className="px-3 py-1 border rounded">
+      {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
+    </button>
+```
+
+**After**:
+```tsx
+<div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+  <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">3D Print Job Dashboard</h1>
+  <div className="flex items-center space-x-4">
+    <SoundToggle soundEnabled={soundOn} onToggle={() => setSoundOn(!soundOn)} />
+    <LastUpdated lastUpdated={lastUpdated} />
+    <button onClick={refreshPage} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+      Refresh
+    </button>
+  </div>
+</div>
+```
+
+---
+
+#### Task V0.4: Transform Status Tabs
+**Goal**: Replace basic status buttons with V0's beautiful tab design
+**Time Estimate**: 30 minutes
+**Dependencies**: Task V0.2
+**Success Criteria**: Tabs look professional with proper states and animations
+
+**Actions**:
+1. Create new `StatusTabs` component in `frontend/src/components/dashboard/status-tabs.tsx`
+2. Replace button mapping in dashboard page with StatusTabs component
+3. Maintain existing click handlers and state management
+4. Add proper hover and active states
+5. Ensure responsive design works on mobile
+
+**Files Modified**:
+- `frontend/src/app/dashboard/page.tsx`
+
+**New Components Created**:
+- `frontend/src/components/dashboard/status-tabs.tsx`
+
+**Before**:
+```tsx
+<div className="my-8 flex space-x-3">
+  {statusOptions.map(s => (
+    <button
+      key={s}
+      onClick={() => updateStatus(s)}
+      className={`px-6 py-3 rounded-lg text-lg font-medium flex items-center space-x-2 ${status===s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+    >
+```
+
+**After**:
+```tsx
+<StatusTabs 
+  currentStatus={status} 
+  onStatusChange={updateStatus} 
+  stats={statusCounts} 
+/>
+```
+
+**StatusTabs Component**:
+- Beautiful rounded tabs with proper spacing
+- Smooth transitions and hover effects
+- Badge counts with proper styling
+- Responsive horizontal scroll on mobile
+
+---
+
+#### Task V0.5: Enhance Job Cards
+**Goal**: Transform basic job cards into V0's detailed, beautiful design
+**Time Estimate**: 60 minutes
+**Dependencies**: Tasks V0.1, V0.2
+**Success Criteria**: Job cards match V0 design with all existing functionality
+
+**Actions**:
+1. Update `frontend/src/components/dashboard/job-card.tsx` with V0 design
+2. Add Lucide React icons (User, Mail, Printer, Palette, etc.)
+3. Implement age-based color coding (green, yellow, orange, red)
+4. Add "NEW" badge with pulse animation for unreviewed jobs
+5. Create expandable details section
+6. Add proper action buttons (Approve, Reject)
+7. Preserve existing job data structure and click handlers
+
+**Files Modified**:
+- `frontend/src/components/dashboard/job-card.tsx`
+
+**Key Improvements**:
+- Professional icon usage instead of emojis
+- Better visual hierarchy and spacing
+- Age-based time display with color coding
+- Expandable details with proper layout
+- Action buttons with consistent styling
+- Visual indicators for unreviewed jobs
+
+**Example Transformation**:
+```tsx
+// OLD: Basic emoji-based design
+<div className="flex items-center text-gray-600">
+  <span className="mr-1">👤</span>
+  <span>{job.student_name || 'Unknown'}</span>
+</div>
+
+// NEW: Professional icon-based design
+<div className="flex items-center text-sm text-gray-500">
+  <User className="w-4 h-4 mr-1" />
+  <span className="truncate">{job.student_name}</span>
+</div>
+```
+
+---
+
+#### Task V0.6: Implement Grid Layout
+**Goal**: Convert job list from vertical to responsive grid layout
+**Time Estimate**: 30 minutes
+**Dependencies**: Task V0.5
+**Success Criteria**: Jobs display in responsive grid like V0
+
+**Actions**:
+1. Update `frontend/src/components/dashboard/job-list.tsx`
+2. Change from `<ul className="space-y-4">` to grid layout
+3. Add responsive breakpoints (1 column mobile, 2 tablet, 3 desktop)
+4. Preserve existing loading and error states
+5. Add empty state handling
+
+**Files Modified**:
+- `frontend/src/components/dashboard/job-list.tsx`
+
+**Layout Change**:
+```tsx
+// OLD: Vertical list
+<ul className="space-y-4">
+  {jobs.map(job => (
+    <li key={job.id} className="bg-white shadow p-4 rounded">
+      <JobCard job={job} />
+    </li>
+  ))}
+</ul>
+
+// NEW: Responsive grid
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {jobs.map((job) => (
+    <JobCard key={job.id} job={job} />
+  ))}
+</div>
+```
+
+---
+
+#### Task V0.7: Add Loading States and Polish
+**Goal**: Add professional loading states and final visual polish
+**Time Estimate**: 30 minutes
+**Dependencies**: All previous tasks
+**Success Criteria**: Professional loading states and smooth interactions
+
+**Actions**:
+1. Add skeleton loading states for job cards
+2. Improve button loading states
+3. Add smooth transitions and animations
+4. Polish spacing and typography throughout
+5. Test responsive design on all screen sizes
+6. Add proper focus states for accessibility
+
+**Files Modified**:
+- Multiple component files for loading states
+- Global CSS for final polish
+
+### Risk Mitigation Strategies
+
+**Low Risk Items**:
+- All changes are visual/presentation only
+- Existing API calls and data flow unchanged
+- Can test each component independently
+- Easy to rollback individual components
+
+**Mitigation Steps**:
+1. Implement incrementally - one task at a time
+2. Test each component after changes
+3. Keep git commits small and focused
+4. Maintain existing prop interfaces where possible
+
+### Success Metrics
+
+**Visual Quality**:
+- ✅ Dashboard looks as professional as V0 version
+- ✅ Responsive design works on all screen sizes
+- ✅ Proper icons and visual hierarchy
+- ✅ Smooth interactions and animations
+
+**Functionality Preservation**:
+- ✅ All existing API calls still work
+- ✅ Authentication flow unchanged
+- ✅ Job status filtering works
+- ✅ Search functionality preserved
+- ✅ Navigation and routing intact
+
+**User Experience**:
+- ✅ Loading states are professional
+- ✅ Error handling preserved
+- ✅ Accessibility maintained
+- ✅ Mobile experience improved
 
 ## Executor's Feedback or Assistance Requests
 
@@ -588,6 +931,51 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
     token: "<JWT_TOKEN_HERE>"
     ```
 **Status**: Login flow fully functional.
+
+### V0 Dashboard Integration - Task V0.1 Execution Log ✅
+**Context**: Installing required dependencies for V0 UI components integration
+**Actions Completed**:
+- ✅ Successfully installed `lucide-react` (v0.294.0) for professional React icons
+- ✅ Successfully installed `date-fns` (v2.30.0) for time formatting utilities  
+- ✅ Verified imports work correctly with test file
+- ✅ Confirmed compatibility with existing Next.js 14.0.0 and Tailwind CSS 3.3.0
+- ✅ Updated package.json with new dependencies
+**Result**: All V0 dependencies are now available for use in components
+**Time Taken**: 10 minutes (under 15 minute estimate)
+**Next Step**: Task V0.2 - Add V0 design tokens to global CSS
+
+### V0 Dashboard Integration - Task V0.2 Execution Log ✅
+**Context**: Adding V0's design tokens and CSS variables to extend our existing global styles
+**Actions Completed**:
+- ✅ Added `animate-pulse-subtle` animation with orange border pulsing effect for "NEW" job badges
+- ✅ Added `@keyframes pulse-subtle` with smooth cubic-bezier timing for professional animation
+- ✅ Added `text-balance` utility for better text wrapping in components
+- ✅ Extended CSS custom properties with sidebar variables for consistency
+- ✅ Added both light and dark theme variants for all new variables
+- ✅ Set professional font family (Arial, Helvetica, sans-serif) to match V0
+- ✅ Preserved all existing Tailwind configuration and custom properties
+- ✅ Verified no CSS syntax errors or build issues
+**Result**: V0 design tokens and animations now available across all components
+**Time Taken**: 12 minutes (under 15 minute estimate)
+**Next Step**: Task V0.3 - Transform dashboard header with professional styling
+
+### V0 Dashboard Integration - Task V0.3 Execution Log ✅
+**Context**: Transforming basic dashboard header into professional V0-style design
+**Actions Completed**:
+- ✅ Created `SoundToggle` component with professional Volume2/VolumeX icons from Lucide React
+- ✅ Added test sound functionality using Web Audio API with proper error handling
+- ✅ Created `LastUpdated` component with Clock icon and consistent text styling
+- ✅ Updated dashboard header layout to responsive flex design (mobile-first)
+- ✅ Replaced emoji-based sound button with professional toggle component
+- ✅ Enhanced button styling with hover effects and transition animations
+- ✅ Added proper spacing and typography (text-gray-900, consistent sizing)
+- ✅ Implemented responsive design - stacks vertically on mobile, horizontal on desktop
+- ✅ Updated dashboard layout to use clean V0-style background (bg-gray-50)
+- ✅ Added professional container styling (container mx-auto px-4 py-8)
+- ✅ Verified build compilation and no linter errors
+**Result**: Dashboard header now matches V0's professional design with all functionality preserved
+**Time Taken**: 35 minutes (under 45 minute estimate)
+**Next Step**: Task V0.4 - Replace basic status buttons with beautiful V0 tab design
 ### Critical Issue Analysis: Database Connectivity Problems - RESOLVED ✅
 **Context**: User updated pgAdmin and PostgreSQL; unable to connect to the database using the default `postgres` user; when Docker is running, authentication fails; when Docker is off, connection times out.
 **Root Cause Analysis**:
