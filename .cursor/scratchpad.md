@@ -418,8 +418,15 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
   - [x] Update form validation and error handling
   - [x] Polish visual design and responsiveness
 - [x] Staff dashboard foundation (layout, page stub, and JobList created)
+- [x] **V0 Dashboard Integration - COMPLETE** (All 7 tasks finished successfully)
 - [ ] Job management modals
 - [ ] Real-time updates
+
+### Phase 3.5: V0 Design System Expansion (NEW)
+- [ ] **DS.1: Login Page Professional Upgrade** (45 min) - HIGH PRIORITY
+- [ ] **DS.2: Submission Form Professional Upgrade** (90 min) - CRITICAL  
+- [ ] **DS.3: Success & Confirmation Pages Upgrade** (60 min) - MEDIUM
+- [ ] **DS.4: Error Pages & Edge Cases** (30 min) - LOW
 
 ### Phase 4: Advanced Features
 - [ ] Email service integration
@@ -447,8 +454,8 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 ## Current Status / Progress Tracking
 
-**Current Phase**: V0 Dashboard Integration - ALL TASKS COMPLETE ✅✅✅✅✅✅✅  
-**Next Milestone**: V0 Integration Project COMPLETE - Dashboard ready for production use
+**Current Phase**: V0 Design System Expansion Planning  
+**Next Milestone**: Comprehensive V0 Design System Rollout - All pages styled consistently
 **Estimated Completion**: 6 weeks from start date + 3.25 hours for V0 integration
 
 ### Completed Tasks:
@@ -1096,6 +1103,253 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - 📊 Interactive expandable job details
 - 🔔 Sound notifications ready for integration
 - 📦 Mock data for immediate preview
+
+## V0 Design System Expansion Project
+
+### Strategic Opportunity: Design Consistency Across All Pages
+
+**Current Situation Analysis**: 
+We've successfully transformed our dashboard into a professional, V0-quality interface that looks and feels like a modern SaaS application. However, our other pages (login, submission form, success pages, error pages) still use basic styling patterns, creating an inconsistent user experience.
+
+**The Opportunity**: Apply the same professional design system across ALL pages to create a cohesive, enterprise-quality application.
+
+### Current Page Styling Assessment
+
+**✅ Professional V0 Styling (Complete)**:
+- Dashboard page - Full V0 integration complete
+- All dashboard components (JobCard, StatusTabs, SoundToggle, LastUpdated)
+
+**❌ Basic Styling (Needs Upgrade)**:
+- Login page - Basic `bg-gray-50`, simple shadows, basic button styling
+- Submission form - Basic borders, simple focus states, inconsistent spacing  
+- Success/confirmation pages - Unknown, likely basic
+- Error pages - Unknown, likely basic
+
+**📋 Available Design Assets**:
+- ✅ Professional CSS design system in `globals.css`
+- ✅ CSS custom properties for light/dark themes
+- ✅ Utility classes: `focus-ring`, `btn-transition`, `card-hover`
+- ✅ Professional animations: `animate-pulse-subtle`  
+- ✅ Consistent color palette and typography
+- ✅ Lucide React icons installed and ready
+- ✅ date-fns utilities available
+
+### High-Level Implementation Strategy
+
+**Design Principles to Apply**:
+1. **Visual Hierarchy**: Consistent typography, spacing, and layout patterns
+2. **Professional Forms**: Enhanced input styling, focus states, error handling
+3. **Interactive Elements**: Professional buttons, links, and hover effects
+4. **Loading States**: Consistent loading indicators and skeleton states
+5. **Error Handling**: Professional error messages and recovery flows
+6. **Responsive Design**: Mobile-first approach with proper breakpoints
+
+### Detailed Task Breakdown
+
+#### Phase DS.1: Login Page Professional Upgrade
+**Goal**: Transform basic login page into professional V0-quality authentication interface
+**Time Estimate**: 45 minutes
+**Priority**: HIGH - Gateway to the application
+
+**Current Issues**:
+- Basic `bg-gray-50` background 
+- Simple `shadow-sm` card styling
+- Basic button without hover effects
+- Inconsistent typography and spacing
+- No loading states or enhanced error handling
+
+**Transformation Plan**:
+1. **Background & Layout Enhancement**
+   - Replace `bg-gray-50` with professional gradient or pattern
+   - Add professional container styling matching dashboard
+   - Implement proper responsive centering and spacing
+
+2. **Card Styling Upgrade**  
+   - Replace basic `shadow-sm` with V0 card styling (`shadow-md`, `rounded-xl`)
+   - Add proper padding and spacing consistency
+   - Implement hover effects with `card-hover` utility
+
+3. **Form Controls Enhancement**
+   - Apply `focus-ring` utility to all inputs
+   - Add professional input styling with proper borders and transitions
+   - Enhance dropdown styling to match dashboard components
+   - Add proper spacing between form elements
+
+4. **Button Transformation**
+   - Apply `btn-transition` for smooth interactions
+   - Use professional color scheme (blue-600, hover:blue-700)
+   - Add loading state with spinner when authenticating
+   - Implement disabled state during submission
+
+5. **Error Handling Enhancement**
+   - Style error messages with proper color and spacing
+   - Add icons to error states using Lucide React
+   - Implement slide-in animations for error messages
+
+**Files to Modify**:
+- `frontend/src/app/login/page.tsx`
+
+**Success Criteria**: Login page visually matches dashboard quality with smooth interactions and professional error handling
+
+---
+
+#### Phase DS.2: Submission Form Professional Upgrade  
+**Goal**: Transform submission form into professional, user-friendly interface matching V0 standards
+**Time Estimate**: 90 minutes
+**Priority**: CRITICAL - Primary user touchpoint
+
+**Current Issues**:
+- Basic `border-gray-300` input styling
+- Simple focus states without professional ring effects
+- Inconsistent spacing and typography
+- Basic error message styling
+- No loading states during file upload
+- Basic button styling without hover effects
+
+**Transformation Plan**:
+
+1. **Overall Layout Enhancement**
+   - Add professional page background (`bg-gray-50` or gradient)
+   - Implement proper container styling with max-width and centering
+   - Add breadcrumb or progress indicator
+   - Enhance page title and subtitle styling
+
+2. **Form Controls Professional Upgrade**
+   - Apply `focus-ring` utility to all inputs, selects, and textareas
+   - Replace basic borders with professional styling
+   - Add proper hover states for interactive elements
+   - Implement consistent spacing using design system
+   - Add Lucide React icons to enhance form sections
+
+3. **Input Field Enhancements**
+   - Professional text input styling with proper padding and typography
+   - Enhanced dropdown styling with smooth transitions
+   - Professional file upload component with drag-and-drop styling
+   - Checkbox and radio button custom styling to match V0 patterns
+
+4. **Loading States Implementation**
+   - File upload progress bar with professional styling
+   - Button loading state with spinner during submission
+   - Skeleton loading for dynamic content (printer options)
+   - Professional disabled states during form submission
+
+5. **Error Handling Enhancement**
+   - Professional error message styling with proper colors and icons
+   - Smooth error message animations (slide-in, fade effects)
+   - Form validation with smooth scrolling to errors
+   - Enhanced visual feedback for field validation
+
+6. **Information Sections Styling**
+   - Professional styling for printer dimensions info section
+   - Enhanced warning sections with proper background colors and icons
+   - Consistent card-style containers for information blocks
+
+**Files to Modify**:
+- `frontend/src/components/submission/submission-form.tsx`
+- `frontend/src/app/submit/page.tsx` (page wrapper)
+
+**Success Criteria**: Submission form provides professional, intuitive experience matching modern SaaS application standards
+
+---
+
+#### Phase DS.3: Success & Confirmation Pages Upgrade
+**Goal**: Create professional success and confirmation flows with consistent styling
+**Time Estimate**: 60 minutes
+**Priority**: MEDIUM - Important for user completion experience
+
+**Pages to Transform**:
+- `frontend/src/app/submit/success/page.tsx` - Post-submission success page
+- `frontend/src/app/confirm/[token]/page.tsx` - Email confirmation page
+
+**Transformation Plan**:
+
+1. **Success Page Enhancement**
+   - Professional layout with proper centering and spacing
+   - Add success icon (CheckCircle from Lucide React) with animation
+   - Enhanced typography for confirmation message
+   - Professional styling for job details display
+   - Add next steps section with proper call-to-action styling
+
+2. **Email Confirmation Page Enhancement**  
+   - Professional loading states while verifying token
+   - Success state with professional confirmation message
+   - Error states (expired, invalid token) with helpful recovery options
+   - Consistent card styling and spacing
+   - Add navigation options back to main site
+
+3. **Consistent Navigation Elements**
+   - Professional "Back to Dashboard" or "Submit Another" buttons
+   - Consistent header/footer styling if applicable
+   - Professional breadcrumb navigation
+
+**Success Criteria**: Completion flows feel professional and provide clear next steps for users
+
+---
+
+#### Phase DS.4: Error Pages & Edge Cases
+**Goal**: Create professional error handling throughout the application  
+**Time Estimate**: 30 minutes
+**Priority**: LOW - Polish for edge cases
+
+**Components to Create/Enhance**:
+- 404 error page
+- Network error states
+- API error handling components  
+- Loading failure states
+
+**Transformation Plan**:
+1. **Professional Error Pages**
+   - Consistent styling with application theme
+   - Helpful error messages with recovery options
+   - Professional illustrations or icons
+   - Clear navigation back to main flows
+
+2. **Component Error States**
+   - Enhanced error boundaries with professional styling
+   - Network error messages with retry functionality
+   - Loading failure states with proper messaging
+
+**Success Criteria**: All error states provide professional, helpful user experience
+
+### Implementation Timeline
+
+**Total Estimated Time**: 3.5 hours
+**Recommended Order**: DS.1 → DS.2 → DS.3 → DS.4
+
+**Parallel Implementation Opportunity**: DS.1 and DS.3 can be done in parallel as they don't share components
+
+### Risk Assessment: **VERY LOW RISK**
+
+**Why Low Risk**:
+- All design assets already established and proven
+- No API or backend changes required
+- Can implement incrementally and test each page
+- Easy rollback if issues arise
+- Established patterns from successful V0 dashboard integration
+
+**Success Metrics**:
+- ✅ Visual consistency across all pages
+- ✅ Professional user experience throughout application
+- ✅ Enhanced accessibility and usability
+- ✅ Improved perceived quality and trustworthiness
+- ✅ Reduced development friction for future pages
+
+### Strategic Value
+
+**User Experience Impact**: 
+- Transforms application from "prototype" to "production-ready"
+- Builds user trust and confidence in the system
+- Provides consistent, intuitive interactions
+- Enhances accessibility and usability
+
+**Development Benefits**:
+- Establishes reusable design patterns
+- Reduces future development time for new pages
+- Creates consistent component library
+- Improves maintainability through standardization
+
+**Recommendation**: **Proceed immediately with DS.1 (Login Page)** as the highest-impact, quickest win to establish momentum for the full design system rollout.
+
 ### Critical Issue Analysis: Database Connectivity Problems - RESOLVED ✅
 **Context**: User updated pgAdmin and PostgreSQL; unable to connect to the database using the default `postgres` user; when Docker is running, authentication fails; when Docker is off, connection times out.
 **Root Cause Analysis**:
