@@ -18,6 +18,7 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
   const [timeHours, setTimeHours] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const rate = useMemo(() => {
     const mat = (material || "").toLowerCase();
@@ -56,9 +57,7 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
 
   const isValid = staffName.trim().length > 0 && !!weightG && !!timeHours && parseFloat(weightG) > 0 && parseFloat(timeHours) > 0;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isValid) return;
+  async function doApprove() {
     try {
       setSubmitting(true);
       setError("");
@@ -85,7 +84,14 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
       setError("Approval failed. Please check inputs and try again.");
     } finally {
       setSubmitting(false);
+      setConfirmOpen(false);
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isValid) return;
+    setConfirmOpen(true);
   }
 
   return (
@@ -161,8 +167,22 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
               {submitting ? "Approving..." : "Approve"}
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-2">You will be asked to confirm on the next step.</p>
         </form>
       </div>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmOpen(false)} />
+          <div className="relative bg-white w-full max-w-sm rounded-xl shadow-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Are you sure?</h3>
+            <p className="text-sm text-gray-600 mb-4">This will send an approval email and move the job to Pending.</p>
+            <div className="flex justify-end space-x-2">
+              <button onClick={() => setConfirmOpen(false)} className="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Cancel</button>
+              <button onClick={doApprove} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition">Yes, approve</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

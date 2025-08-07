@@ -59,6 +59,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ### Phase 5: Job Management Modals 📋 IN PROGRESS
 - [ ] **Approval Modal** - File selection, weight/time inputs, cost calculation (next)
 - [ ] **Rejection Modal** - Rejection reasons, custom messages
+  - Note: Includes double-confirmation step to reduce errors
 - [ ] **Status Change Modals** - Printing, Complete, Pickup confirmations  
 - [ ] **Notes Editing** - Inline notes interface
 
@@ -112,6 +113,28 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - Success criteria: Backend tests for approve payload validation and event logging; Frontend tests for modal validation and API call; all CI tests pass
 - [x] Executor: Phase 5.1.5 — Candidate Files (stub)
   - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
+
+## Phase 5.2 — Rejection Flow
+
+- [x] Backend: `POST /api/v1/jobs/:id/reject` with `{ staff_name, reasons[], custom_reason }` — validates status `UPLOADED`, persists `reject_reasons`, sets status `REJECTED`, logs `StaffRejected`, returns updated job
+- [x] Frontend: Rejection Modal UI and wiring
+  - Success criteria: Modal with common reason checkboxes + custom message textarea, required Staff Attribution, submits to backend, removes job from `UPLOADED` on success, errors visible, accessible focus/ARIA
+- Enhancement: Added second-step confirmation dialog ("Are you sure?") before submission
+- [x] Tests: Frontend rejection modal validation and API call
+  - Success criteria: Disabled submit until attribution/reason provided, correct payload shape, success path calls close/removal
+
+## Phase 5.3 — Status Change Modals (Printing, Complete, Pickup)
+
+- [x] Backend: Implement state transition endpoints
+  - `POST /api/v1/jobs/:id/mark-printing` (from READYTOPRINT)
+  - `POST /api/v1/jobs/:id/mark-complete` (from PRINTING)
+  - `POST /api/v1/jobs/:id/mark-picked-up` (from COMPLETED)
+  - Success criteria: Validate status preconditions; require `{ staff_name }`; log events; tests added
+- [ ] Frontend: Modals/UI + wiring
+  - Success criteria: Each action opens a confirm modal with Staff Attribution; on success, move job to next tab and refresh counts; accessible and error states
+  - Enhancement: Include second-step confirmation dialogs for each action
+- [x] Tests: Backend status transition tests
+  - Success criteria: Happy path transitions validated; guards enforced for wrong states
 
 - [x] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
   - Success criteria: Document clear UX rules, backend persistence contract, frontend modal behavior, and tests; added tasks below

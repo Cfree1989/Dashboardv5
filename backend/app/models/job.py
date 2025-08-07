@@ -74,6 +74,7 @@ class Job(db.Model):
                 self.student_confirmed_at.replace(tzinfo=timezone.utc).isoformat() if self.student_confirmed_at else None
             ),
             'is_confirmation_expired': self.is_confirmation_expired,
+            'reject_reasons': self.reject_reasons,
             'last_updated_by': self.last_updated_by,
             'notes': self.notes,
             'created_at': self.created_at.replace(tzinfo=timezone.utc).isoformat(),

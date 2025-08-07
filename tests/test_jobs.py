@@ -205,3 +205,71 @@ def test_candidate_files_stub_returns_original_filename(client, token, app):
     data = resp.get_json()
     assert 'files' in data
     assert job.original_filename in data['files']
+
+
+def test_reject_job_with_reasons(client, token, app):
+    job = create_job(app)
+    # Add active staff
+    client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers={'Authorization': f'Bearer {token}'})
+
+    payload = {
+        'staff_name': 'Reviewer',
+        'reasons': ['Poor model quality'],
+        'custom_reason': 'Walls too thin'
+    }
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/reject',
+        json=payload,
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['status'] == 'REJECTED'
+    assert 'reject_reasons' in data
+    assert any('Poor model quality' in r for r in data['reject_reasons'])
+    assert any('Walls too thin' in r for r in data['reject_reasons'])
+
+    # Events include StaffRejected
+    resp_events = client.get(
+        f'/api/v1/jobs/{job.id}/events',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp_events.status_code == 200
+    events = [e['event_type'] for e in resp_events.get_json()]
+    assert 'StaffRejected' in events
+
+
+def test_status_transitions_printing_complete_picked_up(client, token, app):
+    job = create_job(app)
+    # Move to READYTOPRINT via confirm path shortcut
+    with app.app_context():
+        job.status = 'READYTOPRINT'
+        db.session.commit()
+    client.post('/api/v1/staff', json={'name': 'Operator'}, headers={'Authorization': f'Bearer {token}'})
+
+    # mark printing
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/mark-printing',
+        json={'staff_name': 'Operator'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['status'] == 'PRINTING'
+
+    # mark complete (requires PRINTING)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/mark-complete',
+        json={'staff_name': 'Operator'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['status'] == 'COMPLETED'
+
+    # mark picked up (requires COMPLETED)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/mark-picked-up',
+        json={'staff_name': 'Operator'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['status'] == 'PAIDPICKEDUP'

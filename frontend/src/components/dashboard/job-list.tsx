@@ -82,8 +82,9 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
   };
 
   const handleReject = (jobId: string) => {
-    console.log("Reject job:", jobId);
-    // TODO: Implement rejection logic
+    // Remove rejected job from current list
+    setJobs(prev => prev.filter(j => j.id !== jobId));
+    onJobsMutated?.();
   };
 
   const handleMarkReviewed = (jobId: string) => {

@@ -6,7 +6,7 @@ import { LastUpdated } from '../../components/dashboard/last-updated';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
 
-const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'ARCHIVED'];
+const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
 
 export default function DashboardPage() {
   const router = useRouter();

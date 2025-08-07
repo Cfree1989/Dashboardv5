@@ -169,6 +169,82 @@ def approve_job(job_id):
     return jsonify(job.to_dict()), 200
 
 
+def _validate_staff_and_body(data):
+    staff_name = data.get('staff_name')
+    if not staff_name:
+        return None, jsonify({'message': 'staff_name is required'}), 400
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return None, jsonify({'message': 'Invalid or inactive staff_name'}), 400
+    return staff_name, None, None
+
+
+@bp.route('/<job_id>/mark-printing', methods=['POST'])
+@token_required
+def mark_printing(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'READYTOPRINT':
+        return jsonify({'message': 'Job must be in READYTOPRINT to mark printing'}), 400
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    job.status = 'PRINTING'
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+    evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/mark-complete', methods=['POST'])
+@token_required
+def mark_complete(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'PRINTING':
+        return jsonify({'message': 'Job must be in PRINTING to mark complete'}), 400
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    job.status = 'COMPLETED'
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+    evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/mark-picked-up', methods=['POST'])
+@token_required
+def mark_picked_up(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'COMPLETED':
+        return jsonify({'message': 'Job must be in COMPLETED to mark picked up'}), 400
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    job.status = 'PAIDPICKEDUP'
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+    evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
 @bp.route('/<job_id>/review', methods=['POST'])
 @token_required
 def review_job(job_id):
@@ -211,6 +287,57 @@ def review_job(job_id):
         job_id=job.id,
         event_type=event_type,
         details={},
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(evt)
+    db.session.commit()
+
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/reject', methods=['POST'])
+@token_required
+def reject_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+
+    if job.status != 'UPLOADED':
+        return jsonify({'message': 'Job cannot be rejected in its current status'}), 400
+
+    data = request.get_json(silent=True) or {}
+    staff_name = data.get('staff_name')
+    reasons = data.get('reasons') or []
+    custom_reason = (data.get('custom_reason') or '').strip()
+
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+
+    # Normalize reasons
+    if not isinstance(reasons, list):
+        return jsonify({'message': 'reasons must be an array of strings'}), 400
+    reasons = [str(r) for r in reasons if str(r).strip()]
+    if custom_reason:
+        reasons.append(custom_reason)
+    if not reasons:
+        return jsonify({'message': 'At least one reason or a custom_reason is required'}), 400
+
+    # Update job
+    job.status = 'REJECTED'
+    job.reject_reasons = reasons
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+
+    # Log event
+    evt = Event(
+        job_id=job.id,
+        event_type='StaffRejected',
+        details={'reasons': reasons},
         triggered_by=staff_name,
         workstation_id=g.workstation_id,
     )

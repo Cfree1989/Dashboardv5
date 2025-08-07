@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, RotateCcw } from "lucide-react";
 import ReviewModal from './modals/review-modal';
+import RejectionModal from './modals/rejection-modal';
 
 interface Job {
   id: string;
@@ -35,6 +36,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -98,10 +100,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const handleReject = async () => {
-    setIsRejecting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    onReject?.(job.id);
-    setIsRejecting(false);
+    setShowRejectModal(true);
   };
 
   const handleMarkReviewed = () => {
@@ -279,6 +278,17 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             // Fallback: reload page section can be triggered by parent on next refetch
             onMarkReviewed?.(job.id);
             setShowReviewModal(null);
+          }}
+        />
+      )}
+      {showRejectModal && (
+        <RejectionModal
+          jobId={job.id}
+          onClose={() => setShowRejectModal(false)}
+          onRejected={() => {
+            // Delegate to parent to remove from list
+            onReject?.(job.id);
+            setShowRejectModal(false);
           }}
         />
       )}

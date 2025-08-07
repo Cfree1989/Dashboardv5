@@ -19,6 +19,7 @@ export function StatusTabs({ currentStatus, onStatusChange, stats }: StatusTabsP
     { key: "PRINTING", title: "Printing" },
     { key: "COMPLETED", title: "Completed" },
     { key: "PAIDPICKEDUP", title: "Picked Up" },
+    { key: "REJECTED", title: "Rejected" },
     { key: "ARCHIVED", title: "Archived" },
   ]
 
