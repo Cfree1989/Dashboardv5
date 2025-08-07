@@ -99,6 +99,19 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - Success criteria: `POST /api/v1/jobs/:id/approve` sets PENDING, sends email with token link; `POST /api/v1/submit/confirm/<token>` sets READYTOPRINT; tests pass
 - [x] Executor: Wire frontend Approve to backend endpoint
   - Success criteria: Clicking Approve calls API, removes job from UPLOADED list on success; frontend builds cleanly
+- [x] Planner: Scope Phase 5.1 Approval Modal (UX + inputs)
+  - Success criteria: Documented plan with task breakdown, acceptance checklist, and clear API contracts added to this file
+- [ ] Executor: Phase 5.1.1 — Backend: Extend Approve endpoint for attribution + cost
+  - Success criteria: `POST /api/v1/jobs/:id/approve` accepts `{ staff_name, weight_g, time_hours }`, calculates `cost_usd` server-side (min $3.00; $0.10/gram filament, $0.20/gram resin), updates job fields, logs `StaffApproved` + `ApprovalEmailSent` with `triggered_by=staff_name` and `workstation_id`, returns updated job; unit tests green
+  - Status: Implemented and unit-tested (19 tests passing) — awaiting manual verification before marking complete
+- [ ] Executor: Phase 5.1.2 — Frontend: Build Approval Modal UI
+  - Success criteria: Modal with inputs (weight_g, time_hours), live cost preview, required Staff Attribution dropdown (populated from `/api/v1/staff`), inline validation, accessible focus/ARIA; Storybook-like visual check not required
+- [ ] Executor: Phase 5.1.3 — Wire JobCard "Approve" to Modal + API
+  - Success criteria: Clicking Approve opens modal; on submit calls API with Authorization header; optimistic update removes job from `UPLOADED` list; error states render; toast on success
+- [ ] Executor: Phase 5.1.4 — Tests
+  - Success criteria: Backend tests for approve payload validation and event logging; Frontend tests for modal validation and API call; all CI tests pass
+- [ ] Executor: Phase 5.1.5 — Candidate Files (stub)
+  - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
 - [ ] Planner: Scope Admin Page (settings and controls)
   - Success criteria: Define MVP features list (Staff Management, Admin Overrides, System Health/Audit, Archival controls, Background sound config), UI sections, and required API mappings; produce a short acceptance checklist
 - [ ] Planner: Scope Analytics/Stats Page (`/analytics`)
@@ -106,7 +119,9 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 ## Executor's Feedback or Assistance Requests
 
-- None. Change was localized to `frontend/src/app/dashboard/page.tsx` and component removal; no impact on sound playback logic (none existed beyond test button).
+- Phase 5.1.1 backend approve endpoint extended per plan; cost calculation and staff attribution added. Tests: green locally.
+- Please verify manually if desired: approve call now requires JSON body `{ staff_name, weight_g, time_hours }` with valid Authorization header.
+- If verification is OK, I will proceed to Phase 5.1.2 (Frontend Approval Modal UI).
 
 ## Lessons
 
@@ -147,6 +162,41 @@ Building a complete 3D Print Management System for academic/makerspace environme
 **Success Criteria**: 
 - Approval email sent with token link; student can confirm via `/confirm/[token]`
 - Staff can trigger approval; events logged; tests green
+
+## Key Challenges and Analysis — Phase 5.1 Approval Modal
+
+- Backend `POST /api/v1/jobs/<id>/approve` is minimal: sets `PENDING`, sends email; lacks staff attribution, weight/time, and cost calculation; event creation partially inconsistent.
+- No `candidate-files` endpoint exists; to keep scope tight, we will defer advanced file selection to Phase 4.2 and add a small stub as optional.
+- Frontend has no modal; `JobList` currently posts directly to approve; we’ll replace with a modal workflow and validation.
+- Cost rules: Filament $0.10/g, Resin $0.20/g, $3.00 minimum. Material source is job data; server must be source-of-truth for final cost.
+
+## High-level Task Breakdown — Phase 5.1 Approval Modal
+
+1) Backend: Extend Approve Endpoint (Phase 5.1.1)
+- Inputs: `{ staff_name: string, weight_g: number > 0, time_hours: number > 0 }`
+- Server: validate `staff_name` is active staff; compute `cost_usd` using job material; enforce $3 minimum; set `status='PENDING'`, update `weight_g`, `time_hours`, `cost_usd`; generate confirmation token; send email; log events with `triggered_by=staff_name` and `workstation_id`.
+- Response: updated job JSON.
+- Success: unit tests cover validation, cost calc, event logging, and email call path.
+
+2) Frontend: Approval Modal UI (Phase 5.1.2)
+- Fields: Staff Attribution (required select from `/api/v1/staff`), Weight (g), Time (hours, step 0.5), Read-only Cost preview.
+- Validation: Required fields, positive numbers, disabled submit until valid; accessible labels and focus management.
+- UX: Open from `Approve` button on `UPLOADED` cards; cancel closes without side effects.
+
+3) Wiring Modal -> API (Phase 5.1.3)
+- Flow: Open modal, submit posts to `/api/v1/jobs/:id/approve` with Authorization; on 200, remove job from current list and show toast; on error, show error message and keep modal open.
+
+4) Tests (Phase 5.1.4)
+- Backend: New tests for payload schema, staff validation, cost minimum, event fields (`triggered_by`, `workstation_id`).
+- Frontend: Component test ensuring validation disables submit until valid, and submits expected payload.
+
+5) Optional: Candidate Files (Phase 5.1.5)
+- Minimal stub endpoint returning current uploaded filename to keep UI consistent; advanced file scanning deferred to Phase 4.2.
+
+### Acceptance Checklist (Phase 5.1)
+- Approve modal appears and validates inputs; staff list loads; cost preview correct for filament/resin with minimum enforced.
+- Backend computes and persists `weight_g`, `time_hours`, `cost_usd`, sets `PENDING`, sends email, and logs events with staff attribution.
+- After success, job disappears from `UPLOADED` list; no console errors; tests pass.
 
 ## Next Steps Priority Queue
 
@@ -207,3 +257,24 @@ Building a complete 3D Print Management System for academic/makerspace environme
 **Current Blockers**: None identified
 
 **Recommendation**: Proceed with Phase 4.1 (Email Service Integration) to complete the core user experience workflow.
+
+
+The repo structure aligns well with the plan. A few planned pieces aren’t in the tree yet and should be added.
+What matches the plan
+Backend layout: backend/app/{models,routes,services,utils} with analytics.py, auth.py, jobs.py, payment.py, staff.py, submit.py; migrations present.
+Frontend layout: frontend/src/app/{dashboard,submit,login,confirm} pages, shared components, types, and config files.
+Storage: Status folders (Uploaded/, Pending/, ReadyToPrint/, Printing/, Completed/, PaidPickedUp/, Archived/) exist.
+Docker: docker-compose.yml is present.
+Tests: API tests exist under tests/.
+Gaps vs the plan
+Analytics UI: Planned /analytics page and analytics components aren’t in frontend/src/app/analytics yet.
+Admin UI: No admin section/page yet (staff management, overrides, archival, health/audit, sound config).
+Protocol handler: No SlicerOpener/ folder yet.
+Background worker: Plan calls for RQ worker + Redis; ensure both are defined in docker-compose.yml and wired in the backend.
+Email queueing: email_service.py exists (untracked), but full async flow and templates aren’t confirmed here.
+Recommended next steps
+Add frontend/src/app/analytics/page.tsx and frontend/src/components/analytics/*, wired to /analytics/* and /stats*.
+Add an Admin section (initially under dashboard) with settings (background sound), staff management, overrides, archival, and system health (mapping to existing admin endpoints).
+Add SlicerOpener/ with the handler and installer assets, per the plan.
+Verify docker-compose.yml includes redis and worker services, and the backend enqueues tasks accordingly.
+Everything is organized correctly overall; implement the missing Analytics and Admin pages, protocol handler, and worker/Redis to complete parity with the plan.

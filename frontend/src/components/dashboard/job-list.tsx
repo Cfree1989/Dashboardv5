@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
+import ApprovalModal from './modals/approval-modal';
 import { JobListSkeleton } from './job-card-skeleton';
 
 interface Job {
@@ -12,6 +13,7 @@ interface Job {
   original_filename?: string;
   printer?: string;
   color?: string;
+  material?: string;
   created_at?: string;
   notes?: string;
   staff_viewed_at?: string;
@@ -28,6 +30,8 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [approveJobId, setApproveJobId] = useState<string | null>(null);
+  const [approveJobMaterial, setApproveJobMaterial] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -59,24 +63,20 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
     fetchJobs();
   }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
 
-  const handleApprove = async (jobId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-      const res = await fetch(`/api/v1/jobs/${jobId}/approve`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        throw new Error('Approval failed');
-      }
-      // Remove approved job from current list (status changed to PENDING)
-      setJobs(prev => prev.filter(j => j.id !== jobId));
-    } catch (e) {
-      setError('Failed to approve job');
+  const openApproveModal = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    setApproveJobId(jobId);
+    setApproveJobMaterial(job?.material || null);
+  };
+
+  const closeApproveModal = () => {
+    setApproveJobId(null);
+    setApproveJobMaterial(null);
+  };
+
+  const handleApprovedSuccess = () => {
+    if (approveJobId) {
+      setJobs(prev => prev.filter(j => j.id !== approveJobId));
     }
   };
 
@@ -118,11 +118,19 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
           key={job.id} 
           job={job} 
           currentStatus={filters?.status}
-          onApprove={handleApprove}
+          onApprove={openApproveModal}
           onReject={handleReject}
           onMarkReviewed={handleMarkReviewed}
         />
       ))}
+      {approveJobId && (
+        <ApprovalModal
+          jobId={approveJobId}
+          material={approveJobMaterial || undefined}
+          onClose={closeApproveModal}
+          onApproved={handleApprovedSuccess}
+        />
+      )}
     </div>
   );
 }

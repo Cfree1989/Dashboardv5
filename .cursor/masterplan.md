@@ -229,7 +229,7 @@ A mandatory warning and liability disclaimer must be displayed at the top of the
 The project follows a clear separation between backend and frontend, designed for beginner-friendly development and deployment:
 
 ```
-V0DASHBOARDV4/
+DASHBOARDV5/
 ├── frontend/                # Next.js Application
 │   ├── app/                 # App Router pages
 │   │   ├── dashboard/

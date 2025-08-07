@@ -6,6 +6,8 @@ from app.utils.decorators import token_required
 from app.models.event import Event
 from app.services.token_service import generate_confirmation_token
 from app.services.email_service import send_approval_email
+from app.models.staff import Staff
+from decimal import Decimal, ROUND_HALF_UP
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -67,17 +69,85 @@ def approve_job(job_id):
     if not job:
         abort(404, description='Job not found')
 
-    # Basic approval: set PENDING and send confirmation email with token
+    if job.status != 'UPLOADED':
+        return jsonify({'message': 'Job cannot be approved in its current status'}), 400
+
+    # Parse and validate payload
+    data = request.get_json(silent=True) or {}
+    staff_name = data.get('staff_name')
+    weight_g = data.get('weight_g')
+    time_hours = data.get('time_hours')
+
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+
+    # Validate numeric inputs
+    try:
+        weight_val = float(weight_g)
+        time_val = float(time_hours)
+    except (TypeError, ValueError):
+        return jsonify({'message': 'weight_g and time_hours must be numbers'}), 400
+    if weight_val <= 0 or time_val <= 0:
+        return jsonify({'message': 'weight_g and time_hours must be greater than 0'}), 400
+
+    # Determine material rate
+    material = (job.material or '').strip().lower()
+    if material == 'filament':
+        rate = 0.10
+    elif material == 'resin':
+        rate = 0.20
+    else:
+        # Default to filament pricing if unknown, to avoid blocking
+        rate = 0.10
+
+    # Compute cost with minimum $3.00
+    raw_cost = weight_val * rate
+    min_cost = 3.00
+    final_cost = max(raw_cost, min_cost)
+    # Round to 2 decimals using bankers rounding to HALF_UP
+    final_cost_decimal = Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    # Update job fields
+    job.weight_g = weight_val
+    job.time_hours = time_val
+    job.cost_usd = final_cost_decimal
+    job.last_updated_by = staff_name
     job.status = 'PENDING'
+    db.session.add(job)
     db.session.commit()
 
+    # Generate confirmation token and send email
     token = generate_confirmation_token(job.id)
-    # Construct a basic confirmation URL; frontend route expected at /confirm/[token]
     base_url = request.host_url.rstrip('/')
     confirmation_url = f"{base_url}/confirm/{token}"
     send_approval_email(job, confirmation_url)
 
-    Event(job_id=job.id, event_type='StaffApproved', details={'confirmation_url': confirmation_url}, triggered_by=g.workstation_id, workstation_id=g.workstation_id)
-    db.session.add(Event(job_id=job.id, event_type='ApprovalEmailSent', details={}, triggered_by=g.workstation_id, workstation_id=g.workstation_id))
+    # Log events with proper attribution
+    approval_event = Event(
+        job_id=job.id,
+        event_type='StaffApproved',
+        details={
+            'confirmation_url': confirmation_url,
+            'weight_g': weight_val,
+            'time_hours': time_val,
+            'cost_usd': float(final_cost_decimal),
+        },
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    email_event = Event(
+        job_id=job.id,
+        event_type='ApprovalEmailSent',
+        details={},
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(approval_event)
+    db.session.add(email_event)
     db.session.commit()
+
     return jsonify(job.to_dict()), 200
