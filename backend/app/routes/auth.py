@@ -10,7 +10,9 @@ bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 # This is a temporary, insecure way to store credentials.
 # In a real application, this would be configured securely.
 WORKSTATIONS = {
-    "front-desk": "Fabrication"
+    "workstation-1": "Fabrication",
+    "workstation-2": "Fabrication",
+    "admin": "Fabrication",
 }
 
 @bp.route('/login', methods=['POST'])

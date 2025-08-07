@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [workstationId, setWorkstationId] = useState('front-desk');
+  const [workstationId, setWorkstationId] = useState('workstation-1');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
@@ -42,7 +42,9 @@ export default function LoginPage() {
             className="mt-1 w-full border border-gray-300 rounded p-2"
             required
           >
-            <option value="front-desk">Front Desk</option>
+            <option value="workstation-1">Workstation 1</option>
+            <option value="workstation-2">Workstation 2</option>
+            <option value="admin">Admin</option>
           </select>
         </div>
         <div>
