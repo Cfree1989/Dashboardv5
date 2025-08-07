@@ -87,6 +87,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ✅ **Enhanced Accessibility** - Proper focus states, ARIA labels, keyboard navigation  
 
 ### Active Development:
+✅ **Tab Count Authentication Fix** - Fixed dashboard tabs not showing job counts due to missing authentication headers  
 🔄 **Phase 4.1: Email Service Integration** - Implementing Flask-Mail with templates and background processing
 
 ## Phase 4.1: Email Service Integration (Current Focus)
@@ -171,6 +172,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - **API Proxy Configuration**: Next.js rewrites essential for frontend-backend communication  
 - **Progressive Enhancement**: Build functional features first, then enhance with professional styling
 - **Focus on Core Workflows**: Prioritize job submission → approval → completion flow above advanced features
+- **Authentication Headers**: Always include Authorization headers in ALL API calls, including count fetches for tab badges
 
 ## Risk Assessment: LOW
 

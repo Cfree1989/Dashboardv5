@@ -34,19 +34,26 @@ export default function DashboardPage() {
   const initialStatus = searchParams.get('status') || statusOptions[0];
   const [status, setStatus] = useState(initialStatus);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  
+  const fetchCounts = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    const counts: Record<string, number> = {};
+    await Promise.all(
+      statusOptions.map(async (s) => {
+        const params = new URLSearchParams({ status: s });
+        const res = await fetch('/api/v1/jobs?' + params.toString(), {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        counts[s] = (data.jobs || []).length;
+      })
+    );
+    setStatusCounts(counts);
+  };
+  
   useEffect(() => {
-    async function fetchCounts() {
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        statusOptions.map(async (s) => {
-          const params = new URLSearchParams({ status: s });
-          const res = await fetch('/api/v1/jobs?' + params.toString());
-          const data = await res.json();
-          counts[s] = (data.jobs || []).length;
-        })
-      );
-      setStatusCounts(counts);
-    }
     fetchCounts();
   }, []);
   const updateStatus = (newStatus: string) => {

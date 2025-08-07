@@ -26,7 +26,7 @@ def list_jobs():
     jobs = query.all()
     if search:
         jobs = [job for job in jobs if search.lower() in job.student_name.lower() or search.lower() in job.student_email.lower()]
-    return jsonify([job.to_dict() for job in jobs]), 200
+    return jsonify({'jobs': [job.to_dict() for job in jobs]}), 200
 
 @bp.route('/<job_id>', methods=['GET'])
 @token_required
