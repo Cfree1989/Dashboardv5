@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, RotateCcw } from "lucide-react";
+import ReviewModal from './modals/review-modal';
 
 interface Job {
   id: string;
@@ -33,8 +34,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   
-  const isUnreviewed = !job.staff_viewed_at;
+  const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
   // Calculate job age and determine color
   const getAgeColor = (createdAt: string) => {
@@ -102,11 +104,12 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setIsRejecting(false);
   };
 
-  const handleMarkReviewed = async () => {
-    setIsMarkingReviewed(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    onMarkReviewed?.(job.id);
-    setIsMarkingReviewed(false);
+  const handleMarkReviewed = () => {
+    setShowReviewModal({ reviewed: true });
+  };
+
+  const handleReapplyNew = () => {
+    setShowReviewModal({ reviewed: false });
   };
 
   return (
@@ -117,7 +120,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     `}
     >
       <div className="p-4">
-        {isUnreviewed && (
+        {currentStatus === 'UPLOADED' && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
             <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
             <button
@@ -252,11 +255,33 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     </>
                   )}
                 </button>
+                {!!job.staff_viewed_at && (
+                  <button
+                    onClick={handleReapplyNew}
+                    className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 focus-ring btn-transition"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1" />
+                    Reapply NEW
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
       </div>
+      {showReviewModal && (
+        <ReviewModal
+          jobId={job.id}
+          reviewed={showReviewModal.reviewed}
+          onClose={() => setShowReviewModal(null)}
+          onUpdated={(updatedJob) => {
+            // Optimistically reflect returned state in the card via callback to parent when available
+            // Fallback: reload page section can be triggered by parent on next refetch
+            onMarkReviewed?.(job.id);
+            setShowReviewModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }

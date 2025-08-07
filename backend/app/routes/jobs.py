@@ -154,3 +154,54 @@ def approve_job(job_id):
     db.session.commit()
 
     return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/review', methods=['POST'])
+@token_required
+def review_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+
+    # Only allow review state on UPLOADED jobs
+    if job.status != 'UPLOADED':
+        return jsonify({'message': 'Job review state can only be changed in UPLOADED status'}), 400
+
+    data = request.get_json(silent=True) or {}
+    staff_name = data.get('staff_name')
+    reviewed = data.get('reviewed')
+
+    if staff_name is None:
+        return jsonify({'message': 'staff_name is required'}), 400
+
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+
+    if not isinstance(reviewed, bool):
+        return jsonify({'message': 'reviewed must be a boolean'}), 400
+
+    # Apply state change
+    if reviewed:
+        job.staff_viewed_at = datetime.utcnow()
+        event_type = 'JobReviewed'
+    else:
+        job.staff_viewed_at = None
+        event_type = 'JobReviewCleared'
+
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+
+    # Log event with attribution
+    evt = Event(
+        job_id=job.id,
+        event_type=event_type,
+        details={},
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(evt)
+    db.session.commit()
+
+    return jsonify(job.to_dict()), 200

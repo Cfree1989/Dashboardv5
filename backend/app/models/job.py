@@ -66,6 +66,9 @@ class Job(db.Model):
             'weight_g': float(self.weight_g) if self.weight_g else None,
             'time_hours': float(self.time_hours) if self.time_hours else None,
             'cost_usd': float(self.cost_usd) if self.cost_usd else None,
+            'staff_viewed_at': (
+                self.staff_viewed_at.replace(tzinfo=timezone.utc).isoformat() if self.staff_viewed_at else None
+            ),
             'student_confirmed': self.student_confirmed,
             'student_confirmed_at': (
                 self.student_confirmed_at.replace(tzinfo=timezone.utc).isoformat() if self.student_confirmed_at else None

@@ -87,13 +87,19 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
   };
 
   const handleMarkReviewed = (jobId: string) => {
-    console.log("Mark as reviewed:", jobId);
-    // Update local state to mark as reviewed
-    setJobs(prevJobs => 
-      prevJobs.map(job => 
-        job.id === jobId ? { ...job, staff_viewed_at: new Date().toISOString() } : job
-      )
-    );
+    // This callback is now used to trigger a local refresh when the modal completes.
+    // We will refetch the specific job to get the authoritative staff_viewed_at.
+    (async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`/api/v1/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const updated = await res.json();
+        setJobs(prev => prev.map(j => (j.id === jobId ? { ...j, staff_viewed_at: updated.staff_viewed_at } : j)));
+      } catch {
+        // no-op; UI will correct on next list refresh
+      }
+    })();
   };
 
   if (loading) return <JobListSkeleton />;

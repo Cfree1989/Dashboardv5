@@ -137,3 +137,34 @@ def test_approve_cost_minimum_applied_for_small_weight(client, token, app):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data['cost_usd'] == 3.0
+
+
+def test_review_toggle_persists_and_logs_event(client, token, app):
+    job = create_job(app)
+    # Add active staff
+    client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Initially unreviewed
+    resp = client.get(f'/api/v1/jobs/{job.id}', headers={'Authorization': f'Bearer {token}'})
+    assert resp.status_code == 200
+    assert resp.get_json().get('staff_viewed_at') is None
+
+    # Mark reviewed
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/review',
+        json={'reviewed': True, 'staff_name': 'Reviewer'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['staff_viewed_at'] is not None
+
+    # Clear (reapply NEW)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/review',
+        json={'reviewed': False, 'staff_name': 'Reviewer'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['staff_viewed_at'] is None

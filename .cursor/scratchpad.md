@@ -113,6 +113,21 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [ ] Executor: Phase 5.1.5 — Candidate Files (stub)
   - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
 
+- [ ] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
+  - Success criteria: Document clear UX rules, backend persistence contract, frontend modal behavior, and tests; added tasks below
+- [x] Executor: Phase 6.2.1 — Backend: Persist review state + expose in API (toggle)
+  - Success criteria: Add `staff_viewed_at` to `Job.to_dict()`; implement `POST /api/v1/jobs/<id>/review` (auth required) with body `{ reviewed: boolean, staff_name: string }`.
+    - If `reviewed === true`: validate status `UPLOADED`, set `staff_viewed_at=now`, log `JobReviewed` with `{ triggered_by, workstation_id }`.
+    - If `reviewed === false`: validate status `UPLOADED`, set `staff_viewed_at=null`, log `JobReviewCleared` with attribution.
+    - Return updated job; unit tests for both paths.
+- [x] Executor: Phase 6.2.2 — Frontend: Review modal + visibility rules (with reapply)
+  - Success criteria: Show NEW badge + glow only when `currentStatus==='UPLOADED' && !staff_viewed_at`.
+    - Button “Mark as Reviewed” opens confirmation modal (text: “Have you reviewed this job?”) with required Staff Attribution select; on confirm, call backend with `{ reviewed: true }`, update job so indicator disappears and stays gone after refresh.
+    - When `currentStatus==='UPLOADED' && staff_viewed_at` show a secondary action “Reapply NEW indicator” (or “Mark as Unreviewed”); opens modal with attribution; on confirm call backend with `{ reviewed: false }`, update job so indicator returns and persists across refresh.
+    - Accessible focus/ARIA.
+- [x] Executor: Phase 6.2.3 — Frontend/Backend Tests
+  - Success criteria: Backend tests for review endpoint (status guard, event logging, auth; both reviewed/unreviewed). Frontend tests to ensure indicator visible only on Uploaded, modal required to clear/reapply, and persistence across refetch.
+
 ## Planner: Fixes from Feedback (Tabs count, Job ID length, Approved details)
 
 ### Key Challenges and Analysis
@@ -143,6 +158,41 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - Success criteria: Define MVP features list (Staff Management, Admin Overrides, System Health/Audit, Archival controls, Background sound config), UI sections, and required API mappings; produce a short acceptance checklist
 - [ ] Planner: Scope Analytics/Stats Page (`/analytics`)
   - Success criteria: Define overview cards and trend charts, map to `/analytics/overview`, `/analytics/trends`, `/analytics/resources`, and `/stats` endpoints; outline data shapes and loading states
+
+## Planner: Visual Alerts & Reviewed Flow (Scope)
+
+### Key Challenges and Analysis
+- NEW indicator reappears on refresh because review state isn’t persisted: frontend only sets `staff_viewed_at` locally; backend doesn’t expose it in responses.
+- Indicator should show only on `Uploaded` tab, but current UI shows whenever `!staff_viewed_at` regardless of tab.
+- Clicking “Mark as Reviewed” should prompt a confirmation modal and require staff attribution; currently it’s a simple button with no persistence or attribution.
+
+### High-level Task Breakdown — Phase 6.2 Visual Alerts
+1) Backend: Review Persistence
+- Add `staff_viewed_at` to `Job.to_dict()` so clients can render persisted review state.
+- Implement `POST /api/v1/jobs/<job_id>/review`:
+  - Auth required; body: `{ reviewed: boolean, staff_name: string }`.
+  - Validate job exists and is in `UPLOADED` status; validate `staff_name` is active.
+  - If `reviewed === true`: set `staff_viewed_at = now()`, `last_updated_by = staff_name`; log `JobReviewed`.
+  - If `reviewed === false`: set `staff_viewed_at = null`, `last_updated_by = staff_name`; log `JobReviewCleared`.
+  - Return updated job JSON.
+
+2) Frontend: Modal + Visibility Rules
+- Only render NEW badge + glow when `currentStatus === 'UPLOADED' && !job.staff_viewed_at`.
+- Replace inline action with a modal: title “Mark as Reviewed”, body ask confirmation (“Have you reviewed this job?”) and include required Staff Attribution select (from `/api/v1/staff`).
+- On confirm, call `POST /api/v1/jobs/:id/review` with Authorization and selected `staff_name` and the correct `reviewed` boolean; update local state with returned job; close modal.
+- Ensure indicator never shows on non-Uploaded tabs.
+ - Add a companion action in Uploaded when already reviewed: “Reapply NEW indicator”/“Mark as Unreviewed.”
+
+3) Tests
+- Backend: unit tests for review endpoint happy path, invalid status, invalid staff, event assertions.
+- Frontend: component tests verifying visibility rule, modal validation (disabled confirm until staff selected), and that indicator remains cleared after a refetch.
+
+### Acceptance Checklist (Phase 6.2)
+- NEW indicator and glow appear only on `Uploaded` jobs that are unreviewed.
+- “Mark as Reviewed” opens a confirmation modal with staff attribution; upon confirm, indicator disappears and stays gone across refreshes.
+- Ability to reapply indicator on Uploaded jobs (“Mark as Unreviewed”) and it persists across refresh.
+- Backend persists `staff_viewed_at` changes and logs `JobReviewed`/`JobReviewCleared` events with attribution.
+- Tests added and passing.
 
 ## Executor's Feedback or Assistance Requests
 
