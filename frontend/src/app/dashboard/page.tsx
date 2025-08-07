@@ -18,6 +18,10 @@ export default function DashboardPage() {
     setLastUpdated(new Date().toLocaleTimeString());
     window.location.reload();
   };
+  const logout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
   const initialStatus = searchParams.get('status') || statusOptions[0];
   const [status, setStatus] = useState(initialStatus);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
@@ -55,7 +59,7 @@ export default function DashboardPage() {
   return (
     <div>
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">3D Print Job Dashboard</h1>
+        <h1 className="text-3xl font-bold">3D Print Job</h1>
         <div className="flex items-center space-x-4">
           <button onClick={() => setSoundOn(!soundOn)} className="px-3 py-1 border rounded">
             {soundOn ? '🔊 Sound On' : '🔇 Sound Off'}
@@ -63,6 +67,9 @@ export default function DashboardPage() {
           <span className="text-gray-600">Last updated: {lastUpdated}</span>
           <button onClick={refreshPage} className="px-3 py-1 bg-blue-600 text-white rounded">
             Refresh
+          </button>
+          <button onClick={logout} className="px-3 py-1 bg-red-600 text-white rounded">
+            Logout
           </button>
         </div>
       </header>
