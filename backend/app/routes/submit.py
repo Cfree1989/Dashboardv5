@@ -18,6 +18,21 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _normalize_name_for_filename(name: str) -> str:
+    # Remove non-alphanumerics, collapse spaces, PascalCase words
+    parts = [p for p in name.strip().replace('_', ' ').split() if p]
+    joined = ''.join(w.capitalize() for w in parts)
+    # Keep only alphanumerics
+    return ''.join(ch for ch in joined if ch.isalnum()) or 'Student'
+
+
+def _normalize_simple_label(value: str) -> str:
+    # Convert to TitleCase words and remove spaces
+    parts = [p for p in value.strip().replace('_', ' ').split() if p]
+    labeled = ''.join(w.capitalize() for w in parts)
+    return ''.join(ch for ch in labeled if ch.isalnum()) or 'Value'
+
+
 @bp.route('', methods=['POST'])
 def submit_job():
     try:
@@ -53,19 +68,37 @@ def submit_job():
         # Generate job ID and standardized filenames
         new_id = uuid4().hex
         ext = file.filename.rsplit('.', 1)[1].lower()
-        standardized_name = f"{new_id}.{ext}"
-        file_path = os.path.join(storage_dir, standardized_name)
-
-        # Save file
-        with open(file_path, 'wb') as out_f:
-            out_f.write(file_bytes)
-
         # Determine student name: prefer single field, else combine first/last
         student_name = request.form.get('student_name')
         if not student_name:
             first_name = request.form.get('student_first_name')
             last_name = request.form.get('student_last_name')
             student_name = f"{first_name or ''} {last_name or ''}".strip()
+        normalized_student = _normalize_name_for_filename(student_name or 'Student')
+
+        # Derive print method/material and color
+        raw_method = request.form.get('material') or request.form.get('print_method') or ''
+        raw_color = request.form.get('color') or ''
+        normalized_method = _normalize_simple_label(raw_method or 'Method')
+        normalized_color = _normalize_simple_label(raw_color or 'Color')
+
+        # Short/simple Job ID
+        simple_id = new_id[:6]
+        standardized_base = f"{normalized_student}_{normalized_method}_{normalized_color}_{simple_id}"
+        standardized_name = f"{standardized_base}.{ext}"
+        file_path = os.path.join(storage_dir, standardized_name)
+
+        # Save file (ensure unique by appending counter if exists)
+        base_name = standardized_base
+        candidate_name = standardized_name
+        candidate_path = file_path
+        counter = 1
+        while os.path.exists(candidate_path):
+            candidate_name = f"{base_name}_{counter}.{ext}"
+            candidate_path = os.path.join(storage_dir, candidate_name)
+            counter += 1
+        with open(candidate_path, 'wb') as out_f:
+            out_f.write(file_bytes)
 
         # Create metadata JSON
         metadata = {
@@ -74,12 +107,13 @@ def submit_job():
             'discipline': request.form.get('discipline'),
             'class_number': request.form.get('class_number'),
             'printer': request.form.get('printer'),
-            'color': request.form.get('color'),
-            'material': request.form.get('material') or request.form.get('print_method'),
+            'color': raw_color,
+            'material': raw_method,
             'status': 'UPLOADED',
             'created_at': datetime.utcnow().isoformat()
         }
-        metadata_path = os.path.join(storage_dir, f"{new_id}_metadata.json")
+        metadata_base = base_name if counter == 1 else f"{base_name}_{counter-1}"
+        metadata_path = os.path.join(storage_dir, f"{metadata_base}_metadata.json")
         with open(metadata_path, 'w') as meta_f:
             json.dump(metadata, meta_f)
 
@@ -91,13 +125,13 @@ def submit_job():
             discipline=request.form.get('discipline'),
             class_number=request.form.get('class_number'),
             original_filename=file.filename,
-            display_name=standardized_name,
-            file_path=file_path,
+            display_name=candidate_name,
+            file_path=candidate_path,
             metadata_path=metadata_path,
             file_hash=file_hash,
             printer=request.form.get('printer'),
-            color=request.form.get('color'),
-            material=request.form.get('material') or request.form.get('print_method')
+            color=raw_color,
+            material=raw_method
         )
         db.session.add(job)
         db.session.commit()

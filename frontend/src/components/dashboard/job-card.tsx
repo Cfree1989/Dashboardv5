@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from 'react';
-import { formatDistanceToNow } from "date-fns";
 import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } from "lucide-react";
 
 interface Job {
@@ -11,6 +10,10 @@ interface Job {
   original_filename?: string;
   printer?: string;
   color?: string;
+  material?: string;
+  weight_g?: number;
+  time_hours?: number;
+  cost_usd?: number;
   created_at?: string;
   notes?: string;
   staff_viewed_at?: string;
@@ -44,8 +47,45 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const ageColor = job.created_at ? getAgeColor(job.created_at) : "text-gray-500";
 
-  // Format time elapsed
-  const timeElapsed = job.created_at ? formatDistanceToNow(new Date(job.created_at)) + ' ago' : 'recently';
+  // Custom elapsed formatter: 10-min increments up to 2h, then round up to 30-min increments
+  const formatElapsed = (createdAt: string) => {
+    const created = new Date(createdAt);
+    const now = new Date();
+    const diffMinutes = Math.max(0, Math.floor((now.getTime() - created.getTime()) / 60000));
+    if (diffMinutes < 1) return 'just now';
+    const roundUp = (value: number, increment: number) => Math.ceil(value / increment) * increment;
+    let roundedMins: number;
+    if (diffMinutes < 120) {
+      roundedMins = roundUp(diffMinutes, 10);
+    } else {
+      roundedMins = roundUp(diffMinutes, 30);
+    }
+    const hours = Math.floor(roundedMins / 60);
+    const mins = roundedMins % 60;
+    if (hours === 0) return `About ${mins} min ago`;
+    if (mins === 0) return `About ${hours} hr ago`;
+    return `About ${hours} hr ${mins} min ago`;
+  };
+  const timeElapsed = job.created_at ? formatElapsed(job.created_at) : 'recently';
+
+  // Format created timestamp explicitly in Baton Rouge, Louisiana timezone (America/Chicago)
+  const formatCreatedAtCentral = (createdAt?: string) => {
+    if (!createdAt) return 'Unknown';
+    try {
+      const dt = new Date(createdAt);
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Chicago',
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }).format(dt);
+    } catch {
+      return 'Unknown';
+    }
+  };
 
   const handleApprove = async () => {
     setIsApproving(true);
@@ -100,17 +140,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         )}
 
         <div className="flex justify-between items-start mb-3">
-          <h3 className="text-lg font-semibold text-gray-900 truncate">{job.student_name || job.display_name || job.id}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 truncate">{job.student_name || job.display_name || (job.id?.slice(0,8) + '…')}</h3>
           <span className={`text-sm ${ageColor} font-medium`}>{timeElapsed}</span>
         </div>
 
-        <p className="text-gray-600 text-sm mb-3 truncate">{job.original_filename || job.display_name || 'Unknown file'}</p>
+        <p className="text-gray-600 text-sm mb-3 truncate">{job.display_name || job.original_filename || 'Unknown file'}</p>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="flex items-center text-sm text-gray-500">
-            <User className="w-4 h-4 mr-1" />
-            <span className="truncate">{job.student_name || 'Unknown'}</span>
-          </div>
           <div className="flex items-center text-sm text-gray-500">
             <Mail className="w-4 h-4 mr-1" />
             <span className="truncate">{job.student_email || 'No email'}</span>
@@ -139,13 +175,29 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-gray-500">Job ID:</span>
-                <p className="text-gray-900">{job.id}</p>
+                <p className="text-gray-900">{job.id?.slice(0,8)}…</p>
               </div>
               <div>
                 <span className="text-gray-500">Created:</span>
-                <p className="text-gray-900">{job.created_at ? new Date(job.created_at).toLocaleString() : 'Unknown'}</p>
+                <p className="text-gray-900">{formatCreatedAtCentral(job.created_at)}</p>
               </div>
             </div>
+            {(job.weight_g || job.time_hours || job.cost_usd) && (
+              <div className="mt-3">
+                <h5 className="text-sm font-medium text-gray-900 mb-1">Print Details</h5>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  {typeof job.weight_g === 'number' && (
+                    <div className="text-gray-700"><span className="text-gray-500">Weight:</span> {job.weight_g} g</div>
+                  )}
+                  {typeof job.time_hours === 'number' && (
+                    <div className="text-gray-700"><span className="text-gray-500">Time:</span> {job.time_hours} h</div>
+                  )}
+                  {typeof job.cost_usd === 'number' && (
+                    <div className="text-gray-700"><span className="text-gray-500">Cost:</span> ${job.cost_usd.toFixed(2)}</div>
+                  )}
+                </div>
+              </div>
+            )}
             {job.notes && (
               <div className="mt-3">
                 <span className="text-gray-500 text-sm">Notes:</span>

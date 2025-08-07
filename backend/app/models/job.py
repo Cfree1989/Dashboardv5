@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 class Job(db.Model):
@@ -65,10 +65,12 @@ class Job(db.Model):
             'time_hours': float(self.time_hours) if self.time_hours else None,
             'cost_usd': float(self.cost_usd) if self.cost_usd else None,
             'student_confirmed': self.student_confirmed,
-            'student_confirmed_at': self.student_confirmed_at.isoformat() if self.student_confirmed_at else None,
+            'student_confirmed_at': (
+                self.student_confirmed_at.replace(tzinfo=timezone.utc).isoformat() if self.student_confirmed_at else None
+            ),
             'is_confirmation_expired': self.is_confirmation_expired,
             'last_updated_by': self.last_updated_by,
             'notes': self.notes,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.replace(tzinfo=timezone.utc).isoformat(),
+            'updated_at': self.updated_at.replace(tzinfo=timezone.utc).isoformat()
         } 

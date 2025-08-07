@@ -25,7 +25,7 @@ interface JobListFilters {
   printer?: string;
   discipline?: string;
 }
-export default function JobList({ filters }: { filters?: JobListFilters }) {
+export default function JobList({ filters, onJobsMutated }: { filters?: JobListFilters, onJobsMutated?: () => void }) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -78,6 +78,7 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
     if (approveJobId) {
       setJobs(prev => prev.filter(j => j.id !== approveJobId));
     }
+    onJobsMutated?.();
   };
 
   const handleReject = (jobId: string) => {

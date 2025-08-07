@@ -112,6 +112,33 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - Success criteria: Backend tests for approve payload validation and event logging; Frontend tests for modal validation and API call; all CI tests pass
 - [ ] Executor: Phase 5.1.5 — Candidate Files (stub)
   - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
+
+## Planner: Fixes from Feedback (Tabs count, Job ID length, Approved details)
+
+### Key Challenges and Analysis
+- **Tabs not counting jobs**: Backend `GET /api/v1/jobs` returns an array, but frontend expects `{ jobs: [...] }` when counting. This results in zero counts. Also, counts are fetched only on mount and not refreshed after approvals.
+- **Long Job ID in UI**: UUID is shown in places; visually noisy. We should display a shortened form in UI while preserving the full value for actions.
+- **Show cost/time after approval**: Backend now persists `weight_g`, `time_hours`, and `cost_usd`. The UI types and rendering need to surface these fields on cards.
+
+### High-level Task Breakdown — Feedback Fixes
+1) Tabs Count Fix
+- Edit `frontend/src/app/dashboard/page.tsx` `fetchCounts()` to handle array response: `Array.isArray(data) ? data.length : (data.jobs || []).length`.
+- Add a simple refresh hook so counts update after an approval: pass `onJobsMutated` callback from Dashboard to `JobList`; call `fetchCounts()` when invoked.
+- Success: Tab badges reflect correct counts initially and update immediately after approving a job.
+
+2) Shorten Job ID Display
+- In `frontend/src/components/dashboard/job-card.tsx`, when rendering Job ID or fallback to ID in title, display a short form `id.slice(0, 8)` with an ellipsis or tooltip for full ID.
+- Success: UI shows short IDs; actions continue to use full ID.
+
+3) Show Approved Cost/Time on Cards
+- Extend Job types in `job-card.tsx` and `job-list.tsx` to include `material`, `weight_g`, `time_hours`, `cost_usd`.
+- Render a "Print Details" section (weight, time, cost) when these fields are present.
+- Success: After approval, cards in `PENDING` (and beyond) show weight/time/cost.
+
+### Acceptance Checklist (Feedback Fixes)
+- Tab counts show correct numbers and update right after approving a job.
+- Job IDs are shown in a shortened format in UI while keeping full functionality.
+- Approved jobs display weight (g), time (hours), and cost (USD) on their cards.
 - [ ] Planner: Scope Admin Page (settings and controls)
   - Success criteria: Define MVP features list (Staff Management, Admin Overrides, System Health/Audit, Archival controls, Background sound config), UI sections, and required API mappings; produce a short acceptance checklist
 - [ ] Planner: Scope Analytics/Stats Page (`/analytics`)

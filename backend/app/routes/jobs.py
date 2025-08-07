@@ -7,6 +7,7 @@ from app.models.event import Event
 from app.services.token_service import generate_confirmation_token
 from app.services.email_service import send_approval_email
 from app.models.staff import Staff
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
@@ -116,6 +117,8 @@ def approve_job(job_id):
     job.time_hours = time_val
     job.cost_usd = final_cost_decimal
     job.last_updated_by = staff_name
+    # Mark as reviewed to clear "NEW" indicator across statuses
+    job.staff_viewed_at = datetime.utcnow()
     job.status = 'PENDING'
     db.session.add(job)
     db.session.commit()

@@ -45,7 +45,7 @@ export default function DashboardPage() {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         const data = await res.json();
-        counts[s] = (data.jobs || []).length;
+        counts[s] = Array.isArray(data) ? data.length : (data.jobs || []).length;
       })
     );
     setStatusCounts(counts);
@@ -95,7 +95,7 @@ export default function DashboardPage() {
         onStatusChange={updateStatus} 
         stats={statusCounts} 
       />
-      <JobList filters={{ status }} />
+      <JobList filters={{ status }} onJobsMutated={fetchCounts} />
     </div>
   );
 }
