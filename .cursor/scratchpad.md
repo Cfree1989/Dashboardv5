@@ -261,12 +261,32 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 ### Phase 4: Advanced Features (Week 4)
 **Success Criteria**: Complete workflow with email notifications and file management
 
-1. **Email Service Integration**
-   - Implement Flask-Mail configuration
-   - Create email templates
-   - Add background task processing
-   - Handle email delivery failures
-   - Add email resend functionality
+#### Phase 4.1: Email Service Integration [in_progress]
+**Goal**: Implement reliable email notifications for submission confirmations and status updates
+**Time Estimate**: 60 minutes
+
+**Sub-Tasks**:
+1. Configure Flask-Mail in `backend/app/__init__.py`:
+   - Set SMTP server, port, credentials via environment variables
+   - Initialize `Mail` instance and attach to app
+2. Create email templates in `backend/app/templates/mail/`:
+   - `submission_confirmation.html` and `status_update.html`
+   - Include proper branding, styles, and responsive design
+3. Implement `EmailService` in `backend/app/services/email_service.py`:
+   - Methods: `send_confirmation_email(job_id, email)`, `send_status_update(job, new_status)`
+   - Render templates and send via Flask-Mail
+4. Add background task processing with Celery:
+   - Configure Redis broker in `backend/app/__init__.py`
+   - Create task functions in `backend/app/tasks/email_tasks.py`
+   - Ensure tasks are retried on failure and logged
+5. Add endpoint to trigger email resend:
+   - `POST /api/v1/jobs/<id>/resend-email`
+   - Validate id, call `send_confirmation_email`, return status
+6. Write unit tests in `tests/test_email.py`:
+   - Mock Flask-Mail to verify calls
+   - Test template rendering and service methods
+
+---
 
 2. **File Management System**
    - Implement file upload processing
@@ -429,7 +449,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [ ] **DS.4: Error Pages & Edge Cases** (30 min) - LOW
 
 ### Phase 4: Advanced Features
-- [ ] Email service integration
+- [ in_progress ] Email service integration
 - [ ] File management system
 - [ ] Payment & pickup workflow
 - [ ] Protocol handler development
@@ -1147,47 +1167,62 @@ We've successfully transformed our dashboard into a professional, V0-quality int
 ### Detailed Task Breakdown
 
 #### Phase DS.1: Login Page Professional Upgrade
-**Goal**: Transform basic login page into professional V0-quality authentication interface
+**Goal**: Transform basic login page into a professional V0-quality authentication interface
 **Time Estimate**: 45 minutes
 **Priority**: HIGH - Gateway to the application
 
-**Current Issues**:
-- Basic `bg-gray-50` background 
-- Simple `shadow-sm` card styling
-- Basic button without hover effects
-- Inconsistent typography and spacing
-- No loading states or enhanced error handling
+**Detailed Sub-Tasks**:
+1. Create a full-screen gradient background container:
+   - Update outer `<div>` to `bg-gradient-to-r from-blue-50 to-white`
+   - Ensure `min-h-screen flex items-center justify-center`
+2. Create a `LoginCard` wrapper component:
+   - New file: `frontend/src/components/LoginCard.tsx`
+   - Apply `bg-card p-8 rounded-xl shadow-md max-w-sm`
+   - Encapsulate form structure inside this card
+3. Style form controls:
+   - Apply `focus-ring` utility to `<input>` and `<select>`
+   - Use `border border-input p-2 rounded` and `transition-all duration-200`
+   - Ensure consistent typography (`text-sm text-foreground`)
+4. Style action button:
+   - Apply `btn-transition`, `bg-primary`, `text-primary-foreground`, `rounded-lg`, `px-4 py-2`
+   - Add loading spinner (Lucide React’s `Loader2` icon) when authenticating
+   - Disable button during submission (`opacity-50 cursor-not-allowed`)
+5. Implement enhanced error handling:
+   - Slide-in error banner using `transition-all ease-out` and `bg-destructive-foreground bg-opacity-10`
+   - Include `XCircle` icon and descriptive message
+6. Accessibility improvements:
+   - Add `aria-live="assertive"` to error messages
+   - Ensure all actionable elements have visible focus outlines
 
-**Transformation Plan**:
-1. **Background & Layout Enhancement**
-   - Replace `bg-gray-50` with professional gradient or pattern
-   - Add professional container styling matching dashboard
-   - Implement proper responsive centering and spacing
+**Design Tokens & Utilities**:
+- Background gradient: `bg-gradient-to-r from-blue-50 to-white`
+- Card: `bg-card`, `rounded-xl`, `shadow-md`, `p-8`, `max-w-sm`
+- Input: `border border-input`, `p-2`, `rounded`, `focus:ring-blue-500`
+- Button: `bg-primary`, `text-primary-foreground`, `btn-transition`, `focus:ring-blue-500`
 
-2. **Card Styling Upgrade**  
-   - Replace basic `shadow-sm` with V0 card styling (`shadow-md`, `rounded-xl`)
-   - Add proper padding and spacing consistency
-   - Implement hover effects with `card-hover` utility
+**Code Snippets (Before / After)**:
+_Before_:
+```tsx
+<div className="min-h-screen flex items-center justify-center bg-gray-50">
+```
+_After_:
+```tsx
+<div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 to-white">
+```
+```tsx
+<LoginCard>
+  <form> ... </form>
+</LoginCard>
+```
 
-3. **Form Controls Enhancement**
-   - Apply `focus-ring` utility to all inputs
-   - Add professional input styling with proper borders and transitions
-   - Enhance dropdown styling to match dashboard components
-   - Add proper spacing between form elements
-
-4. **Button Transformation**
-   - Apply `btn-transition` for smooth interactions
-   - Use professional color scheme (blue-600, hover:blue-700)
-   - Add loading state with spinner when authenticating
-   - Implement disabled state during submission
-
-5. **Error Handling Enhancement**
-   - Style error messages with proper color and spacing
-   - Add icons to error states using Lucide React
-   - Implement slide-in animations for error messages
+**Testing Plan**:
+- Unit test that the button renders a spinner during API call
+- Manual test: submit invalid credentials and verify error banner slides in
+- Accessibility check: Tab through inputs and button, verify focus states
 
 **Files to Modify**:
 - `frontend/src/app/login/page.tsx`
+- `frontend/src/components/LoginCard.tsx` (new component)
 
 **Success Criteria**: Login page visually matches dashboard quality with smooth interactions and professional error handling
 
@@ -1333,20 +1368,6 @@ We've successfully transformed our dashboard into a professional, V0-quality int
 - ✅ Enhanced accessibility and usability
 - ✅ Improved perceived quality and trustworthiness
 - ✅ Reduced development friction for future pages
-
-### Strategic Value
-
-**User Experience Impact**: 
-- Transforms application from "prototype" to "production-ready"
-- Builds user trust and confidence in the system
-- Provides consistent, intuitive interactions
-- Enhances accessibility and usability
-
-**Development Benefits**:
-- Establishes reusable design patterns
-- Reduces future development time for new pages
-- Creates consistent component library
-- Improves maintainability through standardization
 
 **Recommendation**: **Proceed immediately with DS.1 (Login Page)** as the highest-impact, quickest win to establish momentum for the full design system rollout.
 

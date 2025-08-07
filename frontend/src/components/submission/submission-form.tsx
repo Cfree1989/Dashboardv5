@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 const disciplineOptions = ['Art', 'Architecture', 'Landscape Architecture', 'Interior Design', 'Engineering', 'Hobby/Personal', 'Other'];
 const printMethodOptions = ['Filament', 'Resin'];
@@ -186,7 +187,7 @@ export default function SubmissionForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-lg mx-auto">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div>
         <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">First Name</label>
         <input
@@ -194,7 +195,7 @@ export default function SubmissionForm() {
           type="text"
           value={firstName}
           onChange={e => setFirstName(e.target.value)}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${firstNameError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${firstNameError ? 'border-red-600' : ''}`}
         />
         {firstNameError && <p className="text-red-600 text-sm mt-1">{firstNameError}</p>}
       </div>
@@ -205,7 +206,7 @@ export default function SubmissionForm() {
           type="text"
           value={lastName}
           onChange={e => setLastName(e.target.value)}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${lastNameError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${lastNameError ? 'border-red-600' : ''}`}
         />
         {lastNameError && <p className="text-red-600 text-sm mt-1">{lastNameError}</p>}
       </div>
@@ -221,7 +222,7 @@ export default function SubmissionForm() {
             const isValid = /^\S+@\S+\.\S+$/.test(studentEmail);
             setEmailError(isValid ? '' : 'Please enter a valid email address');
           }}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${emailError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${emailError ? 'border-red-600' : ''}`}
         />
         {emailError && (
           <p className="text-red-600 text-sm mt-1">{emailError}</p>
@@ -234,7 +235,7 @@ export default function SubmissionForm() {
           id="discipline"
           value={discipline}
           onChange={e => setDiscipline(e.target.value)}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${disciplineError ? 'border-red-600' : ''}`}
+          className="mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
         >
           <option value="">Select discipline</option>
           {disciplineOptions.map(opt => (
@@ -251,7 +252,7 @@ export default function SubmissionForm() {
           type="text"
           value={classNumber}
           onChange={e => setClassNumber(e.target.value)}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${classNumberError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${classNumberError ? 'border-red-600' : ''}`}
         />
         {classNumberError && <p className="text-red-600 text-sm mt-1">{classNumberError}</p>}
       </div>
@@ -262,7 +263,7 @@ export default function SubmissionForm() {
           id="printMethod"
           value={printMethod}
           onChange={e => setPrintMethod(e.target.value)}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 ${printMethodError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${printMethodError ? 'border-red-600' : ''}`}
         >
           <option value="">Select print method</option>
           {printMethodOptions.map(opt => (
@@ -287,7 +288,7 @@ export default function SubmissionForm() {
           value={color}
           onChange={e => setColor(e.target.value)}
           disabled={!printMethod}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-50 ${colorError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground disabled:opacity-50 ${colorError ? 'border-red-600' : ''}`}
         >
           <option value="">Select color</option>
           {printMethod && colorOptions[printMethod].map(opt => (
@@ -337,7 +338,7 @@ export default function SubmissionForm() {
           value={printer}
           onChange={e => setPrinter(e.target.value)}
           disabled={!printMethod}
-          className={`mt-1 block w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-50 ${printerError ? 'border-red-600' : ''}`}
+          className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground disabled:opacity-50 ${printerError ? 'border-red-600' : ''}`}
         >
           <option value="">Select printer</option>
           {availablePrinters.map(opt => (
@@ -368,7 +369,7 @@ export default function SubmissionForm() {
           type="file"
           accept=".stl,.obj,.3mf"
           onChange={handleFileChange}
-          className="mt-1 block w-full"
+          className="mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
         />
         {uploadProgress > 0 && (
           <progress value={uploadProgress} max={100} className="mt-2 w-full" />
@@ -384,8 +385,9 @@ export default function SubmissionForm() {
       <button
         type="submit"
         disabled={isSubmitting || !!emailError || !!fileError}
-        className="w-full bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 text-white font-semibold py-3 rounded-md disabled:opacity-50"
+        className="w-full flex items-center justify-center bg-primary text-primary-foreground px-4 py-3 rounded-lg btn-transition focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
       >
+        {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
         {isSubmitting ? 'Submitting...' : 'Submit Print Job'}
       </button>
     </form>

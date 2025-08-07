@@ -3,14 +3,14 @@ import { AlertTriangle } from 'lucide-react';
 
 export default function SubmitPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 to-white">
       <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-8">3D Print Submission</h1>
-          <p className="text-gray-600 mb-6">
+        <div className="bg-card p-8 rounded-xl shadow-md">
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">3D Print Submission</h1>
+          <p className="text-base text-foreground mb-6">
             Submit your 3D model for printing. Please ensure you've reviewed our guidelines before proceeding.
           </p>
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-8">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0" />
               <p className="ml-3 text-sm text-yellow-700">
