@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
+import { JobListSkeleton } from './job-card-skeleton';
 
 interface Job {
   id: string;
@@ -78,11 +79,7 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
     );
   };
 
-  if (loading) return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-      <p className="text-gray-500">Loading jobs...</p>
-    </div>
-  );
+  if (loading) return <JobListSkeleton />;
   
   if (error) return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">

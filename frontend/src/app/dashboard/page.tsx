@@ -14,11 +14,17 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const [soundOn, setSoundOn] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   useEffect(() => {
     setLastUpdated(new Date().toLocaleTimeString());
   }, []);
-  const refreshPage = () => {
+  const refreshPage = async () => {
+    setIsRefreshing(true);
     setLastUpdated(new Date().toLocaleTimeString());
+    
+    // Simulate refresh delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     window.location.reload();
   };
   const logout = () => {
@@ -59,13 +65,21 @@ export default function DashboardPage() {
           <LastUpdated lastUpdated={lastUpdated} />
           <button 
             onClick={refreshPage} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            disabled={isRefreshing}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center focus-ring btn-transition"
           >
-            Refresh
+            {isRefreshing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                Refreshing...
+              </>
+            ) : (
+              'Refresh'
+            )}
           </button>
           <button 
             onClick={logout} 
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus-ring btn-transition"
           >
             Logout
           </button>

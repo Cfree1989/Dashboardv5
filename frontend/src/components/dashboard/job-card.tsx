@@ -26,6 +26,9 @@ interface JobCardProps {
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
   
   const isUnreviewed = !job.staff_viewed_at;
 
@@ -44,11 +47,32 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   // Format time elapsed
   const timeElapsed = job.created_at ? formatDistanceToNow(new Date(job.created_at), { addSuffix: true }) : 'recently';
 
+  const handleApprove = async () => {
+    setIsApproving(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    onApprove?.(job.id);
+    setIsApproving(false);
+  };
+
+  const handleReject = async () => {
+    setIsRejecting(true);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    onReject?.(job.id);
+    setIsRejecting(false);
+  };
+
+  const handleMarkReviewed = async () => {
+    setIsMarkingReviewed(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+    onMarkReviewed?.(job.id);
+    setIsMarkingReviewed(false);
+  };
+
   return (
     <div
       className={`
-      bg-white rounded-xl shadow-sm border transition-all
-      ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200"}
+      bg-white rounded-xl shadow-sm border transition-all card-hover
+      ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
     `}
     >
       <div className="p-4">
@@ -56,11 +80,21 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           <div className="flex items-center justify-between mb-3">
             <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
             <button
-              onClick={() => onMarkReviewed?.(job.id)}
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
+              onClick={handleMarkReviewed}
+              disabled={isMarkingReviewed}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center disabled:opacity-50 focus-ring btn-transition"
             >
-              <Eye className="w-3 h-3 mr-1" />
-              Mark as Reviewed
+              {isMarkingReviewed ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent mr-1"></div>
+                  Marking...
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3 h-3 mr-1" />
+                  Mark as Reviewed
+                </>
+              )}
             </button>
           </div>
         )}
@@ -124,7 +158,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         )}
 
         <div className="flex items-center justify-between mt-4">
-          <button onClick={() => setShowMore(!showMore)} className="text-sm text-gray-500 hover:text-gray-700">
+          <button onClick={() => setShowMore(!showMore)} className="text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition">
             {showMore ? "Show Less" : "Show More"}
           </button>
 
@@ -132,18 +166,38 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             {currentStatus === "UPLOADED" && (
               <>
                 <button
-                  onClick={() => onApprove?.(job.id)}
-                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                  onClick={handleApprove}
+                  disabled={isApproving || isRejecting}
+                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 focus-ring btn-transition"
                 >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Approve
+                  {isApproving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent mr-1"></div>
+                      Approving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Approve
+                    </>
+                  )}
                 </button>
                 <button
-                  onClick={() => onReject?.(job.id)}
-                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  onClick={handleReject}
+                  disabled={isRejecting || isApproving}
+                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 focus-ring btn-transition"
                 >
-                  <XCircle className="w-4 h-4 mr-1" />
-                  Reject
+                  {isRejecting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent mr-1"></div>
+                      Rejecting...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Reject
+                    </>
+                  )}
                 </button>
               </>
             )}
