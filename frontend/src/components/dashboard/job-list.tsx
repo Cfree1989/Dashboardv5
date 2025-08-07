@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
 
 interface Job {
@@ -22,11 +23,17 @@ interface JobListFilters {
   discipline?: string;
 }
 export default function JobList({ filters }: { filters?: JobListFilters }) {
+  const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
     async function fetchJobs() {
       setLoading(true);
       setError('');
@@ -37,7 +44,9 @@ export default function JobList({ filters }: { filters?: JobListFilters }) {
         if (filters?.search) params.append('search', filters.search);
         if (filters?.printer) params.append('printer', filters.printer);
         if (filters?.discipline) params.append('discipline', filters.discipline);
-        const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''));
+        const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''), {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
         const data = await res.json();
         setJobs(data.jobs || []);
       } catch (err) {

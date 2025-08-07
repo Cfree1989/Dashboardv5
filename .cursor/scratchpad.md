@@ -468,7 +468,7 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 - [x] Provided pgAdmin connection instructions and removed default server registration
 
 ### In Progress:
-- [ ] Phase 3.1: UI/UX Refinement (Submission Form) - Design update to match mockup
+- [ ] **EMERGENCY FIX: API Connectivity** - Configure Next.js proxy to Flask backend
 
 ### Blockers:
 - None currently identified
@@ -523,6 +523,59 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 **Recommendation**: **STOP current work and fix immediately**. This is a fundamental architecture issue that blocks all API-dependent functionality. Cannot proceed with job management modals when basic API communication is broken.
 
 **Next Action Required**: Configure API routing between Next.js frontend and Flask backend.
+
+### Emergency Fix: API Connectivity Task Breakdown
+
+**Goal**: Restore API communication between Next.js frontend and Flask backend to enable core system functionality.
+
+**Priority**: CRITICAL - Must complete before any other development work
+
+#### Task 1: Configure Next.js API Proxy
+- **Action**: Create Next.js configuration to proxy `/api/v1/*` requests to Flask backend
+- **Implementation**: 
+  * Update `frontend/next.config.js` to include proxy rewrites
+  * Route all `/api/v1/*` requests to `http://localhost:5000/api/v1/*`
+  * Preserve request headers and method types
+- **Success Criteria**: Next.js dev server proxies API requests to Flask backend
+- **Test**: Manual verification that `/api/v1/submit` and `/api/v1/jobs` requests reach Flask
+- **Estimated Time**: 15 minutes
+
+#### Task 2: Test Student Submission API Flow
+- **Action**: Verify student submission form can communicate with backend
+- **Implementation**:
+  * Test form submission with valid data
+  * Verify file upload functionality works
+  * Confirm proper error handling for validation failures
+- **Success Criteria**: Form submits successfully and creates job record in database
+- **Test**: Submit test job through frontend form and verify in database
+- **Estimated Time**: 10 minutes
+
+#### Task 3: Implement Dashboard Authentication Flow
+- **Action**: Add authentication mechanism for dashboard API calls
+- **Implementation**:
+  * Create authentication context/service in frontend
+  * Add login functionality for staff workstation access
+  * Include JWT tokens in dashboard API requests
+- **Success Criteria**: Dashboard can authenticate and load job data
+- **Test**: Access dashboard, authenticate, and verify job list loads
+- **Estimated Time**: 30 minutes
+
+#### Task 4: Verify Complete API Integration
+- **Action**: Test all existing API endpoints work through proxy
+- **Implementation**:
+  * Test job listing with various filters
+  * Verify job detail retrieval
+  * Test staff management endpoints
+  * Confirm event logging functionality
+- **Success Criteria**: All implemented API endpoints accessible through frontend
+- **Test**: Manual testing of each API endpoint through browser/frontend
+- **Estimated Time**: 15 minutes
+
+**Total Estimated Time**: 1 hour 10 minutes
+
+**Dependencies**: None - can proceed immediately
+
+**Risk Assessment**: Low risk - standard Next.js proxy configuration with well-documented patterns
 
 ### Critical Issue Analysis: Database Connectivity Problems - RESOLVED ✅
 **Context**: User updated pgAdmin and PostgreSQL; unable to connect to the database using the default `postgres` user; when Docker is running, authentication fails; when Docker is off, connection times out.
