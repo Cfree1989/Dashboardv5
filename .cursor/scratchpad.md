@@ -577,6 +577,17 @@ Based on the analysis of `masterplan.md`, `Rebuild.md`, `project-info.md`, and t
 
 **Risk Assessment**: Low risk - standard Next.js proxy configuration with well-documented patterns
 
+### Logged-In Workstation Flow Fix
+**Context**: Login page pre-selected default station and password was mismatched, causing "Could not verify".
+**Fix**:
+  - Set `workstationId` initial state to `'front-desk'` in login page
+  - Updated backend password for `front-desk` to `'Fabrication'`
+  - Verified login via API returned a JWT token successfully:
+    ```
+    PS> Invoke-RestMethod -Uri "http://localhost:3000/api/v1/auth/login" -Method Post -Headers @{ 'Content-Type' = 'application/json' } -Body '{ "workstation_id": "front-desk", "password": "Fabrication" }'
+    token: "<JWT_TOKEN_HERE>"
+    ```
+**Status**: Login flow fully functional.
 ### Critical Issue Analysis: Database Connectivity Problems - RESOLVED ✅
 **Context**: User updated pgAdmin and PostgreSQL; unable to connect to the database using the default `postgres` user; when Docker is running, authentication fails; when Docker is off, connection times out.
 **Root Cause Analysis**:
