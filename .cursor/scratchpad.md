@@ -674,3 +674,61 @@ Add an Admin section (initially under dashboard) with settings (background sound
 Add SlicerOpener/ with the handler and installer assets, per the plan.
 Verify docker-compose.yml includes redis and worker services, and the backend enqueues tasks accordingly.
 Everything is organized correctly overall; implement the missing Analytics and Admin pages, protocol handler, and worker/Redis to complete parity with the plan.
+
+## Planner: Authoritative File Hardening & Transition Moves
+
+### Background and Motivation
+- We’ve implemented automatic authoritative file recommendation with a priority hierarchy and a rescan UX. To make this robust, we need to close several gaps: approval validation, event attribution, file existence checks, deterministic ranking, and eventually transactional file moves and metadata parity across status transitions.
+
+### Key Challenges and Analysis
+- Approve currently restricts authoritative file updates to a subset of extensions; this must align with the environment-configured list and include slicer project files.
+- Approve should verify the selected file exists before switching authority to avoid dangling `job.file_path`.
+- Approve event logging should attribute to the selected staff member, not the workstation id.
+- Candidate ranking should remain stable with deterministic tie-breakers.
+- Status transitions do not yet move files or metadata to status-appropriate directories; we will need a resilient copy→DB update→delete pattern and metadata sync.
+- Concurrency/locking is still planned (not implemented) and will be addressed separately.
+
+### High-level Task Breakdown (small, verifiable)
+1) Approve Alignment & Safety (Immediate)
+   - Backend:
+     - Use env-driven allowed extensions for authoritative selection (include `.3mf,.form,.idea` by default).
+     - Verify existence of the selected `authoritative_filename` within the job’s current directory; error 400 with helpful message if missing.
+     - Log approve events with `triggered_by = staff_name` and `workstation_id = g.workstation_id` (stop using the generic helper for this event).
+     - Deterministic tie-breaker in candidate ranking: use (priority asc, mtime desc, name asc).
+   - Tests:
+     - Approve accepts `.3mf` (and other configured) and rejects unknown extensions.
+     - Approve 400 when `authoritative_filename` not found.
+     - Event row for `StaffApproved` has `triggered_by=staff_name`.
+     - Candidate endpoint returns `recommended` consistent with priority and tie-breakers.
+
+2) Transition File Moves (Near-term)
+   - Implement resilient moves for transitions using copy→DB update→delete, updating `job.file_path` and `metadata_path`:
+     - PENDING (via student confirm): Pending→ReadyToPrint
+     - READYTOPRINT→PRINTING
+     - PRINTING→COMPLETED
+     - COMPLETED→PAIDPICKEDUP
+   - Sync `metadata.json` fields (`status`, `file_path`, `authoritative_filename`, history) on each transition.
+   - Tests (fs-safe): Use a temp directory for `STORAGE_PATH` and create fake files to assert path changes and metadata updates.
+
+3) Documentation & Config (Immediate)
+   - Document envs: `ALLOWED_MODEL_EXTS`, `AUTHORITATIVE_EXT_PRIORITY` (exclude `.gcode` from authoritative list by default).
+   - Note cross-folder saves are not auto-detected; staff can use the chooser when necessary (future enhancement could offer manual path entry or broader scan).
+
+4) (Deferred) Concurrency/Locking
+   - Implement lock/unlock/extend APIs and UI heartbeat for modals before enabling high-stakes multi-user edits.
+
+### Acceptance Checklist
+- Approve uses env-driven extensions and verifies file existence before authority switch.
+- Approve events attribute `triggered_by` to the staff member; `workstation_id` is preserved.
+- Candidate ranking is deterministic (priority > mtime > name) and returns `recommended` accordingly.
+- Transition endpoints move authoritative file/metadata to correct status folders and keep DB + metadata in sync.
+- Tests added and passing for approve validation, attribution, ranking, and transition moves.
+
+### Project Status Board — Authority Hardening
+- [ ] Backend: Approve uses env-driven extensions and existence checks
+- [ ] Backend: Approve event attribution uses `staff_name` instead of workstation
+- [ ] Backend: Candidate ranking deterministic (priority > mtime > name)
+- [ ] Tests: Approve ext acceptance, missing file 400, event attribution, candidate `recommended`
+- [ ] Backend: Implement copy→DB→delete moves for status transitions with metadata sync
+- [ ] Tests: Transition path updates on disk + metadata.json sync under temp storage
+- [ ] Docs: Add env variables and operational notes (exclude .gcode; cross-folder saves)

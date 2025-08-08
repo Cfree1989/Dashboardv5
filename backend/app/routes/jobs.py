@@ -13,7 +13,9 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import shutil
 from decimal import Decimal, ROUND_HALF_UP
+from app.services.file_service import move_authoritative
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -166,7 +168,7 @@ def candidate_files(job_id):
         # Sort by (rank asc if known, else large), then mtime desc
         def _rank(name: str) -> int:
             return ext_rank.get(Path(name).suffix.lower(), len(ext_rank) + 1)
-        candidates.sort(key=lambda x: (_rank(x['name']), -x['mtime']))
+        candidates.sort(key=lambda x: (_rank(x['name']), -x['mtime'], x['name'].lower()))
         # Backward-compatible shape: 'files' is list of strings for legacy callers/tests
         files_strings = [c['name'] for c in candidates]
         return jsonify({ 'files': files_strings, 'files_detailed': candidates, 'recommended': files_strings[0] if files_strings else None }), 200
@@ -281,15 +283,24 @@ def approve_job(job_id):
     job.staff_viewed_at = datetime.utcnow()
     # Optionally set authoritative file within same directory
     if authoritative_filename:
-        try:
-            current_dir = Path(job.file_path).parent
-            candidate_path = (current_dir / authoritative_filename).resolve()
-            # Guard: candidate must be inside the same directory
-            if candidate_path.parent == current_dir and candidate_path.suffix.lower() in {'.stl', '.obj', '.3mf'}:
-                job.file_path = str(candidate_path)
-                job.display_name = authoritative_filename
-        except Exception:
-            pass
+        current_dir = Path(job.file_path).parent
+        candidate_path = (current_dir / authoritative_filename)
+        # Allowed extensions are driven by env
+        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
+        allowed_exts = {
+            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
+            for ext in exts_env.split(',') if ext.strip()
+        }
+        # Validate parent dir, extension, and existence
+        if candidate_path.parent != current_dir:
+            return jsonify({'message': 'authoritative_filename must be in the same directory as the current file'}), 400
+        if candidate_path.suffix.lower() not in allowed_exts:
+            return jsonify({'message': f'authoritative_filename has unsupported extension'}), 400
+        if not candidate_path.exists():
+            return jsonify({'message': f'authoritative file not found: {authoritative_filename}'}), 400
+        # Accept switch
+        job.file_path = str(candidate_path.resolve())
+        job.display_name = authoritative_filename
     job.status = 'PENDING'
     db.session.add(job)
     db.session.commit()
@@ -300,15 +311,31 @@ def approve_job(job_id):
     confirmation_url = f"{base_url}/confirm/{token}"
     send_approval_email(job, confirmation_url)
 
-    # Log events with proper attribution
-    log_event(job.id, 'StaffApproved', {
-        'confirmation_url': confirmation_url,
-        'weight_g': weight_val,
-        'time_hours': time_val,
-        'cost_usd': float(final_cost_decimal),
-        'authoritative_filename': authoritative_filename or job.display_name,
-    })
-    log_event(job.id, 'ApprovalEmailSent', {})
+    # Log events with proper attribution (staff_name + workstation_id)
+    evt1 = Event(
+        job_id=job.id,
+        event_type='StaffApproved',
+        details={
+            'confirmation_url': confirmation_url,
+            'weight_g': weight_val,
+            'time_hours': time_val,
+            'cost_usd': float(final_cost_decimal),
+            'authoritative_filename': authoritative_filename or job.display_name,
+        },
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(evt1)
+    db.session.commit()
+    evt2 = Event(
+        job_id=job.id,
+        event_type='ApprovalEmailSent',
+        details={},
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(evt2)
+    db.session.commit()
 
     # Sync metadata with chosen authoritative file
     _sync_authoritative_metadata(job, authoritative_filename or job.display_name, staff_name, 'StaffApproved')
@@ -340,6 +367,8 @@ def mark_printing(job_id):
         return err_resp, err_code
     job.status = 'PRINTING'
     job.last_updated_by = staff_name
+    # Move file/metadata to Printing
+    move_authoritative(job, 'PRINTING')
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -363,6 +392,8 @@ def mark_complete(job_id):
         return err_resp, err_code
     job.status = 'COMPLETED'
     job.last_updated_by = staff_name
+    # Move file/metadata to Completed
+    move_authoritative(job, 'COMPLETED')
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -386,6 +417,8 @@ def mark_picked_up(job_id):
         return err_resp, err_code
     job.status = 'PAIDPICKEDUP'
     job.last_updated_by = staff_name
+    # Move file/metadata to PaidPickedUp
+    move_authoritative(job, 'PAIDPICKEDUP')
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)

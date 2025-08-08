@@ -1,5 +1,6 @@
 # type: ignore
 import pytest
+import os
 from app import db
 from app.models.job import Job
 
@@ -89,6 +90,14 @@ def test_approve_job_with_attribution_and_cost(client, token, app):
     # Filament at $0.10/g => $5.00, above $3 minimum
     assert data['cost_usd'] == 5.0
 
+    # Check event attribution
+    events_resp = client.get(f'/api/v1/jobs/{job.id}/events', headers={'Authorization': f'Bearer {token}'} )
+    assert events_resp.status_code == 200
+    events = events_resp.get_json()
+    approved = next((e for e in events if e['event_type'] == 'StaffApproved'), None)
+    assert approved is not None
+    assert approved['triggered_by'] == 'Jane Doe'
+
 
 def test_approve_requires_active_staff_and_valid_numbers(client, token, app):
     job = create_job(app)
@@ -137,6 +146,39 @@ def test_approve_cost_minimum_applied_for_small_weight(client, token, app):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data['cost_usd'] == 3.0
+
+
+def test_approve_rejects_missing_or_unsupported_authoritative_file(client, token, app, tmp_path):
+    # Place job in a temp directory with only the original .stl
+    job = create_job(app)
+    with app.app_context():
+        j = Job.query.get(job.id)
+        storage_dir = tmp_path
+        os.environ['STORAGE_PATH'] = str(storage_dir)
+        # Write the original file and update job paths
+        (storage_dir / 'file.stl').write_text('dummy')
+        j.file_path = str(storage_dir / 'file.stl')
+        j.display_name = 'file.stl'
+        j.metadata_path = str(storage_dir / 'file_metadata.json')
+        db.session.commit()
+
+    client.post('/api/v1/staff', json={'name': 'Staff'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Unsupported extension
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/approve',
+        json={'staff_name': 'Staff', 'weight_g': 10, 'time_hours': 1, 'authoritative_filename': 'file.gcode'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Missing file
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/approve',
+        json={'staff_name': 'Staff', 'weight_g': 10, 'time_hours': 1, 'authoritative_filename': 'missing.3mf'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
 
 
 def test_review_toggle_persists_and_logs_event(client, token, app):

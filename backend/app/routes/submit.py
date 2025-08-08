@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.services.event_service import log_event
 from app.services.email_service import send_status_update_email, send_approval_email
 from app.services.token_service import generate_confirmation_token, verify_confirmation_token
+from app.services.file_service import move_authoritative
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
@@ -62,7 +63,9 @@ def submit_job():
             return jsonify({'message': 'duplicate active job exists', 'existing_job_id': existing.id}), 409
 
         # Prepare storage directory
-        storage_dir = os.environ.get('STORAGE_PATH', 'storage/Uploaded')
+        # Use STORAGE_PATH root and ensure status subdir
+        storage_root = os.environ.get('STORAGE_PATH', 'storage')
+        storage_dir = os.path.join(storage_root, 'Uploaded')
         os.makedirs(storage_dir, exist_ok=True)
 
         # Generate job ID and standardized filenames
@@ -176,9 +179,10 @@ def confirm_job(token: str):
     if not job:
         return jsonify({'message': 'Job not found'}), 404
 
-    # Transition to READYTOPRINT
+    # Transition to READYTOPRINT + move file/metadata
     job.student_confirmed = True
     job.status = 'READYTOPRINT'
+    move_authoritative(job, 'READYTOPRINT')
     db.session.commit()
     log_event(job.id, 'StudentConfirmed', {'status': job.status})
     return jsonify(job.to_dict()), 200
