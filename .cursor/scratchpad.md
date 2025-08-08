@@ -104,7 +104,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [ ] **Notes Editing** - Inline notes interface
 
 ### Phase 6: Real-time Updates 📋 PENDING
-- [ ] **Auto-refresh hook** - Dashboard updates every 45s
+- [x] **Auto-refresh hook** - Dashboard updates every 45s
 - [ ] **Audio notifications** - Sound alerts for new jobs
 - [ ] **Visual indicators** - "NEW" badges, job age tracking
 - [ ] **Staff acknowledgment** - Mark as reviewed functionality
@@ -117,7 +117,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Current Status
 
 **Current Phase**: Phase 4 - Advanced Features  
-**Next Milestone**: Phase 6 — Auto-refresh + Last Updated stabilization
+**Next Milestone**: Phase 4.2 — File Management System (candidate-files + authoritative tracking)
 **Overall Progress**: ~60% complete
 
 ### Recently Completed Achievements:
@@ -416,6 +416,16 @@ Building a complete 3D Print Management System for academic/makerspace environme
     - Success: Tab badges update immediately after each transition
   - [x] Tests for modal + wiring
     - Success: New `status-change-modal.test.tsx` assertions pass
+
+### Project Status Board — Phase 4.2 File Management
+- [ ] Backend: Candidate-files full scan hardening
+  - Success: Configurable allowed extensions; only job-related siblings returned; sorted by recency; unit tests cover edge cases
+- [ ] Frontend: Rescan in Approve modal
+  - Success: "Detect newer saves" action refreshes candidate list and re-ranks; recommended preselected; chooser collapsed by default
+- [ ] Metadata: Authoritative tracking durability
+  - Success: `authoritative_filename` + history reliably written in `metadata.json`; matches `job.file_path` across transitions; tests added
+- [ ] Protocol touchpoint (logging only)
+  - Success: Clicking future "Open in Slicer" logs `FileOpenedInSlicer` (stub); no-op if handler not installed
 
 - [x] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
   - Success criteria: Document clear UX rules, backend persistence contract, frontend modal behavior, and tests; added tasks below
