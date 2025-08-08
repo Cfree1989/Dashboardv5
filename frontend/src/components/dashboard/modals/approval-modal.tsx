@@ -22,6 +22,7 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
   const [candidateFiles, setCandidateFiles] = useState<{ name: string; mtime: number }[]>([]);
   const [authoritativeFilename, setAuthoritativeFilename] = useState<string>("");
   const [showChooser, setShowChooser] = useState(false);
+  const [rescanning, setRescanning] = useState(false);
 
   const rate = useMemo(() => {
     const mat = (material || "").toLowerCase();
@@ -56,19 +57,48 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
       }
     }
     fetchStaff();
-    (async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/v1/jobs/${jobId}/candidate-files`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const data = await res.json();
-          const files = (data?.files || []) as { name: string; mtime: number }[];
-          setCandidateFiles(files);
-          if (files.length > 0) setAuthoritativeFilename(files[0].name);
-        }
-      } catch {}
-    })();
+    // Initial candidate fetch
+    doRescan(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function doRescan(forceShowChooser: boolean) {
+    try {
+      setRescanning(true);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/v1/jobs/${jobId}/candidate-files`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Support both shapes: files_detailed (preferred) or files (strings or objects)
+      const raw = (data?.files_detailed ?? data?.files ?? []) as any[];
+      let parsed: { name: string; mtime: number }[];
+      if (raw.length > 0 && typeof raw[0] === 'string') {
+        parsed = (raw as string[]).map((name) => ({ name, mtime: 0 }));
+      } else {
+        parsed = (raw as { name?: string; mtime?: number }[])
+          .filter((f) => typeof f?.name === 'string')
+          .map((f) => ({ name: f.name as string, mtime: typeof f.mtime === 'number' ? f.mtime : 0 }));
+      }
+      // Let server recommendation drive selection if present; otherwise keep same or newest
+      const recommended: string | undefined = data?.recommended;
+      if (recommended && parsed.some(f => f.name === recommended)) {
+        parsed.sort((a, b) => (a.name === recommended ? -1 : b.name === recommended ? 1 : b.mtime - a.mtime));
+      } else {
+        parsed.sort((a, b) => b.mtime - a.mtime);
+      }
+      setCandidateFiles(parsed);
+      if (parsed.length > 0) {
+        // Keep current selection if still present, otherwise pick newest
+        const keep = parsed.find((f) => f.name === authoritativeFilename);
+        setAuthoritativeFilename(keep ? keep.name : (recommended && parsed.some(f => f.name === recommended) ? recommended : parsed[0].name));
+      }
+      if (forceShowChooser && parsed.length > 1) setShowChooser(true);
+    } catch {
+      // non-fatal
+    } finally {
+      setRescanning(false);
+    }
+  }
 
   const isValid = staffName.trim().length > 0 && !!weightG && !!timeHours && parseFloat(weightG) > 0 && parseFloat(timeHours) > 0;
 
@@ -126,15 +156,25 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
                 <div className="text-sm text-gray-700">
                   Using file: <span className="font-medium">{authoritativeFilename || candidateFiles[0]?.name}</span>
                 </div>
-                {candidateFiles.length > 1 && !showChooser && (
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowChooser(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    onClick={() => doRescan(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                    disabled={rescanning}
                   >
-                    Choose different file…
+                    {rescanning ? 'Scanning…' : 'Detect newer saves'}
                   </button>
-                )}
+                  {candidateFiles.length > 1 && !showChooser && (
+                    <button
+                      type="button"
+                      onClick={() => setShowChooser(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Choose different file…
+                    </button>
+                  )}
+                </div>
               </div>
               {showChooser && candidateFiles.length > 1 && (
                 <div>

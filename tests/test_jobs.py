@@ -184,7 +184,8 @@ def test_review_status_guard(client, token, app):
     job = create_job(app)
     # Move job to non-UPLOADED status
     with app.app_context():
-        job.status = 'PENDING'
+        j = Job.query.get(job.id)
+        j.status = 'PENDING'
         db.session.commit()
     client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers={'Authorization': f'Bearer {token}'})
     resp = client.post(
@@ -243,7 +244,8 @@ def test_status_transitions_printing_complete_picked_up(client, token, app):
     job = create_job(app)
     # Move to READYTOPRINT via confirm path shortcut
     with app.app_context():
-        job.status = 'READYTOPRINT'
+        j = Job.query.get(job.id)
+        j.status = 'READYTOPRINT'
         db.session.commit()
     client.post('/api/v1/staff', json={'name': 'Operator'}, headers={'Authorization': f'Bearer {token}'})
 

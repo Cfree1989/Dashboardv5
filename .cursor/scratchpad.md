@@ -58,9 +58,9 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - System Health report flags missing/duplicate/stale authoritative files.
 
 ### Project Status Board — File Tracking
-- [ ] UX: Auto-select recommended file; collapse chooser behind “Choose different file…”
-- [ ] Metadata: write/read `authoritative_filename` + history in `metadata.json`; sync on transitions
-- [ ] SlicerOpener: log `FileOpenedInSlicer`; add “Detect newer saves” rescan
+- [x] UX: Auto-select recommended file; collapse chooser behind “Choose different file…”
+- [x] Metadata: write/read `authoritative_filename` + history in `metadata.json`; sync on transitions (write + history implemented; read not yet used client-side)
+- [x] SlicerOpener: log `FileOpenedInSlicer`; add “Detect newer saves” rescan (logging stub in API; rescan added to Approve modal)
 - [ ] Audit: extend report for authoritative file issues
 
 ### Phase 1: Environment Setup & Foundation ✅ COMPLETE
@@ -131,6 +131,11 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ### Active Development:
 ✅ **Tab Count Authentication Fix** - Fixed dashboard tabs not showing job counts due to missing authentication headers  
 ✅ **Phase 4.1: Email Service Integration** - Implemented Flask-Mail, templates, confirmation token service, approval endpoint, and frontend approval wiring
+
+✅ **Phase 4.2 (subset): File Tracking Auto-Select + Rescan + Priority**
+- Backend `GET /api/v1/jobs/:id/candidate-files` hardened (allowed extensions via env, relevance tokens, sorted by recency, backward-compatible response shape)
+- Added authoritative extension priority hierarchy: `.3mf, .form, .idea > .stl > .obj` (configurable via `AUTHORITATIVE_EXT_PRIORITY`); endpoint returns `recommended`
+- Frontend Approval modal now preselects server-recommended file and hides chooser; added “Detect newer saves” button that rescans and re-ranks candidates
 
 ## Project Status Board
 
@@ -418,13 +423,13 @@ Building a complete 3D Print Management System for academic/makerspace environme
     - Success: New `status-change-modal.test.tsx` assertions pass
 
 ### Project Status Board — Phase 4.2 File Management
-- [ ] Backend: Candidate-files full scan hardening
+- [x] Backend: Candidate-files full scan hardening
   - Success: Configurable allowed extensions; only job-related siblings returned; sorted by recency; unit tests cover edge cases
-- [ ] Frontend: Rescan in Approve modal
+- [x] Frontend: Rescan in Approve modal
   - Success: "Detect newer saves" action refreshes candidate list and re-ranks; recommended preselected; chooser collapsed by default
 - [ ] Metadata: Authoritative tracking durability
   - Success: `authoritative_filename` + history reliably written in `metadata.json`; matches `job.file_path` across transitions; tests added
-- [ ] Protocol touchpoint (logging only)
+- [x] Protocol touchpoint (logging only)
   - Success: Clicking future "Open in Slicer" logs `FileOpenedInSlicer` (stub); no-op if handler not installed
 
 - [x] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow

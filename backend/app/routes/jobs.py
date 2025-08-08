@@ -122,12 +122,16 @@ def candidate_files(job_id):
     try:
         file_path = Path(job.file_path)
         directory = file_path.parent
-        # Allow configurable extensions via env (e.g., ".stl,.obj,.3mf,.form")
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf')
+        # Allow configurable extensions via env (e.g., ".stl,.obj,.3mf,.form,.idea")
+        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
         allowed_exts = {
             (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
             for ext in exts_env.split(',') if ext.strip()
         }
+        # Extension priority ranking (lower is better) via env, default prefers slicer project files
+        priority_env = os.environ.get('AUTHORITATIVE_EXT_PRIORITY', '.3mf,.form,.idea,.stl,.obj')
+        prio_list = [e if e.strip().startswith('.') else f'.{e.strip()}' for e in priority_env.split(',') if e.strip()]
+        ext_rank = {ext.lower(): idx for idx, ext in enumerate(prio_list)}
         candidates = []
         # Build relevance tokens to restrict to this job only
         tokens = set()
@@ -159,11 +163,22 @@ def candidate_files(job_id):
         # Ensure original filename is included (even if not present on disk)
         if job.original_filename and not any(c['name'] == job.original_filename for c in candidates):
             candidates.append({'name': job.original_filename, 'mtime': 0})
-        # Sort by mtime desc
-        candidates.sort(key=lambda x: x['mtime'], reverse=True)
-        return jsonify({ 'files': candidates }), 200
+        # Sort by (rank asc if known, else large), then mtime desc
+        def _rank(name: str) -> int:
+            return ext_rank.get(Path(name).suffix.lower(), len(ext_rank) + 1)
+        candidates.sort(key=lambda x: (_rank(x['name']), -x['mtime']))
+        # Backward-compatible shape: 'files' is list of strings for legacy callers/tests
+        files_strings = [c['name'] for c in candidates]
+        return jsonify({ 'files': files_strings, 'files_detailed': candidates, 'recommended': files_strings[0] if files_strings else None }), 200
     except Exception as e:
-        return jsonify({ 'files': [ {'name': job.original_filename, 'mtime': 0} ] }), 200
+        # On error, return legacy-compatible minimal payload
+        fallback_name = job.original_filename if job and job.original_filename else None
+        payload = { 'files': ([fallback_name] if fallback_name else []) }
+        if fallback_name:
+            payload['files_detailed'] = [{ 'name': fallback_name, 'mtime': 0 }]
+        else:
+            payload['files_detailed'] = []
+        return jsonify(payload), 200
 
 
 @bp.route('/<job_id>/log-file-open', methods=['POST'])
