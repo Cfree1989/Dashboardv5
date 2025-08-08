@@ -16,7 +16,7 @@ export default function ConfirmPage({ params }: Props) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    fetch(`/api/v1/confirm/${token}`, {
+    fetch(`/api/v1/submit/confirm/${token}`, {
       method: 'POST',
     })
       .then(async res => {

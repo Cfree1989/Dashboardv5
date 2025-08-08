@@ -1,8 +1,9 @@
 from __future__ import annotations
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request, g, abort
 from app.utils.decorators import token_required
 from app import db
 from app.models.job import Job
+from app.models.event import Event
 from app.services.file_service import STATUS_TO_DIR
 from pathlib import Path
 import os
@@ -125,5 +126,79 @@ def perform_audit() -> dict:
 @token_required
 def audit_report():
     return jsonify(perform_audit()), 200
+
+
+@bp.route('/audit/orphaned-file', methods=['DELETE'])
+@token_required
+def delete_orphaned_file():
+    data = request.get_json(silent=True) or {}
+    file_path = (data.get('file_path') or '').strip()
+    staff_name = (data.get('staff_name') or '').strip()
+    if not file_path or not staff_name:
+        return jsonify({'message': 'file_path and staff_name are required'}), 400
+    # Security: restrict deletions to STORAGE_PATH
+    root = _storage_root().resolve()
+    target = Path(file_path).resolve()
+    if not str(target).startswith(str(root)):
+        return jsonify({'message': 'file_path must be within STORAGE_PATH'}), 400
+    # Ensure not referenced by DB
+    ref = db.session.query(Job).filter((Job.file_path == str(target)) | (Job.metadata_path == str(target))).first()
+    if ref:
+        return jsonify({'message': 'file is referenced by a job; not an orphan'}), 409
+    try:
+        if target.exists() and target.is_file():
+            target.unlink()
+    except Exception:
+        abort(500, description='Failed to delete file')
+    # Log event (system-level; no job)
+    evt = Event(job_id='system', event_type='OrphanedFileDeleted', details={'file_path': str(target)}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'deleted'}), 200
+
+
+@bp.route('/audit/stale-file', methods=['DELETE'])
+@token_required
+def delete_stale_file():
+    data = request.get_json(silent=True) or {}
+    file_path = (data.get('file_path') or '').strip()
+    staff_name = (data.get('staff_name') or '').strip()
+    if not file_path or not staff_name:
+        return jsonify({'message': 'file_path and staff_name are required'}), 400
+    root = _storage_root().resolve()
+    target = Path(file_path).resolve()
+    if not str(target).startswith(str(root)):
+        return jsonify({'message': 'file_path must be within STORAGE_PATH'}), 400
+    # Ensure not authoritative reference by DB
+    ref = db.session.query(Job).filter((Job.file_path == str(target)) | (Job.metadata_path == str(target))).first()
+    if ref:
+        return jsonify({'message': 'file is referenced by a job; cannot delete'}), 409
+    try:
+        if target.exists() and target.is_file():
+            target.unlink()
+    except Exception:
+        abort(500, description='Failed to delete file')
+    evt = Event(job_id='system', event_type='StaleFileDeleted', details={'file_path': str(target)}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'deleted'}), 200
+
+
+@bp.route('/audit/mark-reviewed', methods=['POST'])
+@token_required
+def mark_reviewed():
+    data = request.get_json(silent=True) or {}
+    job_id = (data.get('job_id') or '').strip()
+    staff_name = (data.get('staff_name') or '').strip()
+    issues = data.get('issues') or []
+    if not job_id or not staff_name:
+        return jsonify({'message': 'job_id and staff_name are required'}), 400
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({'message': 'Job not found'}), 404
+    evt = Event(job_id=job.id, event_type='AuditIssueReviewed', details={'issues': issues}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'reviewed'}), 200
 
 

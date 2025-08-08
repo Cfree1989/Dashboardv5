@@ -35,3 +35,36 @@ def test_admin_audit_report_basic(client, token, app, tmp_path):
     # Orphan should be flagged
     assert any(str(orphan.resolve()) == p for p in data.get('orphaned_files', []))
 
+
+def test_admin_delete_orphaned_file(client, token, app, tmp_path):
+    import os
+    os.environ['STORAGE_PATH'] = str(tmp_path)
+    # Create orphan
+    (tmp_path / 'Uploaded').mkdir(parents=True, exist_ok=True)
+    orphan = tmp_path / 'Uploaded' / 'z.stl'
+    orphan.write_text('x')
+    # Delete via API
+    resp = client.delete(
+        '/api/v1/admin/audit/orphaned-file',
+        json={'file_path': str(orphan), 'staff_name': 'Admin User'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert not orphan.exists()
+
+
+def test_admin_delete_stale_file(client, token, app, tmp_path):
+    import os
+    os.environ['STORAGE_PATH'] = str(tmp_path)
+    # Create stale file (in ReadyToPrint) while job authoritative is elsewhere
+    (tmp_path / 'ReadyToPrint').mkdir(parents=True, exist_ok=True)
+    stale = tmp_path / 'ReadyToPrint' / 'z.stl'
+    stale.write_text('x')
+    resp = client.delete(
+        '/api/v1/admin/audit/stale-file',
+        json={'file_path': str(stale), 'staff_name': 'Admin User'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert not stale.exists()
+

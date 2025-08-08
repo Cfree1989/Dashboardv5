@@ -25,15 +25,15 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 ### Current Status
 - Current Phase: Phase 4 — Advanced Features
-- Next Milestone: Phase 4.2 — File Management: metadata authority durability
-- Overall Progress: ~60%
+- Next Milestone: Phase 4.3 — Payment & Pickup (frontend integration)
+- Overall Progress: ~62%
 
 ### Active Workstreams (Open)
 
 1) File Tracking & Metadata
 - [x] Metadata durability: keep DB `job.file_path` and `metadata.json.authoritative_filename` in sync across transitions; add tests
 - [x] Audit report endpoint: flags missing authoritative file, duplicate/stale siblings, directory/status mismatches
-- [ ] Admin UI: Audit report view + safe actions (delete orphan, mark stale) with events
+- [x] Admin UI: Audit report view + safe actions (delete orphan, delete stale, mark reviewed) with events
 - [x] FS tests: transition path updates on disk + `metadata.json` sync using temp storage
 
 2) Incident — Missing Jobs After Reboot (triage + prevention)
@@ -134,6 +134,7 @@ Preserved for history; reorganized for clarity (do not delete).
 - [x] Frontend: Rescan in Approve modal; recommended preselected
 - [x] Protocol touchpoint (logging only): `FileOpenedInSlicer`
 - [x] Metadata durability + sync: confirmation and all transitions update `metadata.json` (`authoritative_filename`, `status`, `file_path`) and stay in parity with DB; covered by temp FS tests
+ - [x] Admin System Health UI: Wired to `GET /api/v1/admin/audit/report`, orphan cleanup, stale file deletion, and "mark reviewed" actions
 
 ### Authority Hardening — Completed Parts
 - [x] Approve uses env-driven extensions and file existence checks
@@ -167,8 +168,8 @@ Preserved for history; reorganized for clarity (do not delete).
 ### Phase 4 — Advanced Features (Remaining)
 - 4.2 File Management: Metadata Durability
   - [x] Audit report endpoint (GET `/api/v1/admin/audit/report`) — identifies orphans, broken links (missing file/meta, dir/status mismatch, metadata mismatch), and stale duplicates
-  - [ ] Admin UI (report view + safe actions)
-  - Acceptance: Audit flags inconsistencies; safe actions available; events logged
+  - [x] Admin UI (report view + safe actions)
+  - Acceptance: Audit flags inconsistencies; safe actions available; events logged (Met)
 - 4.3 Payment & Pickup
   - Backend
     - [x] `POST /api/v1/jobs/:id/payment` with `{ grams, txn_no, picked_up_by, staff_name }`; validate status `COMPLETED`
@@ -261,10 +262,9 @@ Preserved for history; reorganized for clarity (do not delete).
 - Acceptance: Smoother UX and stable ops with documented SLOs
 
 ## Next Steps Priority Queue
-1) Phase 4.2 — Audit admin UI + safe actions (delete orphan, mark stale) with events
-2) Payment workflow — frontend integration (modal attach to COMPLETED cards + counts refresh)
-3) Protocol handler (SlicerOpener) packaging and UX
-4) Comprehensive testing + deployment docs
-5) Analytics Dashboard (`/analytics`) after operations stabilize
+1) Payment workflow — frontend integration (modal attach to COMPLETED cards + counts refresh)
+2) Protocol handler (SlicerOpener) packaging and UX
+3) Comprehensive testing + deployment docs
+4) Analytics Dashboard (`/analytics`) after operations stabilize
 
 
