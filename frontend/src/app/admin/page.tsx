@@ -2,9 +2,13 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings, Users, Shield, Database, Activity, Mail } from "lucide-react";
-import { DiagPanel } from "../../components/dashboard/diag-panel";
+import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle } from "lucide-react";
 import { StaffPanel } from "../../components/admin/staff-panel";
+import { SystemHealthPanel } from "../../components/admin/system-health";
+import { AdminSettingsPanel } from "../../components/admin/admin-settings";
+import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
+import { DataManagementPanel } from "../../components/admin/data-management";
+import { EmailToolsPanel } from "../../components/admin/email-tools";
 
 type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email";
 
@@ -19,6 +23,7 @@ export default function AdminPage() {
   }, [router]);
 
   const [activeSection, setActiveSection] = useState<AdminSection>("settings");
+  const envLabel = typeof process !== "undefined" && process.env.NODE_ENV === "development" ? "DEV" : "PROD";
 
   const sections: Array<{ id: AdminSection; label: string; icon: React.ComponentType<any> }> = [
     { id: "settings", label: "Settings", icon: Settings },
@@ -32,43 +37,17 @@ export default function AdminPage() {
   const renderSection = () => {
     switch (activeSection) {
       case "settings":
-        return (
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h2 className="text-sm font-semibold text-gray-700 mb-2">Settings</h2>
-              <p className="text-sm text-gray-500">Background sound and environment banner configuration (coming soon).</p>
-            </div>
-          </div>
-        );
+        return <AdminSettingsPanel />;
       case "staff":
         return <StaffPanel />;
       case "overrides":
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Admin Overrides</h3>
-            <p className="text-sm text-gray-500">Force unlock/confirm, change status, mark failed. Pending backend.</p>
-          </div>
-        );
+        return <AdminOverridesPanel />;
       case "data":
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Data Management</h3>
-            <p className="text-sm text-gray-500">Archive and prune controls. Pending backend.</p>
-          </div>
-        );
+        return <DataManagementPanel />;
       case "health":
-        return (
-          <div className="space-y-4">
-            <DiagPanel />
-          </div>
-        );
+        return <SystemHealthPanel />;
       case "email":
-        return (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Email Tools</h3>
-            <p className="text-sm text-gray-500">Resend emails with cooldowns. Pending backend.</p>
-          </div>
-        );
+        return <EmailToolsPanel />;
       default:
         return null;
     }

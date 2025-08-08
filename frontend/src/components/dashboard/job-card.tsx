@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, RotateCcw } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } from "lucide-react";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 
@@ -257,10 +257,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 {!!job.staff_viewed_at && (
                   <button
                     onClick={handleReapplyNew}
-                    className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 focus-ring btn-transition"
+                    title="Mark as Unreviewed"
+                    aria-label="Mark as Unreviewed"
+                    className="p-2 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 focus-ring btn-transition"
                   >
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Reapply NEW
+                    <Eye className="w-4 h-4" />
                   </button>
                 )}
               </>

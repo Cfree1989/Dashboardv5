@@ -308,14 +308,14 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - Navigation link to Admin available from dashboard.
 
 ### Project Status Board — Admin MVP
-- [ ] Add `/admin` route with auth guard
-- [ ] Build Admin header & layout per images
-- [ ] Move Diagnostics to Admin; remove from Dashboard
-- [ ] Implement Staff Management CRUD (list/add/toggle active)
-- [ ] Scaffold Overrides/Data Mgmt/Audit/Email tools (disabled)
-- [ ] Harden `_diag` (current_app + ORM)
-- [ ] Add Admin nav link from dashboard
-- [ ] Tests for `_diag` auth/no-auth
+- [x] Add `/admin` route with auth guard
+- [x] Build Admin header & layout per images (left menu, right content, top actions)
+- [x] Move Diagnostics to Admin; remove from Dashboard
+- [x] Implement Staff Management CRUD (list/add/toggle active)
+- [x] Scaffold Overrides/Data Mgmt/Audit/Email tools (disabled pending backend)
+- [x] Harden `_diag` (current_app + ORM)
+- [x] Add Admin nav link from dashboard
+- [x] Tests for `_diag` auth/no-auth
 
 ### Executor's Feedback or Assistance Requests (Admin)
 - Confirm: From the screenshots, preferred section order and any specific labels/wording you want reproduced.
