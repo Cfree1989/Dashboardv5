@@ -7,8 +7,12 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.services.token_service import generate_confirmation_token
 from app.services.email_service import send_approval_email
+from app.services.event_service import log_event
 from app.models.staff import Staff
 from datetime import datetime
+import json
+import os
+from pathlib import Path
 from decimal import Decimal, ROUND_HALF_UP
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
@@ -34,6 +38,62 @@ def list_jobs():
         jobs = [job for job in jobs if search.lower() in job.student_name.lower() or search.lower() in job.student_email.lower()]
     return jsonify([job.to_dict() for job in jobs]), 200
 
+
+# --- Metadata helpers ---
+def _load_metadata(job: Job) -> dict:
+    try:
+        with open(job.metadata_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_metadata(job: Job, data: dict) -> None:
+    try:
+        meta_path = Path(job.metadata_path)
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        # Non-fatal: metadata sync should not block workflow
+        pass
+
+
+def _sync_authoritative_metadata(job: Job, authoritative_filename: str, staff_name: str | None, event_type: str) -> None:
+    try:
+        meta = _load_metadata(job)
+        history = meta.get('authoritative_history', [])
+        prev = meta.get('authoritative_filename')
+        changed = False
+        if authoritative_filename and authoritative_filename != prev:
+            history.append({
+                'ts': datetime.utcnow().isoformat(),
+                'by': staff_name,
+                'event': event_type,
+                'from': prev,
+                'to': authoritative_filename,
+            })
+            meta['authoritative_history'] = history
+            meta['authoritative_filename'] = authoritative_filename
+            changed = True
+
+        # Keep other fields in sync
+        if meta.get('status') != job.status:
+            meta['status'] = job.status
+            changed = True
+        if meta.get('display_name') != job.display_name:
+            meta['display_name'] = job.display_name
+            changed = True
+        if meta.get('file_path') != job.file_path:
+            meta['file_path'] = job.file_path
+            changed = True
+        meta['updated_at'] = datetime.utcnow().isoformat()
+        if changed:
+            _save_metadata(job, meta)
+    except Exception:
+        # Non-fatal
+        pass
+
 @bp.route('/<job_id>', methods=['GET'])
 @token_required
 def get_job(job_id):
@@ -58,11 +118,47 @@ def candidate_files(job_id):
     job = Job.query.get(job_id)
     if not job:
         abort(404, description='Job not found')
-    # Stub implementation: return at least the originally uploaded filename
-    files = []
-    if job.original_filename:
-        files.append(job.original_filename)
-    return jsonify({ 'files': files }), 200
+
+    try:
+        file_path = Path(job.file_path)
+        directory = file_path.parent
+        allowed_exts = {'.stl', '.obj', '.3mf'}  # extend as needed
+        candidates = []
+        # Build relevance tokens to restrict to this job only
+        tokens = set()
+        if getattr(job, 'short_id', None):
+            tokens.add(str(job.short_id).lower())
+        if getattr(job, 'id', None):
+            tokens.add(str(job.id)[:8].lower())
+        if getattr(job, 'display_name', None):
+            tokens.add(Path(str(job.display_name)).stem.lower())
+
+        if directory.exists() and directory.is_dir():
+            for entry in directory.iterdir():
+                if not (entry.is_file() and entry.suffix.lower() in allowed_exts):
+                    continue
+                name_lower = entry.name.lower()
+                # Keep only files that look related to this job
+                related = any(tok and tok in name_lower for tok in tokens)
+                if not related:
+                    # Always allow exact original filename if present
+                    if job.original_filename and entry.name == job.original_filename:
+                        related = True
+                if not related:
+                    continue
+                try:
+                    stat = entry.stat()
+                    candidates.append({'name': entry.name, 'mtime': int(stat.st_mtime)})
+                except OSError:
+                    continue
+        # Ensure original filename is included (even if not present on disk)
+        if job.original_filename and not any(c['name'] == job.original_filename for c in candidates):
+            candidates.append({'name': job.original_filename, 'mtime': 0})
+        # Sort by mtime desc
+        candidates.sort(key=lambda x: x['mtime'], reverse=True)
+        return jsonify({ 'files': candidates }), 200
+    except Exception as e:
+        return jsonify({ 'files': [ {'name': job.original_filename, 'mtime': 0} ] }), 200
 
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
@@ -92,6 +188,7 @@ def approve_job(job_id):
     staff_name = data.get('staff_name')
     weight_g = data.get('weight_g')
     time_hours = data.get('time_hours')
+    authoritative_filename = (data.get('authoritative_filename') or '').strip()
 
     if not staff_name:
         return jsonify({'message': 'staff_name is required'}), 400
@@ -133,6 +230,17 @@ def approve_job(job_id):
     job.last_updated_by = staff_name
     # Mark as reviewed to clear "NEW" indicator across statuses
     job.staff_viewed_at = datetime.utcnow()
+    # Optionally set authoritative file within same directory
+    if authoritative_filename:
+        try:
+            current_dir = Path(job.file_path).parent
+            candidate_path = (current_dir / authoritative_filename).resolve()
+            # Guard: candidate must be inside the same directory
+            if candidate_path.parent == current_dir and candidate_path.suffix.lower() in {'.stl', '.obj', '.3mf'}:
+                job.file_path = str(candidate_path)
+                job.display_name = authoritative_filename
+        except Exception:
+            pass
     job.status = 'PENDING'
     db.session.add(job)
     db.session.commit()
@@ -144,28 +252,17 @@ def approve_job(job_id):
     send_approval_email(job, confirmation_url)
 
     # Log events with proper attribution
-    approval_event = Event(
-        job_id=job.id,
-        event_type='StaffApproved',
-        details={
-            'confirmation_url': confirmation_url,
-            'weight_g': weight_val,
-            'time_hours': time_val,
-            'cost_usd': float(final_cost_decimal),
-        },
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    email_event = Event(
-        job_id=job.id,
-        event_type='ApprovalEmailSent',
-        details={},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(approval_event)
-    db.session.add(email_event)
-    db.session.commit()
+    log_event(job.id, 'StaffApproved', {
+        'confirmation_url': confirmation_url,
+        'weight_g': weight_val,
+        'time_hours': time_val,
+        'cost_usd': float(final_cost_decimal),
+        'authoritative_filename': authoritative_filename or job.display_name,
+    })
+    log_event(job.id, 'ApprovalEmailSent', {})
+
+    # Sync metadata with chosen authoritative file
+    _sync_authoritative_metadata(job, authoritative_filename or job.display_name, staff_name, 'StaffApproved')
 
     return jsonify(job.to_dict()), 200
 
@@ -199,6 +296,7 @@ def mark_printing(job_id):
     evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPrinting')
     return jsonify(job.to_dict()), 200
 
 
@@ -221,6 +319,7 @@ def mark_complete(job_id):
     evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedComplete')
     return jsonify(job.to_dict()), 200
 
 
@@ -243,6 +342,7 @@ def mark_picked_up(job_id):
     evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPickedUp')
     return jsonify(job.to_dict()), 200
 
 
@@ -295,6 +395,7 @@ def record_payment(job_id):
     evt = Event(job_id=job.id, event_type='PaymentRecorded', details={'price_cents': price_cents}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'PaymentRecorded')
     return jsonify(job.to_dict()), 200
 
 

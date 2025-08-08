@@ -22,6 +22,46 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - **Comprehensive error handling** and recovery mechanisms
 
 ## Project Phases Overview
+## Planner: Authoritative File Tracking Enhancement (Reduce Friction at Approve)
+
+### Background and Motivation
+- Current Approve flow requires staff to explicitly pick an authoritative file. This is safe but adds friction. We want the system to reliably track the authoritative file from submission through status transitions, while still allowing an override when needed.
+
+### Key Challenges and Analysis
+- Slicer saves can create multiple sibling files with various extensions; the newest is not always the right one.
+- Watching the filesystem continuously from Docker/Windows is brittle; safer to scan at workflow checkpoints (Approve, status transitions) and to log explicit staff intent.
+- We need a single source of truth: `job.file_path` in DB and mirrored in `metadata.json` for resilience.
+
+### High-level Task Breakdown
+1) Default Auto-Selection (Immediate UX)
+   - Keep scanning candidates at Approve, but auto-select the recommended file (newest valid sibling). Hide the picker behind “Choose different file…”.
+   - Success: Approve is one-click in most cases; staff can override when needed.
+
+2) Source of Truth + History (DB + metadata.json)
+   - Persist `authoritative_filename` and `authoritative_history` in `metadata.json`; keep DB `job.file_path` in sync.
+   - On each transition, ensure files exist and paths are consistent; log event details.
+   - Success: File choice is durable; recoverable after restarts.
+
+3) Open/Save Awareness via Protocol Handler (Near-term)
+   - When staff click “Open in Slicer” via `3dprint://`, log an `FileOpenedInSlicer` event.
+   - Add a lightweight rescan button “Detect newer slicer saves” that re-ranks candidates and proposes update.
+   - Success: Staff prompted when a newer sibling is detected; minimal manual effort.
+
+4) Integrity Audit Hooks (Admin → System Health)
+   - Extend audit to detect: missing authoritative file, duplicate/stale siblings, and directory/status mismatches.
+   - Success: Admin report highlights inconsistencies with quick fixes.
+
+### Acceptance Checklist
+- Approve modal preselects a recommended file; picker is optional and collapsed by default.
+- `job.file_path` and `metadata.json.authoritative_filename` always match after transitions.
+- “Detect newer saves” action proposes the likely authoritative upgrade.
+- System Health report flags missing/duplicate/stale authoritative files.
+
+### Project Status Board — File Tracking
+- [ ] UX: Auto-select recommended file; collapse chooser behind “Choose different file…”
+- [ ] Metadata: write/read `authoritative_filename` + history in `metadata.json`; sync on transitions
+- [ ] SlicerOpener: log `FileOpenedInSlicer`; add “Detect newer saves” rescan
+- [ ] Audit: extend report for authoritative file issues
 
 ### Phase 1: Environment Setup & Foundation ✅ COMPLETE
 - [x] Project structure creation

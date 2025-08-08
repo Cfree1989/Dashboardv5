@@ -19,6 +19,9 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [candidateFiles, setCandidateFiles] = useState<{ name: string; mtime: number }[]>([]);
+  const [authoritativeFilename, setAuthoritativeFilename] = useState<string>("");
+  const [showChooser, setShowChooser] = useState(false);
 
   const rate = useMemo(() => {
     const mat = (material || "").toLowerCase();
@@ -53,6 +56,18 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
       }
     }
     fetchStaff();
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/v1/jobs/${jobId}/candidate-files`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          const files = (data?.files || []) as { name: string; mtime: number }[];
+          setCandidateFiles(files);
+          if (files.length > 0) setAuthoritativeFilename(files[0].name);
+        }
+      } catch {}
+    })();
   }, []);
 
   const isValid = staffName.trim().length > 0 && !!weightG && !!timeHours && parseFloat(weightG) > 0 && parseFloat(timeHours) > 0;
@@ -72,6 +87,7 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
           staff_name: staffName,
           weight_g: parseFloat(weightG),
           time_hours: parseFloat(timeHours),
+          authoritative_filename: authoritativeFilename || undefined,
         }),
       });
       if (!res.ok) {
@@ -104,6 +120,48 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!!candidateFiles.length && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Using file: <span className="font-medium">{authoritativeFilename || candidateFiles[0]?.name}</span>
+                </div>
+                {candidateFiles.length > 1 && !showChooser && (
+                  <button
+                    type="button"
+                    onClick={() => setShowChooser(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Choose different file…
+                  </button>
+                )}
+              </div>
+              {showChooser && candidateFiles.length > 1 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Select file</label>
+                  <select
+                    className="w-full border rounded-lg px-3 py-2 focus-ring"
+                    value={authoritativeFilename}
+                    onChange={(e) => setAuthoritativeFilename(e.target.value)}
+                  >
+                    {candidateFiles.map((f) => (
+                      <option key={f.name} value={f.name}>{f.name}</option>
+                    ))}
+                  </select>
+                  <div className="mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowChooser(false)}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Hide file chooser
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Newest files appear first.</p>
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
             <select
