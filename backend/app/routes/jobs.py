@@ -122,7 +122,12 @@ def candidate_files(job_id):
     try:
         file_path = Path(job.file_path)
         directory = file_path.parent
-        allowed_exts = {'.stl', '.obj', '.3mf'}  # extend as needed
+        # Allow configurable extensions via env (e.g., ".stl,.obj,.3mf,.form")
+        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf')
+        allowed_exts = {
+            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
+            for ext in exts_env.split(',') if ext.strip()
+        }
         candidates = []
         # Build relevance tokens to restrict to this job only
         tokens = set()
@@ -159,6 +164,35 @@ def candidate_files(job_id):
         return jsonify({ 'files': candidates }), 200
     except Exception as e:
         return jsonify({ 'files': [ {'name': job.original_filename, 'mtime': 0} ] }), 200
+
+
+@bp.route('/<job_id>/log-file-open', methods=['POST'])
+@token_required
+def log_file_open(job_id):
+    """Stub endpoint for protocol handler touchpoint. Logs FileOpenedInSlicer.
+    Body: { "staff_name": "Optional Staff" }
+    """
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip() or None
+    # Validate staff if provided; otherwise allow None to represent unknown
+    if staff_name:
+        staff = Staff.query.get(staff_name)
+        if not staff or not staff.is_active:
+            # Ignore invalid names in stub; do not block logging
+            staff_name = None
+    evt = Event(
+        job_id=job.id,
+        event_type='FileOpenedInSlicer',
+        details={'file_path': job.file_path},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', None),
+    )
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'logged'}), 200
 
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
