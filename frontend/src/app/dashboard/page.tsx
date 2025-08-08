@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { LastUpdated } from '../../components/dashboard/last-updated';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
+import { DiagPanel } from '../../components/dashboard/diag-panel';
 
 
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
@@ -44,6 +45,12 @@ export default function DashboardPage() {
         const res = await fetch('/api/v1/jobs?' + params.toString(), {
           headers: { 'Authorization': `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        }
+        if (!res.ok) return;
         const data = await res.json();
         counts[s] = Array.isArray(data) ? data.length : (data.jobs || []).length;
       })
@@ -96,6 +103,7 @@ export default function DashboardPage() {
         stats={statusCounts} 
       />
       <JobList filters={{ status }} onJobsMutated={fetchCounts} />
+      <DiagPanel />
     </div>
   );
 }

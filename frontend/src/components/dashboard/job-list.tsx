@@ -52,6 +52,14 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
         const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''), {
           headers: { 'Authorization': `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Failed with status ${res.status}`);
+        }
         const data = await res.json();
         setJobs(Array.isArray(data) ? data : (data.jobs || []));
       } catch (err) {

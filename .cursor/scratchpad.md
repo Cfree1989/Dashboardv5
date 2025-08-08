@@ -114,6 +114,213 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [x] Executor: Phase 5.1.5 — Candidate Files (stub)
   - Success criteria: Optional `GET /api/v1/jobs/:id/candidate-files` returns at least the uploaded file; frontend shows file selector (non-blocking); can be deferred to Phase 4.2 File Management
 
+## Incident — Missing Jobs After Reboot (Planner)
+
+### Background and Motivation
+- After a morning reboot, jobs from yesterday no longer appear on the dashboard. This is an operational integrity issue blocking staff work.
+
+### Key Challenges and Analysis
+- Most likely root causes:
+  - Backend connected to a different database than yesterday (SQLite fallback vs Postgres in Docker).
+  - Postgres data volume reset or different Docker project/volume name in use.
+  - Frontend pointing to a different backend instance/host after reboot.
+- Code observations:
+  - `GET /api/v1/jobs` applies only status/printer/discipline filters; no date-based filtering or auto-archival is implemented.
+  - Frontend fetches counts and lists directly; no client-side date pruning.
+
+### High-level Task Breakdown (Recovery + Prevention)
+1) Verify active environment and database in-use (Today vs Yesterday)
+   - Run environment checks:
+     - `docker compose ps` and `docker compose logs backend --no-log-prefix -n 100`.
+     - Backend health: open `http://localhost:5000/health`.
+     - DB truth: `docker compose exec db psql -U fablab_user -d 3d_print_system -c "select status, count(*) from job group by status;"`.
+   - Success criteria: We know exactly which DB is active and whether it contains yesterday's jobs.
+
+2) If mismatch (SQLite vs Postgres) or empty DB, align services to Postgres and restore visibility
+   - Ensure stack is started via Docker (`docker compose up -d`) so backend uses Postgres per `DATABASE_URL`.
+   - If jobs exist in Postgres: confirm dashboard shows them across tabs.
+   - Success criteria: Yesterday’s jobs visible again without code changes.
+
+3) Add backend guardrails to prevent silent SQLite fallback
+   - Fail fast when `DATABASE_URL` is missing in non-test mode; log active DB URI (sanitized) at startup.
+   - Tests: add a unit/integration test asserting startup warning/fail in production mode without `DATABASE_URL`.
+   - Success criteria: Local runs cannot silently create/use `app.db`.
+
+4) Add a diagnostics endpoint for rapid triage (protected)
+   - `GET /api/v1/_diag` (JWT required): returns `{ db_engine, db_url_sanitized, migration_head, job_counts_by_status, app_env }`.
+   - Tests: endpoint returns expected fields with seeded data.
+   - Success criteria: One-click visibility into environment and data health.
+
+5) Frontend diagnostics panel (admin-only, lightweight)
+   - Add a small panel/button in dashboard to fetch and display `_diag` information.
+   - Success criteria: Staff can quickly confirm they are on the correct DB and see counts.
+
+6) Documentation: Runbook for "Missing Jobs After Reboot"
+   - Add a concise README section with the commands above, common causes, and fixes.
+   - Success criteria: Clear steps for future incidents.
+
+### Project Status Board (Incident Tasks)
+- [ ] Task 1: Verify environment/DB
+  - Success: Commands confirm services and DB contents; yesterday’s data location identified.
+- [ ] Task 2: Enforce Postgres usage and regain visibility
+  - Success: Dashboard shows yesterday’s jobs again.
+- [ ] Task 3: Backend guardrails (no SQLite fallback)
+  - Success: Startup fails/warns without `DATABASE_URL`; test added.
+- [ ] Task 4: Backend diagnostics endpoint `_diag`
+  - Success: Endpoint exists, protected, returns fields; tests pass.
+- [ ] Task 5: Frontend diagnostics panel
+  - Success: Admin-only UI shows `_diag` results.
+- [ ] Task 6: Runbook doc
+  - Success: README section added with step-by-step recovery.
+
+### Executor's Feedback or Assistance Requests (Incident)
+- Please confirm how the stack was started today vs yesterday (Docker vs local `flask run`/`python run.py`).
+- Share outputs:
+  - `docker compose ps`
+  - `docker compose logs backend --no-log-prefix -n 100`
+  - `docker compose exec db psql -U fablab_user -d 3d_print_system -c "select status, count(*) from job group by status;"`
+- On the dashboard, do status badges show any non-zero counts?
+
+## Planner: Admin Page & Diagnostics Placement
+
+### Background and Motivation
+- Diagnostics should not appear on the main dashboard. It belongs in an Admin/Settings area. The current diagnostics fetch returned HTTP 500 and must be stabilized.
+
+### Key Challenges and Analysis
+- Diagnostics endpoint may 500 due to environment accessors or raw SQL table naming.
+- Admin page does not exist yet; we need a minimal protected page to host tools like diagnostics.
+
+### High-level Task Breakdown
+1) Remove Diagnostics panel from Dashboard
+   - Edit `frontend/src/app/dashboard/page.tsx` to remove the diagnostics import and component.
+   - Success: Dashboard has no diagnostics card; build passes.
+
+2) Create Admin page and mount Diagnostics there
+   - Add `frontend/src/app/admin/page.tsx` (protected by existing workstation JWT; redirect to `/login` if no token).
+   - Render a simple "Admin / Settings" page that includes the Diagnostics panel component.
+   - Success: Navigating to `/admin` shows diagnostics; other pages unaffected.
+
+3) Fix `_diag` 500
+   - Replace `db.get_app()` calls with `current_app` (available in request context).
+   - Avoid raw SQL table names; compute job counts with ORM: `db.session.query(Job.status, db.func.count()).group_by(Job.status).all()`.
+   - Keep alembic version read optional; no 500 if table missing.
+   - Success: `_diag` returns 200 with fields even on empty DB; returns 401 on invalid/missing token.
+
+4) Tests
+   - Add a backend test for `_diag` happy path (with token) against in-memory SQLite.
+   - Add a backend test for unauthorized access (401).
+   - Success: Tests pass locally/CI.
+
+5) (Optional) Route placement & permissions
+   - Add an Admin nav link (visible only when token present) to `/admin` from dashboard header.
+   - Success: Easy navigation to admin tools.
+
+### Acceptance Checklist
+- Dashboard no longer shows diagnostics.
+- `/admin` exists and renders diagnostics with valid token; unauthorized users are redirected to login.
+- `_diag` returns 200 with `{ db_engine, db_url_sanitized, migration_head|null, job_counts_by_status, app_env }` and never 500 in normal conditions.
+- Tests added for `_diag`.
+
+### Decision & Prioritization
+- Proceed now with a minimal Admin page to host Diagnostics and remove the Diagnostics card from the main dashboard. Defer the full Analytics (`/analytics`) page until after current Phase 5 workflows are solid.
+- Rationale: Diagnostics fix is directly related to stability and recent incident. Admin page is a small, contained addition. Analytics is larger and not blocking operations.
+
+### Project Status Board (Admin/Diagnostics)
+- [ ] Remove Diagnostics card from `dashboard/page.tsx`
+  - Success: No diagnostics UI on dashboard; build passes
+- [ ] Create `frontend/src/app/admin/page.tsx` and mount `DiagPanel`
+  - Success: `/admin` shows diagnostics when logged in; redirects to `/login` otherwise
+- [ ] Backend: Fix `_diag` 500 (use `current_app`, ORM counts, optional alembic)
+  - Success: `_diag` stable 200; unauthorized 401
+- [ ] Tests: `_diag` authorized/unauthorized
+  - Success: Tests green
+
+## Planner: Admin Page (MVP based on Images + Masterplan)
+
+### Background and Motivation
+- Create a dedicated Admin page (`/admin`) to house Diagnostics and administrative tools. Remove Diagnostics from the main dashboard. Follow the master plan’s Admin sections and match the provided screenshots for layout and tone.
+
+### Key Challenges and Analysis
+- Admin actions (overrides, archival, audit) are scoped in master plan but not fully implemented server-side yet. We’ll scaffold UI sections with clear disabled states and tooltips until endpoints exist.
+- Ensure route protection via workstation JWT and consistent attribution patterns.
+
+### High-level Task Breakdown (small, verifiable tasks)
+1) Route & Access Control
+   - Add `frontend/src/app/admin/page.tsx` as a protected page. If no token → redirect to `/login`.
+   - Success: Visiting `/admin` while logged out redirects to login; with token, renders.
+
+2) Page Layout & Header (match images & V0 styling)
+   - Title "Admin / Settings", environment badge (Dev/Prod), subtitle text, last-updated timestamp.
+   - Success: Visual header matches style from screenshots (spacing, typography).
+
+3) Diagnostics Card (moved from Dashboard)
+   - Use existing `DiagPanel` inside Admin page. Remove `DiagPanel` from `dashboard/page.tsx`.
+   - Success: No diagnostics on dashboard; `/admin` shows diagnostics fetch and renders DB info and job counts.
+
+4) Settings Card (MVP)
+   - Fields (placeholders): Background sound enable/disable (disabled control for now), environment banner toggle (display only).
+   - Success: Card renders; controls present but non-destructive; notes indicating "coming soon" where not wired.
+
+5) Staff Management
+   - List active staff (GET `/api/v1/staff`), with toggle to include inactive.
+   - Actions: Add staff (POST `/api/v1/staff`), Deactivate/Reactivate (PATCH `/api/v1/staff/:name`).
+   - Success: Can add, deactivate, reactivate; list updates; errors surfaced.
+
+6) Admin Overrides (Scaffold Only)
+   - Cards for Force Unlock, Force Confirm, Change Status, Mark Failed; disabled buttons with tooltip "Feature pending backend".
+   - Success: UI communicates pending status; no actions performed.
+
+7) Data Management (Archive/Prune) — Scaffold
+   - Cards for Archive (POST `/api/v1/admin/archive`) and Prune (POST `/api/v1/admin/prune`); disabled until endpoints exist.
+   - Success: UI present with descriptions; actions disabled.
+
+8) System Health & Integrity (Audit) — Scaffold
+   - Cards for Start Audit and View Report; disabled until endpoints exist.
+   - Success: UI present with descriptions; actions disabled.
+
+9) Email Tools — Scaffold
+   - Card for Resend Email; disabled until endpoint exists.
+   - Success: UI present with description; disabled.
+
+10) Backend `_diag` Hardening (Fix 500)
+   - Replace `db.get_app()` usage with `from flask import current_app`; use ORM for job counts: `db.session.query(Job.status, db.func.count()).group_by(Job.status)`.
+   - Alembic version query optional; return `null` if not present; never 500.
+   - Success: `_diag` 200 with stable schema; 401 when unauthorized.
+
+11) Navigation
+   - Add link to Admin from dashboard header (visible when token exists).
+   - Success: Quick access to `/admin` from dashboard.
+
+12) Tests (Backend)
+   - `_diag` authorized returns expected fields; unauthorized returns 401 JSON.
+   - Success: Tests pass.
+
+13) QA & Accessibility
+   - Responsive layout; keyboard navigation; aria labels on buttons/links; clear empty/error states.
+   - Success: Basic a11y checks satisfied; no console errors.
+
+### Acceptance Checklist (Admin MVP)
+- `/admin` exists, protected by JWT; header matches style.
+- Diagnostics works on `/admin` and is removed from `/dashboard`.
+- Staff Management: list/add/deactivate/reactivate flows working.
+- All other sections present as disabled scaffolds with clear descriptions.
+- `_diag` stabilized (no 500), unauthorized returns 401.
+- Navigation link to Admin available from dashboard.
+
+### Project Status Board — Admin MVP
+- [ ] Add `/admin` route with auth guard
+- [ ] Build Admin header & layout per images
+- [ ] Move Diagnostics to Admin; remove from Dashboard
+- [ ] Implement Staff Management CRUD (list/add/toggle active)
+- [ ] Scaffold Overrides/Data Mgmt/Audit/Email tools (disabled)
+- [ ] Harden `_diag` (current_app + ORM)
+- [ ] Add Admin nav link from dashboard
+- [ ] Tests for `_diag` auth/no-auth
+
+### Executor's Feedback or Assistance Requests (Admin)
+- Confirm: From the screenshots, preferred section order and any specific labels/wording you want reproduced.
+- Confirm: Are we okay to ship Staff Management as functional now, with other Admin sections disabled until backend endpoints are implemented?
+
 ## Phase 5.2 — Rejection Flow
 
 - [x] Backend: `POST /api/v1/jobs/:id/reject` with `{ staff_name, reasons[], custom_reason }` — validates status `UPLOADED`, persists `reject_reasons`, sets status `REJECTED`, logs `StaffRejected`, returns updated job
