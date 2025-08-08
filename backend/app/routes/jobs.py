@@ -471,6 +471,8 @@ def record_payment(job_id):
     # Transition to PAIDPICKEDUP
     job.status = 'PAIDPICKEDUP'
     job.last_updated_by = staff_name
+    # Move file/metadata to PaidPickedUp
+    move_authoritative(job, 'PAIDPICKEDUP')
     db.session.add(job)
     db.session.commit()
 

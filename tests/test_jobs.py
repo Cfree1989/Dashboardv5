@@ -317,3 +317,33 @@ def test_status_transitions_printing_complete_picked_up(client, token, app):
     )
     assert resp.status_code == 200
     assert resp.get_json()['status'] == 'PAIDPICKEDUP'
+
+
+def test_record_payment_moves_file_and_sets_status(client, token, app, tmp_path):
+    # Prepare job in COMPLETED with temp storage
+    os.environ['STORAGE_PATH'] = str(tmp_path)
+    job = create_job(app)
+    with app.app_context():
+        j = Job.query.get(job.id)
+        (tmp_path / 'Completed').mkdir(parents=True, exist_ok=True)
+        (tmp_path / 'Completed' / 'file.stl').write_text('model')
+        (tmp_path / 'Completed' / 'file_metadata.json').write_text('{}')
+        j.status = 'COMPLETED'
+        j.file_path = str(tmp_path / 'Completed' / 'file.stl')
+        j.metadata_path = str(tmp_path / 'Completed' / 'file_metadata.json')
+        db.session.commit()
+
+    client.post('/api/v1/staff', json={'name': 'Cashier'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Record payment
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 10, 'txn_no': 'TC1', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['status'] == 'PAIDPICKEDUP'
+    # File moved to PaidPickedUp
+    assert not (tmp_path / 'Completed' / 'file.stl').exists()
+    assert (tmp_path / 'PaidPickedUp' / 'file.stl').exists()

@@ -4,10 +4,12 @@ from app.models.job import Job
 import os, hashlib, json
 from datetime import datetime
 from uuid import uuid4
+from pathlib import Path
 from app.services.event_service import log_event
 from app.services.email_service import send_status_update_email, send_approval_email
 from app.services.token_service import generate_confirmation_token, verify_confirmation_token
 from app.services.file_service import move_authoritative
+from app.routes.jobs import _sync_authoritative_metadata
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
@@ -184,5 +186,11 @@ def confirm_job(token: str):
     job.status = 'READYTOPRINT'
     move_authoritative(job, 'READYTOPRINT')
     db.session.commit()
+    # Sync metadata to reflect authoritative file and new status
+    try:
+        _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'StudentConfirmed')
+    except Exception:
+        # Non-fatal: do not block confirmation on metadata issues
+        pass
     log_event(job.id, 'StudentConfirmed', {'status': job.status})
     return jsonify(job.to_dict()), 200

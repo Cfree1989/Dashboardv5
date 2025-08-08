@@ -31,9 +31,10 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ### Active Workstreams (Open)
 
 1) File Tracking & Metadata
-- [ ] Metadata durability: keep DB `job.file_path` and `metadata.json.authoritative_filename` in sync across transitions; add tests
-- [ ] Audit report: flag missing authoritative file, duplicate/stale siblings, directory/status mismatches
-- [ ] FS tests: transition path updates on disk + `metadata.json` sync using temp storage
+- [x] Metadata durability: keep DB `job.file_path` and `metadata.json.authoritative_filename` in sync across transitions; add tests
+- [x] Audit report endpoint: flags missing authoritative file, duplicate/stale siblings, directory/status mismatches
+- [ ] Admin UI: Audit report view + safe actions (delete orphan, mark stale) with events
+- [x] FS tests: transition path updates on disk + `metadata.json` sync using temp storage
 
 2) Incident — Missing Jobs After Reboot (triage + prevention)
 - [ ] Verify environment/DB in use
@@ -48,8 +49,8 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - [ ] Runbook documentation
 
 3) Payment & Pickup Workflow
-- [ ] Backend: `POST /api/v1/jobs/:id/payment` (grams, txn_no, picked_up_by) → transition to `PAIDPICKEDUP`
-- [ ] Frontend: Payment modal (from `COMPLETED`); success removes from list, refreshes counts
+- [x] Backend: `POST /api/v1/jobs/:id/payment` (grams, txn_no, picked_up_by) → transition to `PAIDPICKEDUP`; persists Payment; logs event; moves files; tests pass
+- [ ] Frontend: Payment modal integration on `COMPLETED` cards; success removes job and refreshes counts
 
 4) Protocol Handler (`3dprint://`)
 - [ ] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
@@ -132,6 +133,7 @@ Preserved for history; reorganized for clarity (do not delete).
 - [x] Backend: Candidate-files scan hardening (configurable extensions; priority > recency > name)
 - [x] Frontend: Rescan in Approve modal; recommended preselected
 - [x] Protocol touchpoint (logging only): `FileOpenedInSlicer`
+- [x] Metadata durability + sync: confirmation and all transitions update `metadata.json` (`authoritative_filename`, `status`, `file_path`) and stay in parity with DB; covered by temp FS tests
 
 ### Authority Hardening — Completed Parts
 - [x] Approve uses env-driven extensions and file existence checks
@@ -158,18 +160,19 @@ Preserved for history; reorganized for clarity (do not delete).
 - If vulnerabilities appear, run `npm audit` before proceeding
 - Always ask before using the `-force` git command
 - Remove unused imports/usages safely to avoid build breaks
+ - On Windows PowerShell, prefer `pytest -q` (avoid piping to `cat`); `&&` is not a valid separator
 
-## Future Tasks (Full Plan)
+## Future Tasks
 
 ### Phase 4 — Advanced Features (Remaining)
 - 4.2 File Management: Metadata Durability
-  - [ ] Persist `authoritative_filename` + history reliably in `metadata.json`; keep DB `job.file_path` in sync on all transitions
-  - [ ] Add filesystem-backed tests using temp storage to validate copy → DB update → delete and metadata parity
-  - Acceptance: After each transition, both DB and `metadata.json` reflect correct authoritative path; tests pass
+  - [x] Audit report endpoint (GET `/api/v1/admin/audit/report`) — identifies orphans, broken links (missing file/meta, dir/status mismatch, metadata mismatch), and stale duplicates
+  - [ ] Admin UI (report view + safe actions)
+  - Acceptance: Audit flags inconsistencies; safe actions available; events logged
 - 4.3 Payment & Pickup
   - Backend
-    - [ ] `POST /api/v1/jobs/:id/payment` with `{ grams, txn_no, picked_up_by, staff_name }`; validate status `COMPLETED`
-    - [ ] Persist `Payment` record; transition to `PAIDPICKEDUP`; log attributed events; unit tests
+    - [x] `POST /api/v1/jobs/:id/payment` with `{ grams, txn_no, picked_up_by, staff_name }`; validate status `COMPLETED`
+    - [x] Persist `Payment` record; transition to `PAIDPICKEDUP`; log attributed events; unit tests
   - Frontend
     - [ ] Payment modal on `COMPLETED` cards; inputs + validation; success removes job and refreshes counts; error states; a11y
   - Acceptance: End-to-end payment recorded; job moves to Paid & Picked Up; events/audit present; tests pass
@@ -258,8 +261,8 @@ Preserved for history; reorganized for clarity (do not delete).
 - Acceptance: Smoother UX and stable ops with documented SLOs
 
 ## Next Steps Priority Queue
-1) Phase 4.2 — Metadata authority durability + audit hooks (tests)
-2) Payment & Pickup workflow (backend + modal)
+1) Phase 4.2 — Audit admin UI + safe actions (delete orphan, mark stale) with events
+2) Payment workflow — frontend integration (modal attach to COMPLETED cards + counts refresh)
 3) Protocol handler (SlicerOpener) packaging and UX
 4) Comprehensive testing + deployment docs
 5) Analytics Dashboard (`/analytics`) after operations stabilize
