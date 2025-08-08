@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
 from app.services.event_service import log_event
-from app.services.email_service import send_status_update_email, send_approval_email
+from app.services.email_service import send_submission_confirmation_email, send_approval_email
 from app.services.token_service import generate_confirmation_token, verify_confirmation_token
 from app.services.file_service import move_authoritative
 from app.routes.jobs import _sync_authoritative_metadata
@@ -153,9 +153,9 @@ def submit_job():
         # Event logging
         log_event(job.id, 'JobCreated', {'original_filename': job.original_filename})
 
-        # Fire-and-forget best-effort notification (optional)
+        # Fire-and-forget best-effort submission confirmation email
         try:
-            send_status_update_email(job, 'UPLOADED')
+            send_submission_confirmation_email(job)
         except Exception:
             pass
 
