@@ -184,8 +184,9 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Weight (grams)</label>
+              <label htmlFor="weightG" className="block text-sm font-medium text-gray-700 mb-1">Weight (grams)</label>
               <input
+                id="weightG"
                 type="number"
                 min="0"
                 step="0.1"
@@ -196,8 +197,9 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time (hours)</label>
+              <label htmlFor="timeHours" className="block text-sm font-medium text-gray-700 mb-1">Time (hours)</label>
               <input
+                id="timeHours"
                 type="number"
                 min="0"
                 step="0.5"

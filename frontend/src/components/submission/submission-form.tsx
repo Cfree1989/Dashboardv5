@@ -317,7 +317,7 @@ export default function SubmissionForm() {
         <p className="mt-2">
           Ensure your model's dimensions are within the specified limits for the printer you plan to use.
         </p>
-        <div className="flex items-start mt-3" id="scalingConfirmed">
+        <div className="flex items-start mt-3">
           <input
             id="scalingConfirmed"
             type="checkbox"
@@ -348,7 +348,7 @@ export default function SubmissionForm() {
         {printerError && <p className="text-red-600 text-sm mt-1">{printerError}</p>}
       </div>
 
-      <div className="flex items-center" id="minChargeConsent">
+      <div className="flex items-center">
         <input
           id="minChargeConsent"
           type="checkbox"

@@ -1,5 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), prefetch: jest.fn() })
+}));
 import SubmissionForm from './submission-form';
 
 describe('SubmissionForm initial render', () => {
@@ -7,9 +10,10 @@ describe('SubmissionForm initial render', () => {
     render(<SubmissionForm />);
   });
 
-  it('renders Student Name input', () => {
-    expect(screen.getByLabelText(/Student Name/i)).toBeInTheDocument();
-    expect((screen.getByLabelText(/Student Name/i) as HTMLInputElement).value).toBe('');
+  it('renders First/Last Name inputs', () => {
+    expect(screen.getByLabelText(/First Name/i)).toBeInTheDocument();
+    expect((screen.getByLabelText(/First Name/i) as HTMLInputElement).value).toBe('');
+    expect(screen.getByLabelText(/Last Name/i)).toBeInTheDocument();
   });
 
   it('renders Student Email input', () => {
@@ -36,16 +40,16 @@ describe('SubmissionForm initial render', () => {
   });
 
   it('renders Printer Selection dropdown', () => {
-    expect(screen.getByLabelText(/Printer Selection/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Which printer/i)).toBeInTheDocument();
   });
 
   it('renders Minimum Charge Consent checkbox unchecked', () => {
-    const checkbox = screen.getByLabelText(/I acknowledge the minimum/i) as HTMLInputElement;
+    const checkbox = screen.getByLabelText(/minimum \$3\.00 charge/i) as HTMLInputElement;
     expect(checkbox).toBeInTheDocument();
     expect(checkbox.checked).toBe(false);
   });
 
   it('renders File Upload input', () => {
-    expect(screen.getByLabelText(/File Upload/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Upload 3D Model File/i)).toBeInTheDocument();
   });
 });

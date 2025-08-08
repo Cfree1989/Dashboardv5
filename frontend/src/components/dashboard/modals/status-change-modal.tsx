@@ -83,8 +83,9 @@ export default function StatusChangeModal({ jobId, action, title, description, c
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
+            <label htmlFor="actionStaff" className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
             <select
+              id="actionStaff"
               className="w-full border rounded-lg px-3 py-2 focus-ring"
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}

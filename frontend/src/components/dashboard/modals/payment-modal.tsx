@@ -81,8 +81,9 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
+            <label htmlFor="paymentStaff" className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
             <select
+              id="paymentStaff"
               className="w-full border rounded-lg px-3 py-2 focus-ring"
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}
@@ -98,17 +99,17 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Weight (grams)</label>
-              <input type="number" min="0" step="0.1" className="w-full border rounded-lg px-3 py-2 focus-ring" value={grams} onChange={(e) => setGrams(e.target.value)} required />
+              <label htmlFor="grams" className="block text-sm font-medium text-gray-700 mb-1">Weight (grams)</label>
+              <input id="grams" type="number" min="0" step="0.1" className="w-full border rounded-lg px-3 py-2 focus-ring" value={grams} onChange={(e) => setGrams(e.target.value)} required />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Txn Number</label>
-              <input className="w-full border rounded-lg px-3 py-2 focus-ring" value={txnNo} onChange={(e) => setTxnNo(e.target.value)} required />
+              <label htmlFor="txnNo" className="block text-sm font-medium text-gray-700 mb-1">Txn Number</label>
+              <input id="txnNo" className="w-full border rounded-lg px-3 py-2 focus-ring" value={txnNo} onChange={(e) => setTxnNo(e.target.value)} required />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Picked up by</label>
-            <input className="w-full border rounded-lg px-3 py-2 focus-ring" value={pickedUpBy} onChange={(e) => setPickedUpBy(e.target.value)} required />
+            <label htmlFor="pickedUpBy" className="block text-sm font-medium text-gray-700 mb-1">Picked up by</label>
+            <input id="pickedUpBy" className="w-full border rounded-lg px-3 py-2 focus-ring" value={pickedUpBy} onChange={(e) => setPickedUpBy(e.target.value)} required />
           </div>
 
           <div className="flex justify-end space-x-2 pt-2">

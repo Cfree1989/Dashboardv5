@@ -117,7 +117,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Current Status
 
 **Current Phase**: Phase 4 - Advanced Features  
-**Next Milestone**: Phase 5.1.4 — Tests (Approve + Review flows)
+**Next Milestone**: Phase 6 — Auto-refresh + Last Updated stabilization
 **Overall Progress**: ~60% complete
 
 ### Recently Completed Achievements:
@@ -377,11 +377,45 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - `POST /api/v1/jobs/:id/mark-complete` (from PRINTING)
   - `POST /api/v1/jobs/:id/mark-picked-up` (from COMPLETED)
   - Success criteria: Validate status preconditions; require `{ staff_name }`; log events; tests added
-- [ ] Frontend: Modals/UI + wiring
+- [x] Frontend: Modals/UI + wiring
   - Success criteria: Each action opens a confirm modal with Staff Attribution; on success, move job to next tab and refresh counts; accessible and error states
   - Enhancement: Include second-step confirmation dialogs for each action
 - [x] Tests: Backend status transition tests
   - Success criteria: Happy path transitions validated; guards enforced for wrong states
+
+- #### High-level Task Breakdown (Frontend)
+  1) Modal UI
+     - Build/confirm a reusable `StatusChangeModal` in `frontend/src/components/dashboard/modals/status-change-modal.tsx` that accepts: `action` ("printing" | "complete" | "picked_up"), required Staff Attribution select (from `/api/v1/staff`), confirm/cancel buttons, loading/disabled states, and accessible labels.
+  2) Wire Job Card Actions
+     - In `frontend/src/components/dashboard/job-card.tsx`, surface context actions per status:
+       - READYTOPRINT → “Mark Printing” → calls `POST /api/v1/jobs/:id/mark-printing`
+       - PRINTING → “Mark Complete” → calls `POST /api/v1/jobs/:id/mark-complete`
+       - COMPLETED → “Mark Picked Up” → calls `POST /api/v1/jobs/:id/mark-picked-up`
+     - Require Staff Attribution via the modal before enabling confirm.
+  3) API Integration
+     - Ensure Authorization header is included; handle JSON errors; show success toast and inline error states.
+  4) State Updates
+     - On success, optimistically remove the job from the current list and trigger counts refresh in `dashboard/page.tsx` via the existing `onJobsMutated`/refresh hook.
+  5) Tests
+     - Add `status-change-modal.test.tsx` to validate: disabled confirm until staff selected, correct endpoint per action, success callback invoked, and error rendering.
+
+- #### Acceptance Checklist (Frontend)
+  - “Mark Printing/Complete/Picked Up” open a modal requiring Staff Attribution.
+  - Confirm calls the correct endpoint and moves the job to the next tab; counts refresh immediately.
+  - Buttons are disabled until valid; loading states and ARIA attributes are correct; errors displayed if API fails.
+  - Tests pass locally/CI for modal validation and action wiring.
+
+- ### Project Status Board — Phase 5.3 Frontend
+  - [x] Modal component ready for three actions
+    - Success: Reusable `StatusChangeModal` renders with attribution select and confirm disabled until valid
+  - [x] Wire actions on `job-card.tsx`
+    - Success: Contextual actions appear per status and open the modal
+  - [x] Hook up API calls with auth + error handling
+    - Success: Success toast + removal from current list; errors visible
+  - [x] Counts refresh on mutation
+    - Success: Tab badges update immediately after each transition
+  - [x] Tests for modal + wiring
+    - Success: New `status-change-modal.test.tsx` assertions pass
 
 - [x] Planner: Scope Phase 6.2 — Visual Alerts & Reviewed Flow
   - Success criteria: Document clear UX rules, backend persistence contract, frontend modal behavior, and tests; added tasks below
