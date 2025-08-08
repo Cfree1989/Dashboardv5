@@ -1,10 +1,10 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import JobList from '../../components/dashboard/job-list';
 import { LastUpdated } from '../../components/dashboard/last-updated';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
-import { DiagPanel } from '../../components/dashboard/diag-panel';
 
 
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
@@ -74,6 +74,12 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">3D Print Job Dashboard</h1>
         <div className="flex items-center space-x-4">
           <LastUpdated lastUpdated={lastUpdated} />
+          <Link
+            href="/admin"
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 focus-ring btn-transition"
+          >
+            Admin
+          </Link>
           <button 
             onClick={refreshPage} 
             disabled={isRefreshing}
@@ -103,7 +109,6 @@ export default function DashboardPage() {
         stats={statusCounts} 
       />
       <JobList filters={{ status }} onJobsMutated={fetchCounts} />
-      <DiagPanel />
     </div>
   );
 }

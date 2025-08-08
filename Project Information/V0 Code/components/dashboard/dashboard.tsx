@@ -14,9 +14,10 @@ import { RejectionModal } from "./modals/rejection-modal"
 interface DashboardProps {
   currentStatus: JobStatus
   onStatusChange: (status: JobStatus) => void
+  onLogout: () => void
 }
 
-export function Dashboard({ currentStatus, onStatusChange }: DashboardProps) {
+export function Dashboard({ currentStatus, onStatusChange, onLogout }: DashboardProps) {
   const { jobs, stats, loading, refreshData } = useDashboard()
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false)
@@ -45,11 +46,29 @@ export function Dashboard({ currentStatus, onStatusChange }: DashboardProps) {
           <SoundToggle />
           <LastUpdated />
           <button
+            onClick={() => window.location.href = '/analytics'}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Analytics
+          </button>
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Admin
+          </button>
+          <button
             onClick={() => refreshData(currentStatus)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             disabled={loading}
           >
             {loading ? "Refreshing..." : "Refresh"}
+          </button>
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Logout
           </button>
         </div>
       </div>

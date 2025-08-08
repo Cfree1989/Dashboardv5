@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import type { Job, JobStatus } from "@/types/job"
 import { useDashboard } from "./dashboard-context"
 import { NotesSection } from "./notes-section"
-import { User, Mail, Printer, Palette, DollarSign, CheckCircle, XCircle, ExternalLink, Eye } from "lucide-react"
+import { Mail, Printer, Palette, DollarSign, CheckCircle, XCircle, ExternalLink, Eye } from 'lucide-react'
 
 interface JobCardProps {
   job: Job
@@ -34,6 +34,9 @@ export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProp
 
   // Format time elapsed
   const timeElapsed = formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })
+
+  // Determine if reject button should be shown (all statuses except COMPLETED, PAIDPICKEDUP, and REJECTED)
+  const canReject = !["COMPLETED", "PAIDPICKEDUP", "REJECTED"].includes(currentStatus)
 
   return (
     <div
@@ -64,10 +67,6 @@ export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProp
         <p className="text-gray-600 text-sm mb-3 truncate">{job.displayName}</p>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="flex items-center text-sm text-gray-500">
-            <User className="w-4 h-4 mr-1" />
-            <span className="truncate">{job.studentName}</span>
-          </div>
           <div className="flex items-center text-sm text-gray-500">
             <Mail className="w-4 h-4 mr-1" />
             <span className="truncate">{job.studentEmail}</span>
@@ -128,34 +127,36 @@ export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProp
             {isExpanded ? "Show Less" : "Show More"}
           </button>
 
-          <div className="flex space-x-2">
-            {currentStatus === "UPLOADED" && (
-              <>
-                <button
-                  onClick={() => onApprove(job.id)}
-                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Approve
-                </button>
-                <button
-                  onClick={() => onReject(job.id)}
-                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
-                >
-                  <XCircle className="w-4 h-4 mr-1" />
-                  Reject
-                </button>
-              </>
+          <div className="flex flex-wrap gap-2">
+            {/* Open File button - available on all statuses */}
+            <a
+              href={`3dprint://open?path=${encodeURIComponent(job.filePath)}`}
+              className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              Open File
+            </a>
+
+            {/* Reject button - available until job is completed */}
+            {canReject && (
+              <button
+                onClick={() => onReject(job.id)}
+                className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                Reject
+              </button>
             )}
 
-            {(currentStatus === "READYTOPRINT" || currentStatus === "PRINTING") && (
-              <a
-                href={`3dprint://open?path=${encodeURIComponent(job.filePath)}`}
-                className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+            {/* Status-specific action buttons */}
+            {currentStatus === "UPLOADED" && (
+              <button
+                onClick={() => onApprove(job.id)}
+                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
               >
-                <ExternalLink className="w-4 h-4 mr-1" />
-                Open File
-              </a>
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Approve
+              </button>
             )}
 
             {currentStatus === "READYTOPRINT" && (
