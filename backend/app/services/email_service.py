@@ -47,11 +47,40 @@ def send_approval_email(job, confirmation_url: str) -> bool:
     Send the student an approval email with a confirmation link.
     """
     subject = "3D Print Job Approved - Confirm to Proceed"
+    
+    # Format time display
+    if job.time_hours:
+        if job.time_hours >= 1:
+            time_display = f"{job.time_hours:.1f} hours"
+        else:
+            time_display = f"{int(job.time_hours * 60)} minutes"
+    else:
+        time_display = "Not specified"
+    
     text_body = (
         f"Hello {job.student_name},\n\n"
-        "Your 3D print job has been approved. Please confirm to proceed: "
+        "Great news! Your 3D print job has been reviewed and approved by our FabLab team.\n\n"
+        "APPROVED JOB DETAILS:\n"
+        f"File: {job.display_name}\n"
+        f"Printer: {job.printer}\n"
+        f"Material: {job.material}\n"
+        f"Color: {job.color}\n\n"
+        "PRICING & TIME ESTIMATE:\n"
+        f"Total Cost: ${job.cost_usd:.2f}\n"
+        f"Weight: {job.weight_g}g\n"
+        f"Estimated Print Time: {time_display}\n\n"
+        "Note: All FabLab jobs have a minimum charge of $3.00. "
+        "Pricing is based on material weight at $0.10/gram for filament and $0.20/gram for resin.\n\n"
+        "ACTION REQUIRED:\n"
+        "Please confirm your job by clicking this link to add it to the print queue:\n"
         f"{confirmation_url}\n\n"
-        "If you did not request this, please ignore this email."
+        "What happens after confirmation:\n"
+        "- Your job will be added to the print queue\n"
+        "- You'll receive updates as your print progresses\n"
+        "- We'll notify you when it's ready for pickup\n\n"
+        "This confirmation link will expire in 72 hours.\n"
+        "If you did not request this, you can safely ignore this email.\n\n"
+        "Thank you for using the CoAD FabLab!"
     )
     try:
         html_body = render_template(
@@ -61,10 +90,17 @@ def send_approval_email(job, confirmation_url: str) -> bool:
         )
     except Exception:
         html_body = (
+            f"<h2>Job Approved!</h2>"
             f"<p>Hello {job.student_name},</p>"
-            "<p>Your 3D print job has been approved.</p>"
-            f"<p><a href=\"{confirmation_url}\">Click here to confirm your job</a></p>"
-            "<p>If you did not request this, please ignore this email.</p>"
+            f"<p>Great news! Your 3D print job has been reviewed and approved by our FabLab team.</p>"
+            f"<p><strong>Job Details:</strong> {job.display_name}</p>"
+            f"<p><strong>Total Cost:</strong> ${job.cost_usd:.2f}</p>"
+            f"<p><strong>Weight:</strong> {job.weight_g}g</p>"
+            f"<p><strong>Estimated Print Time:</strong> {time_display}</p>"
+            f"<p><strong>Action Required:</strong> Click the button below to confirm your job and add it to the print queue.</p>"
+            f"<p><a href=\"{confirmation_url}\" style=\"display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600;\">Confirm Your Job</a></p>"
+            f"<p><small>This confirmation link will expire in 72 hours.</small></p>"
+            f"<p><small>If you did not request this, you can safely ignore this email.</small></p>"
         )
     return send_email(subject, [job.student_email], html_body, text_body)
 

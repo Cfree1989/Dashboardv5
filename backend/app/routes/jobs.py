@@ -307,8 +307,9 @@ def approve_job(job_id):
 
     # Generate confirmation token and send email
     token = generate_confirmation_token(job.id)
-    base_url = request.host_url.rstrip('/')
-    confirmation_url = f"{base_url}/confirm/{token}"
+    # Use frontend URL for confirmation link, fallback to host_url if not set
+    frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
+    confirmation_url = f"{frontend_url}/confirm/{token}"
     send_approval_email(job, confirmation_url)
 
     # Log events with proper attribution (staff_name + workstation_id)

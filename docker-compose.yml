@@ -17,6 +17,7 @@ services:
       - MAIL_USERNAME=coad-fablab@lsu.edu
       - MAIL_PASSWORD=CoAD-DFAB6
       - MAIL_DEFAULT_SENDER=coad-fablab@lsu.edu
+      - FRONTEND_PUBLIC_URL=http://localhost:3000
     volumes:
       - ./backend:/app
       - ./storage:/app/storage

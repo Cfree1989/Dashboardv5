@@ -39,7 +39,7 @@ export default function ConfirmPage({ params }: Props) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 to-white py-12">
-      <div className="bg-card p-8 rounded-xl shadow-md max-w-md w-full text-center">
+      <div className="bg-card p-8 rounded-xl shadow-md max-w-lg w-full text-center">
         {status === 'loading' && (
           <>
             <Loader2 className="animate-spin mx-auto h-12 w-12 text-primary mb-4" />
@@ -49,14 +49,31 @@ export default function ConfirmPage({ params }: Props) {
         {status === 'success' && (
           <>
             <CheckCircle className="mx-auto h-12 w-12 text-green-600 mb-4" />
-            <h1 className="text-3xl font-bold text-foreground mb-4">Confirmation Successful!</h1>
-            <p className="text-base text-foreground">Your job has been confirmed. Thank you!</p>
-            <div className="mt-8">
-              <Link href="/dashboard">
-                <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg btn-transition focus-ring">
-                  Back to Dashboard
-                </button>
-              </Link>
+            <h1 className="text-3xl font-bold text-foreground mb-4">Job Confirmed!</h1>
+            <p className="text-base text-foreground mb-6">Your 3D print job has been successfully confirmed and added to the print queue.</p>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h2 className="text-lg font-semibold text-blue-900 mb-2">What Happens Next</h2>
+              <div className="text-left text-sm text-blue-800 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                  <p>Your job is now in the print queue</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                  <p>We'll email you with progress updates</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
+                  <p>You'll be notified when it's ready for pickup</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800">
+                <span className="font-medium">✅ Thank you!</span> You can safely close this page. We'll handle everything from here.
+              </p>
             </div>
           </>
         )}
