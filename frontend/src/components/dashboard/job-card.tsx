@@ -28,9 +28,10 @@ interface JobCardProps {
   onApprove?: (jobId: string) => void;
   onReject?: (jobId: string) => void;
   onMarkReviewed?: (jobId: string) => void;
+  onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
 }
 
-export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed }: JobCardProps) {
+export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -265,6 +266,33 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   </button>
                 )}
               </>
+            )}
+            {currentStatus === "READYTOPRINT" && (
+              <button
+                onClick={() => onStatusAction?.(job.id, "mark-printing")}
+                className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition"
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Mark Printing
+              </button>
+            )}
+            {currentStatus === "PRINTING" && (
+              <button
+                onClick={() => onStatusAction?.(job.id, "mark-complete")}
+                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Mark Complete
+              </button>
+            )}
+            {currentStatus === "COMPLETED" && (
+              <button
+                onClick={() => onStatusAction?.(job.id, "mark-picked-up")}
+                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition"
+              >
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Mark Paid/Picked Up
+              </button>
             )}
           </div>
         </div>

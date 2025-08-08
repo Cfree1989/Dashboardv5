@@ -12,6 +12,7 @@ type DashboardContextType = {
   soundEnabled: boolean
   toggleSound: () => void
   markJobAsReviewed: (jobId: string) => void
+  markJobAsUnreviewed: (jobId: string) => void
   refreshData: () => Promise<void>
   testSound: () => void
   updateNotes: (jobId: string, notes: string) => Promise<boolean>
@@ -183,6 +184,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const markJobAsUnreviewed = async (jobId: string) => {
+    try {
+      // In a real implementation, this would make an API call
+      // await markJobUnreviewed(jobId)
+
+      // Update local state to reflect the change
+      setJobs(jobs.map((job) => (job.id === jobId ? { ...job, staffViewedAt: null } : job)))
+    } catch (error) {
+      console.error("Error marking job as unreviewed:", error)
+    }
+  }
+
   // Auto-refresh data every 45 seconds
   useEffect(() => {
     if (!isClient) return
@@ -207,6 +220,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         soundEnabled,
         toggleSound,
         markJobAsReviewed,
+        markJobAsUnreviewed,
         refreshData,
         testSound,
         updateNotes,

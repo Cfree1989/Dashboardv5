@@ -4,6 +4,7 @@ from app import db
 from app.models.job import Job
 from app.utils.decorators import token_required
 from app.models.event import Event
+from app.models.payment import Payment
 from app.services.token_service import generate_confirmation_token
 from app.services.email_service import send_approval_email
 from app.models.staff import Staff
@@ -240,6 +241,58 @@ def mark_picked_up(job_id):
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/payment', methods=['POST'])
+@token_required
+def record_payment(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'COMPLETED':
+        return jsonify({'message': 'Job must be in COMPLETED to record payment'}), 400
+
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+
+    try:
+        grams = float(data.get('grams'))
+    except (TypeError, ValueError):
+        return jsonify({'message': 'grams must be a number'}), 400
+    txn_no = (data.get('txn_no') or '').strip()
+    picked_up_by = (data.get('picked_up_by') or '').strip()
+    if grams <= 0 or not txn_no or not picked_up_by:
+        return jsonify({'message': 'grams > 0, txn_no and picked_up_by are required'}), 400
+
+    # Compute price from job.cost_usd if present; fallback to grams at $0.10/g (min $3)
+    if job.cost_usd is not None:
+        price_cents = int(Decimal(str(float(job.cost_usd))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
+    else:
+        raw_cost = max(3.0, grams * (0.20 if (job.material or '').lower() == 'resin' else 0.10))
+        price_cents = int(Decimal(str(raw_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
+
+    payment = Payment(
+        job_id=job.id,
+        grams=grams,
+        price_cents=price_cents,
+        txn_no=txn_no,
+        picked_up_by=picked_up_by,
+        paid_by_staff=staff_name,
+    )
+    db.session.add(payment)
+
+    # Transition to PAIDPICKEDUP
+    job.status = 'PAIDPICKEDUP'
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+
+    evt = Event(job_id=job.id, event_type='PaymentRecorded', details={'price_cents': price_cents}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
     return jsonify(job.to_dict()), 200

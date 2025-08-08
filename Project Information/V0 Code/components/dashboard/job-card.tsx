@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import type { Job, JobStatus } from "@/types/job"
 import { useDashboard } from "./dashboard-context"
 import { NotesSection } from "./notes-section"
-import { Mail, Printer, Palette, DollarSign, CheckCircle, XCircle, ExternalLink, Eye } from 'lucide-react'
+import { Mail, Printer, Palette, DollarSign, CheckCircle, XCircle, ExternalLink, Eye, EyeOff } from 'lucide-react'
 
 interface JobCardProps {
   job: Job
@@ -15,7 +15,7 @@ interface JobCardProps {
 }
 
 export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProps) {
-  const { markJobAsReviewed } = useDashboard()
+  const { markJobAsReviewed, markJobAsUnreviewed } = useDashboard()
   const [isExpanded, setIsExpanded] = useState(false)
 
   const isUnreviewed = !job.staffViewedAt
@@ -46,16 +46,10 @@ export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProp
     `}
     >
       <div className="p-4">
+        {/* Only show NEW indicator for unreviewed jobs */}
         {isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
             <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
-            <button
-              onClick={() => markJobAsReviewed(job.id)}
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              Mark as Reviewed
-            </button>
           </div>
         )}
 
@@ -136,6 +130,25 @@ export function JobCard({ job, currentStatus, onApprove, onReject }: JobCardProp
               <ExternalLink className="w-4 h-4 mr-1" />
               Open File
             </a>
+
+            {/* Review toggle button - yellow eye button */}
+            {isUnreviewed ? (
+              <button
+                onClick={() => markJobAsReviewed(job.id)}
+                className="flex items-center px-3 py-1 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200"
+              >
+                <Eye className="w-4 h-4 mr-1" />
+                Mark Reviewed
+              </button>
+            ) : (
+              <button
+                onClick={() => markJobAsUnreviewed(job.id)}
+                className="flex items-center px-3 py-1 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200"
+              >
+                <EyeOff className="w-4 h-4 mr-1" />
+                Mark Unreviewed
+              </button>
+            )}
 
             {/* Reject button - available until job is completed */}
             {canReject && (

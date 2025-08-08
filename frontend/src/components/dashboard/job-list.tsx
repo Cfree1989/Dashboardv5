@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
 import ApprovalModal from './modals/approval-modal';
+import StatusChangeModal from './modals/status-change-modal';
+import PaymentModal from './modals/payment-modal';
 import { JobListSkeleton } from './job-card-skeleton';
 
 interface Job {
@@ -25,13 +27,15 @@ interface JobListFilters {
   printer?: string;
   discipline?: string;
 }
-export default function JobList({ filters, onJobsMutated }: { filters?: JobListFilters, onJobsMutated?: () => void }) {
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [approveJobId, setApproveJobId] = useState<string | null>(null);
   const [approveJobMaterial, setApproveJobMaterial] = useState<string | null>(null);
+  const [statusJobId, setStatusJobId] = useState<string | null>(null);
+  const [statusAction, setStatusAction] = useState<"mark-printing" | "mark-complete" | "mark-picked-up" | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -69,22 +73,43 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
       }
     }
     fetchJobs();
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken]);
 
   const openApproveModal = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
     setApproveJobId(jobId);
     setApproveJobMaterial(job?.material || null);
+    onModalOpenChange?.(true);
   };
 
   const closeApproveModal = () => {
     setApproveJobId(null);
     setApproveJobMaterial(null);
+    onModalOpenChange?.(false);
   };
 
   const handleApprovedSuccess = () => {
     if (approveJobId) {
       setJobs(prev => prev.filter(j => j.id !== approveJobId));
+    }
+    onJobsMutated?.();
+  };
+
+  const openStatusModal = (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => {
+    setStatusJobId(jobId);
+    setStatusAction(action);
+    onModalOpenChange?.(true);
+  };
+
+  const closeStatusModal = () => {
+    setStatusJobId(null);
+    setStatusAction(null);
+    onModalOpenChange?.(false);
+  };
+
+  const handleStatusSuccess = () => {
+    if (statusJobId) {
+      setJobs(prev => prev.filter(j => j.id !== statusJobId));
     }
     onJobsMutated?.();
   };
@@ -137,6 +162,7 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
           onApprove={openApproveModal}
           onReject={handleReject}
           onMarkReviewed={handleMarkReviewed}
+          onStatusAction={openStatusModal}
         />
       ))}
       {approveJobId && (
@@ -145,6 +171,32 @@ export default function JobList({ filters, onJobsMutated }: { filters?: JobListF
           material={approveJobMaterial || undefined}
           onClose={closeApproveModal}
           onApproved={handleApprovedSuccess}
+        />
+      )}
+      {statusJobId && statusAction === 'mark-picked-up' && (
+        <PaymentModal
+          jobId={statusJobId}
+          onClose={closeStatusModal}
+          onSuccess={handleStatusSuccess}
+        />
+      )}
+      {statusJobId && statusAction && statusAction !== 'mark-picked-up' && (
+        <StatusChangeModal
+          jobId={statusJobId}
+          action={statusAction}
+          title={
+            statusAction === 'mark-printing' ? 'Mark as Printing' :
+            statusAction === 'mark-complete' ? 'Mark as Complete' :
+            'Mark as Paid/Picked Up'
+          }
+          description={
+            statusAction === 'mark-printing' ? 'This will move the job into Printing.' : 'This will move the job to Completed.'
+          }
+          confirmVerb={
+            statusAction === 'mark-printing' ? 'Mark Printing' : 'Mark Complete'
+          }
+          onClose={closeStatusModal}
+          onSuccess={handleStatusSuccess}
         />
       )}
     </div>

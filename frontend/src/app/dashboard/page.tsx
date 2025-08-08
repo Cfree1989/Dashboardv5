@@ -14,17 +14,17 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const [lastUpdated, setLastUpdated] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [pauseRefresh, setPauseRefresh] = useState(false);
   useEffect(() => {
     setLastUpdated(new Date().toLocaleTimeString());
   }, []);
   const refreshPage = async () => {
     setIsRefreshing(true);
     setLastUpdated(new Date().toLocaleTimeString());
-    
-    // Simulate refresh delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    window.location.reload();
+    setRefreshTick((t) => t + 1);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setIsRefreshing(false);
   };
   const logout = () => {
     localStorage.removeItem('token');
@@ -61,6 +61,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCounts();
   }, []);
+
+  // Auto-refresh every 45s: update counts and trigger list refresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (pauseRefresh) return;
+      setLastUpdated(new Date().toLocaleTimeString());
+      setRefreshTick((t) => t + 1);
+      fetchCounts();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [pauseRefresh]);
   const updateStatus = (newStatus: string) => {
     setStatus(newStatus);
     const params = new URLSearchParams();
@@ -108,7 +119,12 @@ export default function DashboardPage() {
         onStatusChange={updateStatus} 
         stats={statusCounts} 
       />
-      <JobList filters={{ status }} onJobsMutated={fetchCounts} />
+      <JobList 
+        filters={{ status }} 
+        onJobsMutated={fetchCounts} 
+        refreshToken={refreshTick}
+        onModalOpenChange={setPauseRefresh}
+      />
     </div>
   );
 }

@@ -508,16 +508,16 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Next Steps Priority Queue
 
 ### Immediate (This Session):
-1. **Phase 4.1: Email Service Integration** ⚡ HIGH
-2. **Phase 5.1: Approval Modal** 🔥 CRITICAL for staff workflow
+1. **Phase 5.3: Frontend Status Change Modals** 🔥 CRITICAL for staff workflow
+2. **Phase 6: Auto-refresh + Last Updated** ⚡ HIGH
 
 ### Short-term (Next Session):  
-3. **Phase 5.2-5.4: Remaining Job Management Modals**
-4. **Phase 4.2: File Management System**
+3. **Phase 4.2: File Management System** (candidate-files full scan)
+4. **Phase 4.3: Payment & Pickup modal** (grams/txn/picked_up_by)
 
 ### Medium-term:
-5. **Phase 6: Real-time Updates**
-6. **Phase 4.3: Payment & Pickup Workflow**
+5. **Analytics Dashboard** (`/analytics`) overview + trends
+6. **Protocol Handler** (SlicerOpener) packaging
 
 ## Technical Architecture Status
 
