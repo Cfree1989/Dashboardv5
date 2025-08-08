@@ -11,6 +11,12 @@ services:
       - DATABASE_URL=postgresql://fablab_user:fablab@db:5432/3d_print_system
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=785c1e2dc777280ed4ae125f876662ec3ec798fb9f1fe8f
+      - MAIL_SERVER=smtp.office365.com
+      - MAIL_PORT=587
+      - MAIL_USE_TLS=True
+      - MAIL_USERNAME=coad-fablab@lsu.edu
+      - MAIL_PASSWORD=CoAD-DFAB6
+      - MAIL_DEFAULT_SENDER=coad-fablab@lsu.edu
     volumes:
       - ./backend:/app
       - ./storage:/app/storage
