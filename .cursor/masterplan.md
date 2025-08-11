@@ -641,7 +641,7 @@ The system manages 3D print jobs through a comprehensive, event-driven workflow 
 * **Email Notification:** None.
 
 #### 8. Archived
-* **Trigger:** An administrator triggers the archival process via the dashboard, sending a `POST` request to `/api/v1/admin/archive`. The API will process all jobs in `PaidPickedUp` or `Rejected` status that are older than the configured retention period (e.g., 90 days).
+* **Trigger:** An administrator triggers the archival process via the dashboard, sending a `POST` request to `/api/v1/admin/archive`. The API will process all jobs in `PaidPickedUp` or `Rejected` status that are older than the configured retention period (e.g., 45 days).
 * **File Operations:** The authoritative file and `metadata.json` for each eligible job are moved from their current location (e.g., `storage/PaidPickedUp/`) to `storage/Archived/`. The job's `file_path` is updated accordingly.
 * **Key Actions:** The job status is changed to `ARCHIVED`. An `Event` is logged for each job that is archived, attributed to the admin who triggered the action.
 * **UI/UX**: The admin dashboard will feature a data management section where an admin can review jobs eligible for archival and trigger the process with a confirmation dialog.
@@ -956,8 +956,8 @@ The entire application stack is designed to be deployed using Docker and Docker 
 The system implements a two-stage process for data lifecycle management to ensure both data availability for a reasonable period and eventual cleanup.
 
 - **Stage 1: Archival (Semi-Automated)**
-  - **Retention Period**: Job data and associated files for jobs in a final state (`PaidPickedUp` or `Rejected`) will be retained in an active state for 90 days.
-  - **Archival Process**: After 90 days, these jobs become eligible for archival. An admin-triggered process (`POST /api/v1/admin/archive`) moves the job status to `ARCHIVED` and relocates the associated files to a `storage/Archived/` directory. This keeps the database record for historical purposes while cleaning up the active file storage. This action is fully logged in the `Event` table.
+  - **Retention Period**: Job data and associated files for jobs in a final state (`PaidPickedUp` or `Rejected`) will be retained in an active state for 45 days.
+  - **Archival Process**: After 45 days, these jobs become eligible for archival. An admin-triggered process (`POST /api/v1/admin/archive`) moves the job status to `ARCHIVED` and relocates the associated files to a `storage/Archived/` directory. This keeps the database record for historical purposes while cleaning up the active file storage. This action is fully logged in the `Event` table.
 
 - **Stage 2: Permanent Deletion (Manual Trigger)**
   - **Deletion Policy**: Jobs in the `ARCHIVED` state will be retained for 1 year. After this period, they are eligible for permanent deletion.
@@ -1427,7 +1427,7 @@ All endpoints will be prefixed with `/api/v1`. All responses will be in JSON for
 *   `POST /admin/archive`
     *   **Description**: Triggers the archival of all jobs in a final state (`PaidPickedUp`, `Rejected`) that are older than the specified retention period.
     *   **Auth**: Required (Workstation JWT)
-    *   **Body**: `{ "retention_days": 90, "staff_name": "Admin User" }` (Optional, defaults to 90)
+    *   **Body**: `{ "retention_days": 45, "staff_name": "Admin User" }` (Optional, defaults to 45)
     *   **Success (200)**: `{ "message": "Archival process completed", "jobs_archived": 12 }`. Logs a single `AdminAction` event for the batch operation, and individual `JobArchived` events for each job.
 
 *   `POST /admin/prune`

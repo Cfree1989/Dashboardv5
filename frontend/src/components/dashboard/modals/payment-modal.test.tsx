@@ -68,6 +68,37 @@ describe('PaymentModal', () => {
     expect(body.txn_no).toBe('TC123');
     expect(body.picked_up_by).toBe('Student Name');
   });
+
+  it('shows an error if POST fails and keeps modal open', async () => {
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Eve', is_active: true }] }) } as any)
+      .mockResolvedValueOnce({ ok: false, text: async () => 'Validation error' } as any);
+
+    const onClose = jest.fn();
+    const onSuccess = jest.fn();
+
+    render(<PaymentModal jobId="xyz" onClose={onClose} onSuccess={onSuccess} />);
+
+    await waitFor(() => expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
+
+    const submitBtn = screen.getByRole('button', { name: /Record & Mark Picked Up/i });
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'Eve' } });
+    fireEvent.change(screen.getByLabelText(/Weight \(grams\)/i), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Txn Number/i), { target: { value: 'TXN' } });
+    fireEvent.change(screen.getByLabelText(/Picked up by/i), { target: { value: 'Student' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => expect(screen.getByText('Confirm Payment')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Payment failed/i));
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    // Modal still visible
+    expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument();
+  });
 });
 
 

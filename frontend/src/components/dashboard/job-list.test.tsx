@@ -44,6 +44,108 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getByText(/Failed to load jobs/i)).toBeInTheDocument());
   });
 
+  it('edits and saves notes with staff attribution', async () => {
+    // 1) Jobs fetch (UPLOADED)
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'n1', display_name: 'Note Job', notes: 'old' }] }) })
+      // 2) Staff list for edit notes
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Alice', is_active: true }] }) })
+      // 3) PATCH notes
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'n1', notes: 'new notes', last_updated_by: 'Alice' }) });
+
+    render(<JobList filters={{ status: 'UPLOADED' }} />);
+
+    await waitFor(() => expect(screen.getAllByText('Note Job').length).toBeGreaterThan(0));
+    // Expand card
+    fireEvent.click(screen.getByText('Show More'));
+    // Begin edit
+    fireEvent.click(screen.getByText('Edit Notes'));
+    await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
+    // Change notes
+    const textarea = screen.getByLabelText('Notes');
+    fireEvent.change(textarea, { target: { value: 'new notes' } });
+    // Select staff and save
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'Alice' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Notes' }));
+
+    // Saved -> editor closes and new text shown
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save Notes' })).not.toBeInTheDocument());
+    expect(screen.getByText('new notes')).toBeInTheDocument();
+  });
+
+  it('opens payment modal for COMPLETED job and removes card on success', async () => {
+    // 1) Initial jobs fetch (COMPLETED)
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c1', display_name: 'Completed Job' }] }) })
+      // 2) Staff list for PaymentModal
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Bob', is_active: true }] }) })
+      // 3) Payment POST
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+    const onJobsMutated = jest.fn();
+    render(<JobList filters={{ status: 'COMPLETED' }} onJobsMutated={onJobsMutated} />);
+
+    // Wait for action button to appear (ensures job rendered)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark Paid/Picked Up' })).toBeInTheDocument());
+    // Open payment modal
+    const payBtn = screen.getByText('Mark Paid/Picked Up');
+    fireEvent.click(payBtn);
+
+    // Wait for modal and staff to load
+    await waitFor(() => expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
+
+    // Fill fields
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'Bob' } });
+    fireEvent.change(screen.getByLabelText(/Weight \(grams\)/i), { target: { value: '10.5' } });
+    fireEvent.change(screen.getByLabelText(/Txn Number/i), { target: { value: 'TXN-1' } });
+    fireEvent.change(screen.getByLabelText(/Picked up by/i), { target: { value: 'Student' } });
+
+    // Submit and confirm
+    fireEvent.click(screen.getByRole('button', { name: /Record & Mark Picked Up/i }));
+    await waitFor(() => expect(screen.getByText('Confirm Payment')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    // Job removed and counts refresh requested
+    await waitFor(() => expect(screen.queryByText('Completed Job')).not.toBeInTheDocument());
+    expect(onJobsMutated).toHaveBeenCalled();
+  });
+
+  it('shows error toast/message if payment fails and keeps modal open', async () => {
+    // 1) Initial jobs fetch (COMPLETED)
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c2', display_name: 'Completed Err Job' }] }) })
+      // 2) Staff list for PaymentModal
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Alice', is_active: true }] }) })
+      // 3) Payment POST fails
+      .mockResolvedValueOnce({ ok: false, text: async () => 'Bad Request' });
+
+    render(<JobList filters={{ status: 'COMPLETED' }} />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark Paid/Picked Up' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Paid/Picked Up' }));
+
+    await waitFor(() => expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
+
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByLabelText(/Weight \(grams\)/i), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText(/Txn Number/i), { target: { value: 'TXN-ERR' } });
+    fireEvent.change(screen.getByLabelText(/Picked up by/i), { target: { value: 'Student' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Record & Mark Picked Up/i }));
+    await waitFor(() => expect(screen.getByText('Confirm Payment')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    // Error message appears, modal remains
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Payment failed/i));
+    expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument();
+    // Job list still present (button remains available)
+    expect(screen.getByRole('button', { name: 'Record & Mark Picked Up' })).toBeInTheDocument();
+  });
   it('shows NEW indicator only for Uploaded and clears after review modal confirms', async () => {
     const job = { id: '1', display_name: 'Test Job', staff_viewed_at: null };
     // First fetch for list

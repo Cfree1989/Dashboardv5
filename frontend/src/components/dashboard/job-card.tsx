@@ -33,6 +33,15 @@ interface JobCardProps {
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
+  const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState<string>(job.notes || "");
+  const [staff, setStaff] = useState<{ name: string; is_active: boolean }[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [notesStaffName, setNotesStaffName] = useState<string>("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string>("");
+  const [saveError, setSaveError] = useState<string>("");
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
@@ -110,6 +119,64 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const handleReapplyNew = () => {
     setShowReviewModal({ reviewed: false });
+  };
+
+  const beginEditNotes = async () => {
+    setIsEditingNotes(true);
+    setNotesDraft(jobNotes || "");
+    setSaveMessage("");
+    setSaveError("");
+    // lazy-load staff
+    try {
+      setLoadingStaff(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Failed to load staff');
+      const data = await res.json();
+      setStaff((data?.staff || []).filter((s: any) => s.is_active));
+    } catch (e) {
+      setSaveError('Failed to load staff list');
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
+
+  const cancelEditNotes = () => {
+    setIsEditingNotes(false);
+    setNotesDraft(jobNotes || "");
+    setNotesStaffName("");
+    setSaveMessage("");
+    setSaveError("");
+  };
+
+  const saveNotes = async () => {
+    if (!notesStaffName) {
+      setSaveError('Please select your name before saving.');
+      return;
+    }
+    try {
+      setSavingNotes(true);
+      setSaveError("");
+      setSaveMessage("Saving...");
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/v1/jobs/${job.id}/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ notes: notesDraft, staff_name: notesStaffName })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || 'Failed to save notes');
+      }
+      setJobNotes(notesDraft);
+      setSaveMessage('Saved');
+      setIsEditingNotes(false);
+    } catch (e) {
+      setSaveError('Failed to save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
+      setTimeout(() => setSaveMessage(""), 1500);
+    }
   };
 
   return (
@@ -202,11 +269,48 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 </div>
               </div>
             )}
-            {job.notes && (
+            {jobNotes && !isEditingNotes && (
               <div className="mt-3">
                 <span className="text-gray-500 text-sm">Notes:</span>
                 <div className="bg-gray-50 p-2 rounded border mt-1">
-                  <p className="whitespace-pre-wrap text-sm text-gray-900">{job.notes}</p>
+                  <p className="whitespace-pre-wrap text-sm text-gray-900">{jobNotes}</p>
+                </div>
+              </div>
+            )}
+            {isEditingNotes && (
+              <div className="mt-3">
+                <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Notes</label>
+                <textarea
+                  id={`notes-${job.id}`}
+                  className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  aria-describedby={`notes-status-${job.id}`}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
+                    <select
+                      id={`notesStaff-${job.id}`}
+                      className="w-full border rounded-lg px-3 py-2 focus-ring text-sm"
+                      value={notesStaffName}
+                      onChange={(e) => setNotesStaffName(e.target.value)}
+                      disabled={loadingStaff}
+                    >
+                      <option value="" disabled>{loadingStaff ? 'Loading staff...' : 'Select your name'}</option>
+                      {staff.map(s => (
+                        <option key={s.name} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end justify-end space-x-2">
+                    <button onClick={cancelEditNotes} type="button" className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Cancel</button>
+                    <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
+                  </div>
+                </div>
+                <div id={`notes-status-${job.id}`} className="mt-2 text-sm" aria-live="polite">
+                  {saveMessage && <span className="text-green-600">{saveMessage}</span>}
+                  {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
                 </div>
               </div>
             )}
@@ -219,6 +323,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </button>
 
           <div className="flex space-x-2">
+            {showMore && (
+              <button
+                onClick={beginEditNotes}
+                className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition"
+                title="Edit Notes"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Edit Notes
+              </button>
+            )}
             {currentStatus === "UPLOADED" && (
               <>
                 <button

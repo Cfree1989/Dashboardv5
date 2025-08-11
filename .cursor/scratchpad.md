@@ -24,9 +24,9 @@ Building a complete 3D Print Management System for academic/makerspace environme
 ## Working Roadmap (Condensed)
 
 ### Current Status
-- Current Phase: Phase 4 — Advanced Features
-- Next Milestone: Phase 4.3 — Payment & Pickup (frontend integration)
-- Overall Progress: ~62%
+- Current Phase: Phase 5 — UI Workflows
+- Next Milestone: Phase 5.4 — Notes Editing + "Open File" Button
+- Overall Progress: ~65%
 
 ### Active Workstreams (Open)
 
@@ -50,7 +50,35 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 3) Payment & Pickup Workflow
 - [x] Backend: `POST /api/v1/jobs/:id/payment` (grams, txn_no, picked_up_by) → transition to `PAIDPICKEDUP`; persists Payment; logs event; moves files; tests pass
-- [ ] Frontend: Payment modal integration on `COMPLETED` cards; success removes job and refreshes counts
+- [x] Frontend: Payment modal integration on `COMPLETED` cards
+  - [x] Tests: update `frontend/src/components/dashboard/modals/payment-modal.test.tsx` (validation + submit + failure alert)
+  - [x] Tests: extend `frontend/src/components/dashboard/job-list.test.tsx` (button visible, submit → API call, list removal + counts refresh, error keeps modal open)
+  - [x] UI: “Mark Paid/Picked Up” button wired in `job-card.tsx` → opens `PaymentModal`
+  - [x] Hook `payment-modal.tsx` submit → `POST /api/v1/jobs/:id/payment`
+  - [x] Success: close modal, remove from list, trigger counts refresh
+  - [x] Error handling: inline alert in modal; retain context for retry
+  - [x] A11y: labels and disabled states ensured
+- Acceptance: End-to-end payment recorded; job moves to Paid & Picked Up; events/audit present; tests pass
+
+4) Notes Editing & Open File Button (New Active)
+- Notes Editing
+  - [ ] Backend: `PATCH /api/v1/jobs/<id>/notes` with `{ notes: string, staff_name }`; validate attribution; persist; log `NotesUpdated` event; tests
+  - [ ] Frontend: Inline notes editor on job card (within Show More)
+    - [ ] Textarea with character guidance (e.g., up to 5,000 chars)
+    - [ ] Auto-save with debounce (~500ms) and in-flight indicator
+    - [ ] Save success feedback; error banner with retry
+    - [ ] A11y: labels, aria-live for save status, keyboard friendly
+  - Acceptance: Notes persist, are audited with staff attribution, and UI shows saved/error states. Tests pass (API + UI).
+- "Open File" Button (Protocol handler deferred; provide graceful fallback)
+  - [ ] Backend: Use existing `POST /api/v1/jobs/<id>/log-file-open` (optional `staff_name`); ensure covered by tests
+  - [ ] Frontend: Add "Open File" to job cards for statuses `READYTOPRINT`, `PRINTING`, `COMPLETED`
+    - [ ] Modal with "Performing Action As" (staff dropdown)
+    - [ ] Primary: "Open in Slicer" link `3dprint://open?path=<urlencoded job.file_path>`
+    - [ ] Secondary: "Copy File Path" action (clipboard) + success toast
+    - [ ] On confirm: POST log event with `staff_name`, then proceed
+    - [ ] Fallback: Helper text if protocol not installed
+    - [ ] A11y: focus management, keyboard activation
+  - Acceptance: Clicking "Open File" logs event with attribution and either opens via protocol (if installed) or allows copying path. Tests pass.
 
 4) Protocol Handler (`3dprint://`)
 - [ ] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
@@ -98,15 +126,34 @@ Preserved for history; reorganized for clarity (do not delete).
 - ✅ Tab Count Authentication Fix (counts include auth header)
 - ✅ File Tracking: auto-select recommended file; “Detect newer saves” rescan; priority hierarchy
 
-### Project Status Board — Completed Items (general)
-- [x] Remove sound toggle and test button from dashboard UI
-  - Success: Component deleted, imports removed, build passes
-- [x] Implement backend approval + confirmation flow
-  - Success: `POST /api/v1/jobs/:id/approve` → PENDING, email with token; confirmation sets READYTOPRINT; tests pass
-- [x] Wire frontend Approve to backend endpoint
-  - Success: Clicking Approve calls API; job removed from UPLOADED; frontend builds cleanly
-- [x] Planner: Scope Phase 5.1 Approval Modal (UX + inputs)
-  - Success: Documented plan with tasks, acceptance, and API contracts
+### Project Status Board — Active Items
+- [x] Phase 4.3 — Payment & Pickup (Frontend Integration)
+  - [x] Tests first: `payment-modal.test.tsx`, `job-list.test.tsx`
+  - [x] Wire “Record Payment” button in `job-card.tsx` for `COMPLETED`
+  - [x] Submit flow to `/api/v1/jobs/:id/payment` with attribution
+  - [x] Success: close modal, remove card, refresh counts/last-updated
+  - [x] Errors: show helpful inline alerts
+  - [x] A11y + loading/disabled states
+- [ ] Phase 5.4 — Notes Editing
+  - [ ] Backend: `PATCH /api/v1/jobs/<id>/notes` (+ event, tests)
+  - [ ] Frontend: Inline notes editor (debounced auto-save, a11y)
+  - [ ] Tests: API and UI
+- [ ] Add "Open File" Button (protocol handler later)
+  - [ ] Frontend modal with staff attribution; primary open via protocol; fallback copy path; POST `/log-file-open`
+  - [ ] Tests: UI behavior + event POST
+
+- [x] Archival retention adjustment
+  - [x] Docs: Update archival retention from 90 to 45 days in `/.cursor/masterplan.md`
+    - [x] Section 3.4.2 — Archived: parenthetical example now 45 days
+    - [x] Section 5.7 — Data Retention: Retention Period and Archival Process now 45 days
+    - [x] API Spec — `POST /admin/archive`: default `retention_days` now 45
+  - Impact: Documentation reflects new policy; implementation alignment pending
+
+- [ ] Align implementation defaults with 45-day policy
+  - [ ] Backend: Ensure `/api/v1/admin/archive` default `retention_days` is 45 when omitted
+  - [ ] Admin UI: Default value in Data Management forms set to 45
+  - [ ] Tests: Add/adjust tests to verify defaulting behavior and display values
+  - Success: API returns expected behavior with omitted param; UI shows 45 by default; tests pass
 
 ### Phase 5.1 — Approval Modal Flow (Completed Parts)
 - [x] 5.1.2 — Frontend: Approval Modal UI
@@ -175,7 +222,7 @@ Preserved for history; reorganized for clarity (do not delete).
     - [x] `POST /api/v1/jobs/:id/payment` with `{ grams, txn_no, picked_up_by, staff_name }`; validate status `COMPLETED`
     - [x] Persist `Payment` record; transition to `PAIDPICKEDUP`; log attributed events; unit tests
   - Frontend
-    - [ ] Payment modal on `COMPLETED` cards; inputs + validation; success removes job and refreshes counts; error states; a11y
+    - [x] Payment modal on `COMPLETED` cards; inputs + validation; success removes job and refreshes counts; error states; a11y
   - Acceptance: End-to-end payment recorded; job moves to Paid & Picked Up; events/audit present; tests pass
 - 4.4 Protocol Handler (Foundational)
   - [ ] Package `SlicerOpener` with `config.ini`, security validation, GUI feedback, logging, PyInstaller build, registry installer
@@ -262,9 +309,10 @@ Preserved for history; reorganized for clarity (do not delete).
 - Acceptance: Smoother UX and stable ops with documented SLOs
 
 ## Next Steps Priority Queue
-1) Payment workflow — frontend integration (modal attach to COMPLETED cards + counts refresh)
-2) Protocol handler (SlicerOpener) packaging and UX
+1) Notes Editing — backend endpoint + frontend inline editor (debounced auto-save)
+2) "Open File" Button — modal with staff attribution, event logging, open link + copy path fallback
 3) Comprehensive testing + deployment docs
-4) Analytics Dashboard (`/analytics`) after operations stabilize
+4) Protocol handler (SlicerOpener) packaging and UX
+5) Analytics Dashboard (`/analytics`) after operations stabilize
 
 

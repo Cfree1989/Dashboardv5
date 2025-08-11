@@ -347,3 +347,151 @@ def test_record_payment_moves_file_and_sets_status(client, token, app, tmp_path)
     # File moved to PaidPickedUp
     assert not (tmp_path / 'Completed' / 'file.stl').exists()
     assert (tmp_path / 'PaidPickedUp' / 'file.stl').exists()
+
+
+def test_update_notes_persists_and_logs_event(client, token, app):
+    job = create_job(app)
+    # Add active staff
+    client.post('/api/v1/staff', json={'name': 'NoteTaker'}, headers={'Authorization': f'Bearer {token}'} )
+
+    # Update notes
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 'Initial investigation complete.', 'staff_name': 'NoteTaker'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['notes'] == 'Initial investigation complete.'
+    assert data['last_updated_by'] == 'NoteTaker'
+
+    # Verify event
+    resp_events = client.get(
+        f'/api/v1/jobs/{job.id}/events',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp_events.status_code == 200
+    events = resp_events.get_json()
+    found = next((e for e in events if e['event_type'] == 'NotesUpdated'), None)
+    assert found is not None
+    assert found['triggered_by'] == 'NoteTaker'
+
+
+def test_update_notes_validation_rules(client, token, app):
+    job = create_job(app)
+    # Add staff and then deactivate to test inactive guard
+    client.post('/api/v1/staff', json={'name': 'Inactive'}, headers={'Authorization': f'Bearer {token}'} )
+    client.patch('/api/v1/staff/Inactive', json={'is_active': False}, headers={'Authorization': f'Bearer {token}'} )
+
+    # Missing staff_name
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 'x'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Inactive staff
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 'x', 'staff_name': 'Inactive'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Notes required and must be string (allow empty string to clear)
+    client.post('/api/v1/staff', json={'name': 'Active'}, headers={'Authorization': f'Bearer {token}'} )
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'staff_name': 'Active'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 123, 'staff_name': 'Active'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Too long notes (limit 5000 chars)
+    long_text = 'a' * 6000
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': long_text, 'staff_name': 'Active'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Clearing notes with empty string is allowed
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': '', 'staff_name': 'Active'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['notes'] == ''
+
+
+def test_update_notes_with_attribution_and_event(client, token, app):
+    job = create_job(app)
+    # Add active staff
+    client.post('/api/v1/staff', json={'name': 'Noter'}, headers={'Authorization': f'Bearer {token}'})
+
+    payload = { 'notes': 'Initial investigation notes', 'staff_name': 'Noter' }
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json=payload,
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['notes'] == 'Initial investigation notes'
+    assert data['last_updated_by'] == 'Noter'
+
+    # Verify event
+    events_resp = client.get(f'/api/v1/jobs/{job.id}/events', headers={'Authorization': f'Bearer {token}'})
+    assert events_resp.status_code == 200
+    events = events_resp.get_json()
+    notes_evt = next((e for e in events if e['event_type'] == 'NotesUpdated'), None)
+    assert notes_evt is not None
+    assert notes_evt['triggered_by'] == 'Noter'
+    assert notes_evt.get('details', {}).get('notes_len') == len('Initial investigation notes')
+
+
+def test_update_notes_requires_active_staff_and_string_notes(client, token, app):
+    job = create_job(app)
+    # Missing staff_name
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 'x'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Inactive/unknown staff
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 'x', 'staff_name': 'Nobody'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Add active staff; invalid notes type
+    client.post('/api/v1/staff', json={'name': 'Writer'}, headers={'Authorization': f'Bearer {token}'})
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': 123, 'staff_name': 'Writer'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Clearing notes with empty string should be accepted
+    resp = client.patch(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'notes': '', 'staff_name': 'Writer'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['notes'] == ''

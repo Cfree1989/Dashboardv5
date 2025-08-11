@@ -211,6 +211,48 @@ def log_file_open(job_id):
     db.session.commit()
     return jsonify({'message': 'logged'}), 200
 
+
+@bp.route('/<job_id>/notes', methods=['PATCH'])
+@token_required
+def update_notes(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+
+    data = request.get_json(silent=True) or {}
+    staff_name = data.get('staff_name')
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+
+    if 'notes' not in data:
+        return jsonify({'message': 'notes field is required'}), 400
+    notes_val = data.get('notes')
+    if not isinstance(notes_val, str):
+        return jsonify({'message': 'notes must be a string'}), 400
+    if len(notes_val) > 5000:
+        return jsonify({'message': 'notes must be at most 5000 characters'}), 400
+
+    job.notes = notes_val
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+
+    # Log event with length only (avoid storing full notes in event log)
+    evt = Event(
+        job_id=job.id,
+        event_type='NotesUpdated',
+        details={'notes_len': len(notes_val)},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', None),
+    )
+    db.session.add(evt)
+    db.session.commit()
+
+    return jsonify(job.to_dict()), 200
+
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
 def delete_job(job_id):
@@ -352,6 +394,9 @@ def _validate_staff_and_body(data):
     if not staff or not staff.is_active:
         return None, jsonify({'message': 'Invalid or inactive staff_name'}), 400
     return staff_name, None, None
+
+
+# Duplicate update_notes route removed (consolidated above)
 
 
 @bp.route('/<job_id>/mark-printing', methods=['POST'])
