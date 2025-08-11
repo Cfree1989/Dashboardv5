@@ -19,25 +19,13 @@ export default function DashboardPage() {
   useEffect(() => {
     setLastUpdated(new Date().toLocaleTimeString());
   }, []);
-  const refreshPage = async () => {
-    setIsRefreshing(true);
-    setLastUpdated(new Date().toLocaleTimeString());
-    setRefreshTick((t) => t + 1);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    setIsRefreshing(false);
-  };
-  const logout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
-  };
-  const initialStatus = searchParams.get('status') || statusOptions[0];
-  const [status, setStatus] = useState(initialStatus);
+  
+  const [status, setStatus] = useState(searchParams.get('status') || statusOptions[0]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   
   const fetchCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    
     const counts: Record<string, number> = {};
     await Promise.all(
       statusOptions.map(async (s) => {
@@ -72,11 +60,27 @@ export default function DashboardPage() {
     }, 45000);
     return () => clearInterval(interval);
   }, [pauseRefresh]);
+  
+  const refreshPage = async () => {
+    setIsRefreshing(true);
+    setLastUpdated(new Date().toLocaleTimeString());
+    setRefreshTick((t) => t + 1);
+    await fetchCounts(); // ensure tab counts update immediately
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setIsRefreshing(false);
+  };
+  
   const updateStatus = (newStatus: string) => {
     setStatus(newStatus);
     const params = new URLSearchParams();
     params.set('status', newStatus);
     router.replace(`${window.location.pathname}?${params.toString()}`);
+    fetchCounts(); // keep counts in sync on tab change
+  };
+
+  const logout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
   };
 
   return (
