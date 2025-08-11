@@ -59,6 +59,7 @@ class Job(db.Model):
             'class_number': self.class_number,
             'original_filename': self.original_filename,
             'display_name': self.display_name,
+            'file_path': self.file_path,
             'status': self.status,
             'printer': self.printer,
             'color': self.color,

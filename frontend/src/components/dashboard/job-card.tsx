@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy } from "lucide-react";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 
@@ -20,6 +20,7 @@ interface Job {
   created_at?: string;
   notes?: string;
   staff_viewed_at?: string;
+  file_path?: string;
 }
 
 interface JobCardProps {
@@ -49,6 +50,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [openFileModal, setOpenFileModal] = useState(false);
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -151,6 +153,46 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setSaveMessage("");
     setSaveError("");
     onModalOpenChange?.(false);
+  };
+
+  const openOpenFileModal = async () => {
+    setOpenFileModal(true);
+    onModalOpenChange?.(true);
+  };
+
+  const closeOpenFileModal = () => {
+    setOpenFileModal(false);
+    onModalOpenChange?.(false);
+  };
+
+  const logAndOpen = async (mode: 'protocol' | 'copy') => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({})
+      });
+    } catch {
+      // ignore logging failures
+    }
+    if (mode === 'protocol') {
+      const path = encodeURIComponent(job.file_path || '');
+      if (path) {
+        window.location.href = `3dprint://open?path=${path}`;
+      }
+    } else if (mode === 'copy') {
+      if (job.file_path) {
+        try {
+          await navigator.clipboard.writeText(job.file_path);
+          // basic inline feedback
+          alert('File path copied to clipboard');
+        } catch {
+          // fallback
+        }
+      }
+    }
+    closeOpenFileModal();
   };
 
   const saveNotes = async () => {
@@ -387,6 +429,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             )}
             {currentStatus === "UPLOADED" && (
               <>
+                {!!job.staff_viewed_at && (
+                  <button
+                    onClick={handleReapplyNew}
+                    title="Mark as Unreviewed"
+                    aria-label="Mark as Unreviewed"
+                    className="p-2 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 focus-ring btn-transition"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={handleApprove}
                   disabled={isApproving || isRejecting}
@@ -421,16 +473,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     </>
                   )}
                 </button>
-                {!!job.staff_viewed_at && (
-                  <button
-                    onClick={handleReapplyNew}
-                    title="Mark as Unreviewed"
-                    aria-label="Mark as Unreviewed"
-                    className="p-2 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 focus-ring btn-transition"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                )}
               </>
             )}
             {currentStatus === "READYTOPRINT" && (
@@ -442,6 +484,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 Mark Printing
               </button>
             )}
+            <button
+              onClick={openOpenFileModal}
+              className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition"
+              title="Open File"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" />
+              Open File
+            </button>
             {currentStatus === "PRINTING" && (
               <button
                 onClick={() => onStatusAction?.(job.id, "mark-complete")}
@@ -486,6 +536,27 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             setShowRejectModal(false);
           }}
         />
+      )}
+      {openFileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={closeOpenFileModal} />
+          <div className="relative bg-white w-full max-w-sm rounded-xl shadow-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Open File</h3>
+            <p className="text-sm text-gray-600 mb-3">This logs the action, then opens via the local protocol handler or copies the path.</p>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => logAndOpen('protocol')} className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition">
+                <ExternalLink className="w-4 h-4 mr-2" /> Open in Slicer
+              </button>
+              <button onClick={() => logAndOpen('copy')} className="flex items-center justify-center px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 focus-ring btn-transition">
+                <Copy className="w-4 h-4 mr-2" /> Copy File Path
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">If nothing happens, install the protocol handler on this machine.</p>
+            <div className="mt-3 text-right">
+              <button onClick={closeOpenFileModal} className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

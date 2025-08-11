@@ -187,19 +187,13 @@ def candidate_files(job_id):
 @token_required
 def log_file_open(job_id):
     """Stub endpoint for protocol handler touchpoint. Logs FileOpenedInSlicer.
-    Body: { "staff_name": "Optional Staff" }
+    Body: { } (staff_name no longer required)
     """
     job = Job.query.get(job_id)
     if not job:
         abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name = (data.get('staff_name') or '').strip() or None
-    # Validate staff if provided; otherwise allow None to represent unknown
-    if staff_name:
-        staff = Staff.query.get(staff_name)
-        if not staff or not staff.is_active:
-            # Ignore invalid names in stub; do not block logging
-            staff_name = None
+    staff_name = None
     evt = Event(
         job_id=job.id,
         event_type='FileOpenedInSlicer',
