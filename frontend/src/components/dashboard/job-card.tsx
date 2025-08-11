@@ -179,9 +179,19 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       // ignore logging failures
     }
     if (mode === 'protocol') {
-      const path = encodeURIComponent(job.file_path || '');
-      if (path) {
-        window.location.href = `3dprint://open?path=${path}`;
+      const rawPath = job.file_path || '';
+      if (rawPath) {
+        const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
+        const uri = isWindows
+          ? `3dprint://open/?path=${encodeURIComponent(rawPath)}`
+          : `print3d://open/?path=${encodeURIComponent(rawPath)}`; // fallback for browsers that block schemes starting with a digit
+        // Use a temporary anchor to avoid SPA/router intercepts and ensure the custom protocol is invoked
+        const link = document.createElement('a');
+        link.href = uri;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
       }
     } else if (mode === 'copy') {
       if (job.file_path) {
