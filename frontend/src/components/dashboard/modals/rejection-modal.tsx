@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useToast } from "../../ui/toast";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -26,6 +27,7 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { show } = useToast();
 
   useEffect(() => {
     async function fetchStaff() {
@@ -79,6 +81,7 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
         const text = await res.text();
         throw new Error(text || "Failed to reject job");
       }
+      show('Job rejected');
       onRejected();
       onClose();
     } catch (err) {

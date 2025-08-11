@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../ui/toast";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -17,6 +18,7 @@ export default function ReviewModal({ jobId, reviewed, onClose, onUpdated }: Rev
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { show } = useToast();
 
   useEffect(() => {
     async function fetchStaff() {
@@ -63,6 +65,7 @@ export default function ReviewModal({ jobId, reviewed, onClose, onUpdated }: Rev
         throw new Error(text || "Failed to update review state");
       }
       const updated = await res.json();
+      show(reviewed ? 'Marked as reviewed' : 'Marked as unreviewed');
       onUpdated(updated);
       onClose();
     } catch (err) {

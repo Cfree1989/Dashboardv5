@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useToast } from "../../ui/toast";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -26,6 +27,7 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
   const [rescanning, setRescanning] = useState(false);
   // Optional staff-side printer override
   const [printer, setPrinter] = useState<string>(currentPrinter || "");
+  const { show } = useToast();
 
   const rate = useMemo(() => {
     const mat = (material || "").toLowerCase();
@@ -138,6 +140,7 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
         const text = await res.text();
         throw new Error(text || "Failed to approve job");
       }
+      show('Approval sent');
       onApproved();
       onClose();
     } catch (err) {

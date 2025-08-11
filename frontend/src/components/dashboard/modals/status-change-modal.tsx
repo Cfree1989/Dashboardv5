@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../ui/toast";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -20,6 +21,7 @@ export default function StatusChangeModal({ jobId, action, title, description, c
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { show } = useToast();
 
   useEffect(() => {
     async function fetchStaff() {
@@ -57,6 +59,12 @@ export default function StatusChangeModal({ jobId, action, title, description, c
         const txt = await res.text();
         throw new Error(txt || "Request failed");
       }
+      const msg = action === 'mark-printing'
+        ? 'Marked Printing'
+        : action === 'mark-complete'
+          ? 'Marked Complete'
+          : 'Marked Paid/Picked Up';
+      show(msg);
       onSuccess();
       onClose();
     } catch (e) {

@@ -74,7 +74,7 @@ Building a complete 3D Print Management System for academic/makerspace environme
   - Frontend
     - [x] Replace inline full-editor with an "Add note" composer (single-line or textarea) + staff attribution dropdown
     - [x] On submit: POST `/api/v1/jobs/<id>/notes`; on success, prepend/append rendered note line without a page reload
-    - [ ] Render existing notes as a list split by newlines; newest first
+    - [x] Render existing notes as a list split by newlines; newest first
     - [x] A11y: labels, aria-live for status, keyboard submit, disabled while sending
     - [x] Error states: inline banner with retry; character counter (per-entry)
     - [x] Visible "Has notes" indicator on `JobCard` without expanding
@@ -89,9 +89,10 @@ Building a complete 3D Print Management System for academic/makerspace environme
     - [x] Modal (no staff field): primary open via `3dprint://open?path=<urlencoded job.file_path>`
     - [x] Secondary: "Copy File Path" action (clipboard) + inline feedback
     - [x] On confirm: POST log event, then proceed
-    - [x] Fallback: Helper text if protocol not installed
+  - [x] Fallback: Helper text if protocol not installed
+  - [x] Toasts: Success toasts wired for copy path, approval, rejection, status changes (Printing/Complete/Paid&Picked Up have explicit messages), review/unreview, and payment
     - [x] A11y: focus management, keyboard activation; pauses auto-refresh while open
-  - Acceptance: Clicking "Open File" logs the event and either opens via protocol (if installed) or allows copying path. Tested manually; automated tests pending.
+  - Acceptance: Clicking "Open File" logs the event and either opens via protocol (if installed) or allows copying path. Automated UI tests added and passing.
   - [x] Polish: Replace blocking `alert()` with a non-blocking toast for "Copy File Path" success
     - Plan A (simplest): Local inline toast inside the Open File modal
       - Show a small success pill (e.g., "Copied to clipboard") in the bottom-right of the modal
@@ -105,6 +106,24 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 4) Protocol Handler (`3dprint://`)
 - [ ] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
+    - [ ] Step 1 — Repo scaffold and installer (Executor)
+      - [x] Add `SlicerOpener/SlicerOpener.py` with: config-driven paths+slicer mapping, robust path validation, GUI success/error, rotating file logging, multi-slicer chooser
+      - [x] Add `SlicerOpener/config.example.ini`
+      - [x] Add `SlicerOpener/register.bat` (admin) to write Windows registry keys for `3dprint://`
+      - [x] Add `SlicerOpener/README.md` with build (PyInstaller) and workstation setup instructions
+      - Success criteria: Files exist; code builds with PyInstaller; README covers install and troubleshooting
+    - [ ] Step 2 — Build + smoke-test on Windows (Executor)
+      - [ ] Build one-file exe via PyInstaller; verify GUI dialogs, selection UI, and logging
+      - [ ] Manual test from dashboard: click Open File → opens slicer (fallback works if protocol not installed)
+      - Success criteria: Slicer launches with sample files; logs contain validation entries
+    - [ ] Step 3 — Packaging (Planner/Executor)
+      - [ ] Provide signed zip with `SlicerOpener.exe`, `config.ini` template, and `register.bat`
+      - [ ] Optional: add `.reg` alternative; icon polish
+      - Success criteria: Single zip usable by staff; minimal steps
+    - [ ] Step 4 — Backend/Frontend touchups (Planner/Executor)
+      - [ ] Confirm event type name alignment (`FileOpenedInSlicer`) and error-toasts consistency
+      - [ ] Short in-app setup guide link for staff (admin-only)
+      - Success criteria: Clear UX; consistent events
 
 5) Testing & Deployment
 - [ ] Expand unit/integration/e2e coverage
@@ -157,14 +176,14 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Success: close modal, remove card, refresh counts/last-updated
   - [x] Errors: show helpful inline alerts
   - [x] A11y + loading/disabled states
-- [ ] Phase 5.4 — Notes Editing
+- [x] Phase 5.4 — Notes Editing
   - [x] Backend: `POST /api/v1/jobs/<id>/notes` append-only; log `NoteAdded`; per-entry + total limits; tests
   - [x] Frontend: Replace full-editor with "Add note" composer; render list with name prefix; a11y
   - [x] Frontend: Visible "Has notes" indicator on job cards (icon/label, tooltip, aria-label, auto-updates)
   - [x] Tests: API (append validations) and UI (add note flow, errors, indicator presence/absence and live update)
 - [x] Add "Open File" Button (protocol handler later)
   - [x] Frontend modal (no staff attribution); primary open via protocol; fallback copy path; POST `/log-file-open`
-  - [ ] Tests: UI behavior + event POST
+  - [x] Tests: UI behavior + event POST
 
 - [x] UI Polish: Prevent action buttons from overlapping/stacking poorly on job cards
   - Change: In `frontend/src/components/dashboard/job-card.tsx`, updated the action bar to `flex-wrap` with `gap-2` and `ml-auto`, replacing `space-x-2`. Added `whitespace-nowrap` per button and hid long labels on small screens (`hidden sm:inline`).
@@ -175,12 +194,12 @@ Preserved for history; reorganized for clarity (do not delete).
     - [x] Section 3.4.2 — Archived: parenthetical example now 45 days
     - [x] Section 5.7 — Data Retention: Retention Period and Archival Process now 45 days
     - [x] API Spec — `POST /admin/archive`: default `retention_days` now 45
-  - Impact: Documentation reflects new policy; implementation alignment pending
+  - Impact: Documentation and implementation aligned; tests updated and passing
 
-- [ ] Align implementation defaults with 45-day policy
-  - [ ] Backend: Ensure `/api/v1/admin/archive` default `retention_days` is 45 when omitted
+- [x] Align implementation defaults with 45-day policy
+  - [x] Backend: Ensure `/api/v1/admin/archive` default `retention_days` is 45 when omitted
   - [x] Admin UI: Default value in Data Management forms set to 45
-  - [ ] Tests: Add/adjust tests to verify defaulting behavior and display values
+  - [x] Tests: Add/adjust tests to verify defaulting behavior and display values
   - Success: API returns expected behavior with omitted param; UI shows 45 by default; tests pass
 
 ### Phase 5.1 — Approval Modal Flow (Completed Parts)
@@ -337,10 +356,16 @@ Preserved for history; reorganized for clarity (do not delete).
 - Acceptance: Smoother UX and stable ops with documented SLOs
 
 ## Next Steps Priority Queue
-1) Notes Editing — backend endpoint + frontend inline editor (debounced auto-save)
-2) "Open File" Button — modal with staff attribution, event logging, open link + copy path fallback
-3) Comprehensive testing + deployment docs
-4) Protocol handler (SlicerOpener) packaging and UX
+1) Protocol handler (SlicerOpener) packaging and UX (Foundational)
+   - Package helper app with `config.ini`, path validation, GUI feedback, logging; Windows registry installer
+   - Deliver minimal viable handler to make "Open in Slicer" fully functional on staff machines
+2) E2E happy paths and deployment docs
+   - Write end-to-end tests for submit → approve → confirm → print → complete → pay/pickup
+   - Document production deploy (env vars, volumes, reverse proxy, CORS)
+3) Incident — Missing Jobs After Reboot (triage + prevention)
+   - Verify environment/DB, enforce Postgres, add guardrails; author runbook
+4) Admin Overrides (wire existing UI)
+   - Backend endpoints with guardrails and reason capture; frontend confirmations
 5) Analytics Dashboard (`/analytics`) after operations stabilize
 
 
