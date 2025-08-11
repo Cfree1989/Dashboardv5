@@ -193,13 +193,18 @@ def log_file_open(job_id):
     if not job:
         abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name = None
+    
+    # Ensure non-null values for required Event fields
+    workstation_id = getattr(g, 'workstation_id', 'unknown')
+    if not workstation_id:
+        workstation_id = 'unknown'
+    
     evt = Event(
         job_id=job.id,
         event_type='FileOpenedInSlicer',
         details={'file_path': job.file_path},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
+        triggered_by='file-open-action',  # System action, not staff-attributed
+        workstation_id=workstation_id,
     )
     db.session.add(evt)
     db.session.commit()

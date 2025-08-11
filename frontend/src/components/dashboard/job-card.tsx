@@ -34,6 +34,34 @@ interface JobCardProps {
   onModalOpenChange?: (open: boolean) => void; // pause auto-refresh while editing notes
 }
 
+/**
+ * Convert database file paths to Windows paths for SlicerOpener
+ * Handles: /app/storage/... -> C:\Dashboardv5\storage\...
+ *         storage/... -> C:\Dashboardv5\storage\...
+ *         C:\Dashboardv5\storage\... -> unchanged
+ */
+function convertToWindowsPath(filePath: string): string {
+  if (!filePath) return '';
+  
+  // Already a Windows path
+  if (filePath.startsWith('C:\\Dashboardv5\\storage\\')) {
+    return filePath;
+  }
+  
+  // Container absolute path: /app/storage/... -> C:\Dashboardv5\storage\...
+  if (filePath.startsWith('/app/storage/')) {
+    return filePath.replace('/app/storage/', 'C:\\Dashboardv5\\storage\\').replace(/\//g, '\\');
+  }
+  
+  // Relative path: storage/... -> C:\Dashboardv5\storage\...
+  if (filePath.startsWith('storage/')) {
+    return `C:\\Dashboardv5\\${filePath}`.replace(/\//g, '\\');
+  }
+  
+  // Fallback: assume relative and prepend base
+  return `C:\\Dashboardv5\\storage\\${filePath}`.replace(/\//g, '\\');
+}
+
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onModalOpenChange }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   const MAX_NOTES_LEN = 5000;
@@ -167,50 +195,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     onModalOpenChange?.(false);
   };
 
-  const logAndOpen = async (mode: 'protocol' | 'copy') => {
-    if (mode === 'protocol') {
-      const rawPath = job.file_path || '';
-      if (rawPath) {
-        // Use 'print3d' scheme to avoid issues with leading-digit schemes in some browsers
-        const uri = `print3d://open/?path=${encodeURIComponent(rawPath)}`;
-        // Strategy A: Programmatic anchor click
-        const a = document.createElement('a');
-        a.href = uri;
-        a.style.display = 'none';
-        a.rel = 'noopener';
-        a.target = '_self';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Strategy B: window.open to _self (some browsers honor this better for custom protocols)
-        try { window.open(uri, '_self'); } catch { /* ignore */ }
-        // Strategy C: Hidden iframe as last resort
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = uri;
-        document.body.appendChild(iframe);
-        setTimeout(() => iframe.remove(), 2000);
+  const copyFilePath = async () => {
+    if (job.file_path) {
+      try {
+        const windowsPath = convertToWindowsPath(job.file_path);
+        await navigator.clipboard.writeText(windowsPath);
+        show('Copied Windows path to clipboard');
+      } catch {
+        // fallback
       }
-    } else if (mode === 'copy') {
-      if (job.file_path) {
-        try {
-          await navigator.clipboard.writeText(job.file_path);
-          show('Copied to clipboard');
-        } catch {
-          // fallback
-        }
-      }
-    }
-    // Fire-and-forget logging after attempting to open to preserve user gesture for protocol launch
-    try {
-      const token = localStorage.getItem('token');
-      fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({})
-      }).catch(() => {});
-    } catch {
-      // ignore
     }
     closeOpenFileModal();
   };
@@ -520,6 +513,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <ExternalLink className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Open File</span>
             </button>
+
             {currentStatus === "PRINTING" && (
               <button
                 onClick={() => onStatusAction?.(job.id, "mark-complete")}
@@ -572,10 +566,43 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Open File</h3>
             <p className="text-sm text-gray-600 mb-3">This logs the action, then opens via the local protocol handler or copies the path.</p>
             <div className="flex flex-col gap-2">
-              <button onClick={() => logAndOpen('protocol')} className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition">
+              {/* FIXED: Real anchor preserves user gesture for protocol launching */}
+              <a 
+                href={`print3d://open/?path=${encodeURIComponent(convertToWindowsPath(job.file_path || ''))}`}
+                className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition"
+                onClick={(e) => {
+                  const windowsPath = convertToWindowsPath(job.file_path || '');
+                  
+                  // Log the action but preserve the anchor behavior
+                  console.log('✅ MODAL ANCHOR CLICKED (preserves user gesture):', {
+                    href: e.currentTarget.href,
+                    originalPath: job.file_path,
+                    windowsPath: windowsPath,
+                    jobId: job.id,
+                    currentTab: window.location.pathname,
+                    timestamp: new Date().toISOString(),
+                    trusted: e.isTrusted
+                  });
+                  
+                  // Fire-and-forget logging (don't block the protocol launch)
+                  try {
+                    const token = localStorage.getItem('token');
+                    fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({})
+                    }).catch(() => {});
+                  } catch {
+                    // ignore
+                  }
+                  
+                  // Close modal after click
+                  setTimeout(() => closeOpenFileModal(), 100);
+                }}
+              >
                 <ExternalLink className="w-4 h-4 mr-2" /> Open in Slicer
-              </button>
-              <button onClick={() => logAndOpen('copy')} className="flex items-center justify-center px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 focus-ring btn-transition">
+              </a>
+              <button onClick={copyFilePath} className="flex items-center justify-center px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 focus-ring btn-transition">
                 <Copy className="w-4 h-4 mr-2" /> Copy File Path
               </button>
             </div>

@@ -1,11 +1,11 @@
-# SlicerOpener (3dprint:// Protocol Handler)
+# SlicerOpener (3dprint:// & print3d:// Protocol Handler)
 
-This tool handles `3dprint://open?path=<urlencoded absolute path>` links on Windows. It reads `config.ini`, validates the requested file path, chooses a compatible slicer by extension, launches it, shows GUI success/error dialogs, and writes logs.
+This tool handles `3dprint://open?path=<urlencoded absolute path>` and `print3d://open?path=<urlencoded absolute path>` links on Windows. It reads `config.ini`, validates the requested file path, chooses a compatible slicer by extension, launches it, shows GUI success/error dialogs, and writes logs.
 
 ## Files
 - `SlicerOpener.py` — Python app (tkinter dialogs, rotating logs)
 - `config.example.ini` — Copy to `config.ini` and edit for your lab
-- `register.bat` — Registers the `3dprint://` protocol (run as Administrator)
+- `register.bat` — Registers both `3dprint://` and `print3d://` protocols (run as Administrator)
 
 ## Build (PyInstaller)
 1) Install Python 3.11+ and PyInstaller:
@@ -46,7 +46,7 @@ Notes:
 - Add more `[slicer_*]` sections as needed; extensions are case-insensitive
 
 ## Usage
-- Click "Open File" in the dashboard → browser opens `3dprint://...`
+- Click "Open File" in the dashboard → browser opens `print3d://...` (or `3dprint://...` for legacy)
 - Windows launches `SlicerOpener.exe`
 - App validates, selects slicer (or prompts), launches, shows success dialog; errors show clear dialogs
 
