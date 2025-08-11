@@ -41,6 +41,8 @@ def load_config(config_path: str):
     if not parser.has_section("main"):
         raise SlicerOpenerError("[main] section missing in config.ini")
     storage_base = parser.get("main", "AUTHORITATIVE_STORAGE_BASE_PATH", fallback=None)
+    if storage_base:
+        storage_base = storage_base.strip().strip('"').strip("'")
     if not storage_base:
         raise SlicerOpenerError("AUTHORITATIVE_STORAGE_BASE_PATH is required in [main]")
     log_path = parser.get("main", "LOG_PATH", fallback=os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "SlicerOpener", "sliceropener.log"))
@@ -50,6 +52,8 @@ def load_config(config_path: str):
             continue
         name = parser.get(section, "name", fallback=None)
         path = parser.get(section, "path", fallback=None)
+        if path:
+            path = path.strip().strip('"').strip("'")
         exts = [e.strip().lower() for e in parser.get(section, "extensions", fallback="").split(",") if e.strip()]
         if name and path and exts:
             slicers.append(SlicerDefinition(name, path, exts))
