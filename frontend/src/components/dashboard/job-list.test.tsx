@@ -44,14 +44,14 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getByText(/Failed to load jobs/i)).toBeInTheDocument());
   });
 
-  it('edits and saves notes with staff attribution', async () => {
+  it('adds a new note with staff attribution (append via POST)', async () => {
     // 1) Jobs fetch (UPLOADED)
     (global.fetch as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'n1', display_name: 'Note Job', notes: 'old' }] }) })
       // 2) Staff list for edit notes
       .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Alice', is_active: true }] }) })
-      // 3) PATCH notes
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'n1', notes: 'new notes', last_updated_by: 'Alice' }) });
+      // 3) POST append note
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'n1', notes: 'old\nAlice - new notes' }) });
 
     render(<JobList filters={{ status: 'UPLOADED' }} />);
 
@@ -61,18 +61,16 @@ describe('JobList component', () => {
     // Begin edit
     fireEvent.click(screen.getByText('Edit Notes'));
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
-    // Change notes triggers autosave after debounce
+    // Enter note
     const textarea = screen.getByLabelText('Notes');
     fireEvent.change(textarea, { target: { value: 'new notes' } });
     // Select staff
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'Alice' } });
-    // Wait for auto-save to run (debounce 800ms)
-    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
-    // Explicit save should also work and close editor
+    // Save and close editor
     fireEvent.click(screen.getByRole('button', { name: 'Save Notes' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save Notes' })).not.toBeInTheDocument());
-    expect(screen.getByText('new notes')).toBeInTheDocument();
+    expect(screen.getByText(/Has notes/i)).toBeInTheDocument();
   });
 
   it('opens payment modal for COMPLETED job and removes card on success', async () => {

@@ -349,6 +349,46 @@ def test_record_payment_moves_file_and_sets_status(client, token, app, tmp_path)
     assert (tmp_path / 'PaidPickedUp' / 'file.stl').exists()
 
 
+def test_append_note_with_name_prefix_and_limits(client, token, app):
+    job = create_job(app)
+    # Add active staff
+    client.post('/api/v1/staff', json={'name': 'NoteTaker'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Append a note
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'text': 'Model needs to be split', 'staff_name': 'NoteTaker'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert 'notes' in data
+    assert 'NoteTaker - Model needs to be split' in data['notes']
+
+    # Per-entry limit
+    too_long = 'a' * 2000
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'text': too_long, 'staff_name': 'NoteTaker'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Total limit
+    filler = 'b' * 4900
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/notes',
+        json={'text': filler, 'staff_name': 'NoteTaker'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 400
+
+    # Event logged
+    ev = client.get(f'/api/v1/jobs/{job.id}/events', headers={'Authorization': f'Bearer {token}'})
+    assert ev.status_code == 200
+    events = ev.get_json()
+    assert any(e['event_type'] == 'NoteAdded' for e in events)
+
 def test_update_notes_persists_and_logs_event(client, token, app):
     job = create_job(app)
     # Add active staff

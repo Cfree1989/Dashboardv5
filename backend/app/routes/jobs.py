@@ -386,6 +386,59 @@ def approve_job(job_id):
     return jsonify(job.to_dict()), 200
 
 
+@bp.route('/<job_id>/notes', methods=['POST'])
+@token_required
+def append_note(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip()
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+
+    text = data.get('text')
+    if not isinstance(text, str):
+        return jsonify({'message': 'text must be a string'}), 400
+    text = text.strip()
+    if not text:
+        return jsonify({'message': 'text is required'}), 400
+
+    per_entry_limit = 1000
+    total_limit = 5000
+    if len(text) > per_entry_limit:
+        return jsonify({'message': f'text must be at most {per_entry_limit} characters'}), 400
+
+    # Build the new line to append
+    new_line = f"{staff_name} - {text}"
+    current = job.notes or ''
+    # Compute resulting total length with newline if needed
+    separator = ('\n' if current else '')
+    proposed = current + separator + new_line
+    if len(proposed) > total_limit:
+        return jsonify({'message': 'total notes length exceeded'}), 400
+
+    job.notes = proposed
+    job.last_updated_by = staff_name
+    db.session.add(job)
+    db.session.commit()
+
+    evt = Event(
+        job_id=job.id,
+        event_type='NoteAdded',
+        details={'text_len': len(text)},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', None),
+    )
+    db.session.add(evt)
+    db.session.commit()
+
+    return jsonify(job.to_dict()), 200
+
 def _validate_staff_and_body(data):
     staff_name = data.get('staff_name')
     if not staff_name:

@@ -36,7 +36,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [notesDraft, setNotesDraft] = useState<string>(job.notes || "");
+  const [notesDraft, setNotesDraft] = useState<string>("");
   const [staff, setStaff] = useState<{ name: string; is_active: boolean }[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [notesStaffName, setNotesStaffName] = useState<string>("");
@@ -124,7 +124,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const beginEditNotes = async () => {
     setIsEditingNotes(true);
-    setNotesDraft(jobNotes || "");
+    setNotesDraft("");
     setSaveMessage("");
     setSaveError("");
     // lazy-load staff
@@ -155,8 +155,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSaveError('Please select your name before saving.');
       return;
     }
-    if (notesDraft.length > MAX_NOTES_LEN) {
-      setSaveError(`Notes must be at most ${MAX_NOTES_LEN} characters.`);
+    const MAX_ENTRY_LEN = 1000;
+    if (notesDraft.length === 0) {
+      setSaveError('Please enter a note.');
+      return;
+    }
+    if (notesDraft.length > MAX_ENTRY_LEN) {
+      setSaveError(`Note must be at most ${MAX_ENTRY_LEN} characters.`);
       return;
     }
     try {
@@ -165,57 +170,27 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSaveMessage("Saving...");
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/v1/jobs/${job.id}/notes`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ notes: notesDraft, staff_name: notesStaffName })
+        body: JSON.stringify({ text: notesDraft, staff_name: notesStaffName })
       });
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || 'Failed to save notes');
+        throw new Error(txt || 'Failed to add note');
       }
-      setJobNotes(notesDraft);
+      const data = await res.json();
+      setJobNotes(data?.notes || (jobNotes ? `${jobNotes}\n${notesDraft}` : notesDraft));
       setSaveMessage('Saved');
       setIsEditingNotes(false);
+      setNotesDraft("");
     } catch (e) {
-      setSaveError('Failed to save notes. Please try again.');
+      setSaveError('Failed to add note. Please try again.');
     } finally {
       setSavingNotes(false);
       setTimeout(() => setSaveMessage(""), 1500);
     }
   };
-  
-  // Debounced auto-save when staff selected and content changed
-  React.useEffect(() => {
-    if (!isEditingNotes) return;
-    if (!notesStaffName) return;
-    if (savingNotes) return;
-    if (notesDraft === jobNotes) return;
-    if (notesDraft.length > MAX_NOTES_LEN) return;
-    const handle = setTimeout(() => {
-      // Fire-and-forget save; keep editor open to continue editing
-      (async () => {
-        try {
-          setSavingNotes(true);
-          setSaveError("");
-          const token = localStorage.getItem('token');
-          const res = await fetch(`/api/v1/jobs/${job.id}/notes`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ notes: notesDraft, staff_name: notesStaffName })
-          });
-          if (!res.ok) throw new Error('save failed');
-          setJobNotes(notesDraft);
-          setSaveMessage('Saved');
-          setTimeout(() => setSaveMessage(""), 1200);
-        } catch (e) {
-          setSaveError('Auto-save failed. You can try again.');
-        } finally {
-          setSavingNotes(false);
-        }
-      })();
-    }, 800);
-    return () => clearTimeout(handle);
-  }, [notesDraft, notesStaffName, isEditingNotes]);
+  // Removed autosave; composer uses explicit submit to POST append
 
   return (
     <div
