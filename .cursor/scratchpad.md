@@ -84,15 +84,24 @@ Building a complete 3D Print Management System for academic/makerspace environme
       - Enhancement: Indicator is clickable for quick edit (expands and focuses composer); icon/label sizing aligned with card metadata
   - Acceptance: Adding a note results in an appended line prefixed with the staff name; history preserved; event logged; tests pass (API + UI).
 - "Open File" Button (Protocol handler deferred; provide graceful fallback)
-  - [ ] Backend: Use existing `POST /api/v1/jobs/<id>/log-file-open` (optional `staff_name`); ensure covered by tests
-  - [ ] Frontend: Add "Open File" to job cards for statuses `READYTOPRINT`, `PRINTING`, `COMPLETED`
-    - [ ] Modal with "Performing Action As" (staff dropdown)
-    - [ ] Primary: "Open in Slicer" link `3dprint://open?path=<urlencoded job.file_path>`
-    - [ ] Secondary: "Copy File Path" action (clipboard) + success toast
-    - [ ] On confirm: POST log event with `staff_name`, then proceed
-    - [ ] Fallback: Helper text if protocol not installed
-    - [ ] A11y: focus management, keyboard activation
-  - Acceptance: Clicking "Open File" logs event with attribution and either opens via protocol (if installed) or allows copying path. Tests pass.
+  - [x] Backend: `POST /api/v1/jobs/<id>/log-file-open` (no staff attribution)
+  - [x] Frontend: Add "Open File" to job cards for all statuses
+    - [x] Modal (no staff field): primary open via `3dprint://open?path=<urlencoded job.file_path>`
+    - [x] Secondary: "Copy File Path" action (clipboard) + inline feedback
+    - [x] On confirm: POST log event, then proceed
+    - [x] Fallback: Helper text if protocol not installed
+    - [x] A11y: focus management, keyboard activation; pauses auto-refresh while open
+  - Acceptance: Clicking "Open File" logs the event and either opens via protocol (if installed) or allows copying path. Tested manually; automated tests pending.
+  - [x] Polish: Replace blocking `alert()` with a non-blocking toast for "Copy File Path" success
+    - Plan A (simplest): Local inline toast inside the Open File modal
+      - Show a small success pill (e.g., "Copied to clipboard") in the bottom-right of the modal
+      - Auto-hide after 2 seconds; does not block interaction
+      - No global provider, minimal code change, easy to test
+    - Plan B (nice to have, later): Lightweight global toast provider shared across app
+      - Add `ToastProvider` to `app/layout.tsx` and `useToast()` hook
+      - Reuse for future success/error messages
+    - Tests: Simulate click → assert success pill appears then disappears (use fake timers)
+    - Acceptance: Copy action shows non-blocking confirmation with no browser alert dialogs
 
 4) Protocol Handler (`3dprint://`)
 - [ ] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
@@ -153,9 +162,13 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Frontend: Replace full-editor with "Add note" composer; render list with name prefix; a11y
   - [x] Frontend: Visible "Has notes" indicator on job cards (icon/label, tooltip, aria-label, auto-updates)
   - [x] Tests: API (append validations) and UI (add note flow, errors, indicator presence/absence and live update)
-- [ ] Add "Open File" Button (protocol handler later)
-  - [ ] Frontend modal with staff attribution; primary open via protocol; fallback copy path; POST `/log-file-open`
+- [x] Add "Open File" Button (protocol handler later)
+  - [x] Frontend modal (no staff attribution); primary open via protocol; fallback copy path; POST `/log-file-open`
   - [ ] Tests: UI behavior + event POST
+
+- [x] UI Polish: Prevent action buttons from overlapping/stacking poorly on job cards
+  - Change: In `frontend/src/components/dashboard/job-card.tsx`, updated the action bar to `flex-wrap` with `gap-2` and `ml-auto`, replacing `space-x-2`. Added `whitespace-nowrap` per button and hid long labels on small screens (`hidden sm:inline`).
+  - Success criteria: Buttons wrap to a new line within the card without overlapping neighboring cards; layout remains right-aligned; small screens show icon-only labels.
 
 - [x] Archival retention adjustment
   - [x] Docs: Update archival retention from 90 to 45 days in `/.cursor/masterplan.md`

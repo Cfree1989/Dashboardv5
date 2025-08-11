@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useToast } from "../../ui/toast";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -19,6 +20,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { show } = useToast();
 
   useEffect(() => {
     async function fetchStaff() {
@@ -56,6 +58,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
         const txt = await res.text();
         throw new Error(txt || "Payment failed");
       }
+      show('Payment recorded');
       onSuccess();
       onClose();
     } catch (e) {

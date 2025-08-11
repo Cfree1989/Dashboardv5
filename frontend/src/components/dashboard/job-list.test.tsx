@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { renderWithProviders as render } from '../../../jest.setup';
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() })
 }));
@@ -44,6 +45,8 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getByText(/Failed to load jobs/i)).toBeInTheDocument());
   });
 
+  // TODO: Add Open File modal tests (render + POST `/log-file-open`) once test helpers are refactored
+
   it('adds a new note with staff attribution (append via POST)', async () => {
     // 1) Jobs fetch (UPLOADED)
     (global.fetch as any)
@@ -62,7 +65,7 @@ describe('JobList component', () => {
     fireEvent.click(screen.getByText('Edit Notes'));
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
     // Enter note
-    const textarea = screen.getByLabelText('Notes');
+    const textarea = screen.getByLabelText(/Add a new note/i);
     fireEvent.change(textarea, { target: { value: 'new notes' } });
     // Select staff
     const select = screen.getByRole('combobox');

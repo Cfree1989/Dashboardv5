@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy } from "lucide-react";
+import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 
@@ -51,6 +52,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
+  const { show } = useToast();
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -185,8 +187,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       if (job.file_path) {
         try {
           await navigator.clipboard.writeText(job.file_path);
-          // basic inline feedback
-          alert('File path copied to clipboard');
+          show('Copied to clipboard');
         } catch {
           // fallback
         }
@@ -352,7 +353,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <div className="mt-3">
                 <span className="text-gray-500 text-sm">Notes:</span>
                 <div className="bg-gray-50 p-2 rounded border mt-1">
-                  <p className="whitespace-pre-wrap text-sm text-gray-900">{jobNotes}</p>
+                  <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
+                    {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}
@@ -362,7 +367,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   <div>
                     <span className="text-gray-500 text-sm">Existing notes:</span>
                     <div className="bg-gray-50 p-2 rounded border mt-1">
-                      <p className="whitespace-pre-wrap text-sm text-gray-900">{jobNotes}</p>
+                      <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
+                        {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
+                          <li key={idx}>{line}</li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 )}
@@ -411,20 +420,20 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex flex-wrap items-center mt-4 gap-2">
           <button onClick={() => setShowMore(!showMore)} className="text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition">
             {showMore ? "Show Less" : "Show More"}
           </button>
 
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2 ml-auto">
             {showMore && (
               <button
                 onClick={beginEditNotes}
-                className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition"
+                className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition whitespace-nowrap"
                 title="Edit Notes"
               >
                 <FileText className="w-4 h-4 mr-1" />
-                Edit Notes
+                <span className="hidden sm:inline">Edit Notes</span>
               </button>
             )}
             {currentStatus === "UPLOADED" && (
@@ -442,34 +451,34 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 <button
                   onClick={handleApprove}
                   disabled={isApproving || isRejecting}
-                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 focus-ring btn-transition"
+                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
                 >
                   {isApproving ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent mr-1"></div>
-                      Approving...
+                      <span className="hidden sm:inline">Approving...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle className="w-4 h-4 mr-1" />
-                      Approve
+                      <span className="hidden sm:inline">Approve</span>
                     </>
                   )}
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={isRejecting || isApproving}
-                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 focus-ring btn-transition"
+                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
                 >
                   {isRejecting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent mr-1"></div>
-                      Rejecting...
+                      <span className="hidden sm:inline">Rejecting...</span>
                     </>
                   ) : (
                     <>
                       <XCircle className="w-4 h-4 mr-1" />
-                      Reject
+                      <span className="hidden sm:inline">Reject</span>
                     </>
                   )}
                 </button>
@@ -478,36 +487,36 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             {currentStatus === "READYTOPRINT" && (
               <button
                 onClick={() => onStatusAction?.(job.id, "mark-printing")}
-                className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition"
+                className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
               >
                 <Printer className="w-4 h-4 mr-1" />
-                Mark Printing
+                <span className="hidden sm:inline">Mark Printing</span>
               </button>
             )}
             <button
               onClick={openOpenFileModal}
-              className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition"
+              className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
               title="Open File"
             >
               <ExternalLink className="w-4 h-4 mr-1" />
-              Open File
+              <span className="hidden sm:inline">Open File</span>
             </button>
             {currentStatus === "PRINTING" && (
               <button
                 onClick={() => onStatusAction?.(job.id, "mark-complete")}
-                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition"
+                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Mark Complete
+                <span className="hidden sm:inline">Mark Complete</span>
               </button>
             )}
             {currentStatus === "COMPLETED" && (
               <button
                 onClick={() => onStatusAction?.(job.id, "mark-picked-up")}
-                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition"
+                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Mark Paid/Picked Up
+                <span className="hidden sm:inline">Mark Paid/Picked Up</span>
               </button>
             )}
           </div>
