@@ -33,6 +33,7 @@ interface JobCardProps {
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
+  const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState<string>(job.notes || "");
@@ -154,6 +155,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSaveError('Please select your name before saving.');
       return;
     }
+    if (notesDraft.length > MAX_NOTES_LEN) {
+      setSaveError(`Notes must be at most ${MAX_NOTES_LEN} characters.`);
+      return;
+    }
     try {
       setSavingNotes(true);
       setSaveError("");
@@ -178,6 +183,39 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setTimeout(() => setSaveMessage(""), 1500);
     }
   };
+  
+  // Debounced auto-save when staff selected and content changed
+  React.useEffect(() => {
+    if (!isEditingNotes) return;
+    if (!notesStaffName) return;
+    if (savingNotes) return;
+    if (notesDraft === jobNotes) return;
+    if (notesDraft.length > MAX_NOTES_LEN) return;
+    const handle = setTimeout(() => {
+      // Fire-and-forget save; keep editor open to continue editing
+      (async () => {
+        try {
+          setSavingNotes(true);
+          setSaveError("");
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/v1/jobs/${job.id}/notes`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ notes: notesDraft, staff_name: notesStaffName })
+          });
+          if (!res.ok) throw new Error('save failed');
+          setJobNotes(notesDraft);
+          setSaveMessage('Saved');
+          setTimeout(() => setSaveMessage(""), 1200);
+        } catch (e) {
+          setSaveError('Auto-save failed. You can try again.');
+        } finally {
+          setSavingNotes(false);
+        }
+      })();
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [notesDraft, notesStaffName, isEditingNotes]);
 
   return (
     <div
@@ -222,9 +260,17 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             <Mail className="w-4 h-4 mr-1" />
             <span className="truncate">{job.student_email || 'No email'}</span>
           </div>
-          <div className="flex items-center text-sm text-gray-500">
-            <Printer className="w-4 h-4 mr-1" />
-            <span className="truncate">{job.printer || 'Not set'}</span>
+          <div className="text-sm text-gray-500">
+            <div className="flex items-center">
+              <Printer className="w-4 h-4 mr-1" />
+              <span className="truncate">{job.printer || 'Not set'}</span>
+            </div>
+            {jobNotes && (
+              <div className="flex items-center text-xs text-blue-700 mt-1" title="Has notes" aria-label="Has notes">
+                <FileText className="w-3 h-3 mr-1" />
+                <span className="hidden md:inline">Has notes</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center text-sm text-gray-500">
             <Palette className="w-4 h-4 mr-1" />
@@ -232,13 +278,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </div>
         </div>
 
-        {/* Notes indicator when collapsed */}
-        {job.notes && !showMore && (
-          <div className="flex items-center text-xs text-gray-500 mt-2">
-            <FileText className="w-3 h-3 mr-1" />
-            <span className="truncate">Has notes</span>
-          </div>
-        )}
+        
 
         {showMore && (
           <div className="mt-3 pt-3 border-t border-gray-100">
@@ -287,6 +327,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   onChange={(e) => setNotesDraft(e.target.value)}
                   aria-describedby={`notes-status-${job.id}`}
                 />
+                <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                   <div>
                     <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
@@ -305,12 +346,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   </div>
                   <div className="flex items-end justify-end space-x-2">
                     <button onClick={cancelEditNotes} type="button" className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Cancel</button>
-                    <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
+                    <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName || notesDraft.length > MAX_NOTES_LEN} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
                   </div>
                 </div>
                 <div id={`notes-status-${job.id}`} className="mt-2 text-sm" aria-live="polite">
                   {saveMessage && <span className="text-green-600">{saveMessage}</span>}
                   {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
+                  {notesDraft.length > MAX_NOTES_LEN && (
+                    <div className="text-red-600" role="alert">Notes must be at most {MAX_NOTES_LEN} characters.</div>
+                  )}
                 </div>
               </div>
             )}

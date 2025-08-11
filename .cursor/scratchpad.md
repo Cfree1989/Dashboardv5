@@ -61,14 +61,27 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - Acceptance: End-to-end payment recorded; job moves to Paid & Picked Up; events/audit present; tests pass
 
 4) Notes Editing & Open File Button (New Active)
-- Notes Editing
-  - [ ] Backend: `PATCH /api/v1/jobs/<id>/notes` with `{ notes: string, staff_name }`; validate attribution; persist; log `NotesUpdated` event; tests
-  - [ ] Frontend: Inline notes editor on job card (within Show More)
-    - [ ] Textarea with character guidance (e.g., up to 5,000 chars)
-    - [ ] Auto-save with debounce (~500ms) and in-flight indicator
-    - [ ] Save success feedback; error banner with retry
-    - [ ] A11y: labels, aria-live for save status, keyboard friendly
-  - Acceptance: Notes persist, are audited with staff attribution, and UI shows saved/error states. Tests pass (API + UI).
+- Notes Editing — Append-style with inline attribution
+  - Goal: When a staff member adds a note, automatically prefix it with their name (e.g., "Conrad Freeman - Model needs to be split"). Preserve history by appending to the existing `job.notes` text with newline separation.
+  - Backend
+    - [ ] New endpoint: `POST /api/v1/jobs/<id>/notes` with `{ text: string, staff_name }`
+      - Appends a single line to `job.notes` as: `<staff_name> - <text>` with a timestamp kept only in the `NoteAdded` event (avoid duplicating in text)
+      - Enforce per-entry limit (e.g., 1000 chars) and total notes length limit (e.g., 5000 chars)
+      - Validate active staff; on success, return updated job object
+      - Log `NoteAdded` event with `{ text_len, staff_name }`
+    - [ ] Keep existing `PATCH /jobs/<id>/notes` for full-replace (legacy); new UI will use POST append only
+    - [ ] Tests: success append, per-entry len guard, total len guard, event content, inactive staff
+  - Frontend
+    - [ ] Replace inline full-editor with an "Add note" composer (single-line or textarea) + staff attribution dropdown
+    - [ ] On submit: POST `/api/v1/jobs/<id>/notes`; on success, prepend/append rendered note line without a page reload
+    - [ ] Render existing notes as a list split by newlines; newest first
+    - [ ] A11y: labels, aria-live for status, keyboard submit, disabled while sending
+    - [ ] Error states: inline banner with retry; character counter (per-entry)
+    - [x] Visible "Has notes" indicator on `JobCard` without expanding
+      - UI: Show FileText icon with tooltip "Has notes" whenever `job.notes` is non-empty; on md+ also show small label "Has notes"; icon-only on small screens
+      - Placement: Under the printer line within the card details; high-contrast color; aria-label for screen readers
+      - Live update: After adding a note, indicator appears immediately without refresh
+  - Acceptance: Adding a note results in an appended line prefixed with the staff name; history preserved; event logged; tests pass (API + UI).
 - "Open File" Button (Protocol handler deferred; provide graceful fallback)
   - [ ] Backend: Use existing `POST /api/v1/jobs/<id>/log-file-open` (optional `staff_name`); ensure covered by tests
   - [ ] Frontend: Add "Open File" to job cards for statuses `READYTOPRINT`, `PRINTING`, `COMPLETED`
@@ -135,9 +148,10 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Errors: show helpful inline alerts
   - [x] A11y + loading/disabled states
 - [ ] Phase 5.4 — Notes Editing
-  - [ ] Backend: `PATCH /api/v1/jobs/<id>/notes` (+ event, tests)
-  - [ ] Frontend: Inline notes editor (debounced auto-save, a11y)
-  - [ ] Tests: API and UI
+  - [ ] Backend: `POST /api/v1/jobs/<id>/notes` append-only; log `NoteAdded`; per-entry + total limits; tests
+  - [ ] Frontend: Replace full-editor with "Add note" composer; render list with name prefix; a11y
+  - [x] Frontend: Visible "Has notes" indicator on job cards (icon/label, tooltip, aria-label, auto-updates)
+  - [ ] Tests: API (append validations) and UI (add note flow, rendering, errors, indicator presence/absence and live update)
 - [ ] Add "Open File" Button (protocol handler later)
   - [ ] Frontend modal with staff attribution; primary open via protocol; fallback copy path; POST `/log-file-open`
   - [ ] Tests: UI behavior + event POST

@@ -61,15 +61,16 @@ describe('JobList component', () => {
     // Begin edit
     fireEvent.click(screen.getByText('Edit Notes'));
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
-    // Change notes
+    // Change notes triggers autosave after debounce
     const textarea = screen.getByLabelText('Notes');
     fireEvent.change(textarea, { target: { value: 'new notes' } });
-    // Select staff and save
+    // Select staff
     const select = screen.getByRole('combobox');
     fireEvent.change(select, { target: { value: 'Alice' } });
+    // Wait for auto-save to run (debounce 800ms)
+    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
+    // Explicit save should also work and close editor
     fireEvent.click(screen.getByRole('button', { name: 'Save Notes' }));
-
-    // Saved -> editor closes and new text shown
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Save Notes' })).not.toBeInTheDocument());
     expect(screen.getByText('new notes')).toBeInTheDocument();
   });
