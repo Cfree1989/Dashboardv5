@@ -168,30 +168,17 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const logAndOpen = async (mode: 'protocol' | 'copy') => {
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({})
-      });
-    } catch {
-      // ignore logging failures
-    }
     if (mode === 'protocol') {
       const rawPath = job.file_path || '';
       if (rawPath) {
-        const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
-        const uri = isWindows
-          ? `3dprint://open/?path=${encodeURIComponent(rawPath)}`
-          : `print3d://open/?path=${encodeURIComponent(rawPath)}`; // fallback for browsers that block schemes starting with a digit
-        // Use a temporary anchor to avoid SPA/router intercepts and ensure the custom protocol is invoked
-        const link = document.createElement('a');
-        link.href = uri;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        // Use 'print3d' scheme to avoid issues with leading-digit schemes in some browsers
+        const uri = `print3d://open/?path=${encodeURIComponent(rawPath)}`;
+        // Use only a hidden iframe to invoke the custom protocol without navigating the SPA
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = uri;
+        document.body.appendChild(iframe);
+        setTimeout(() => iframe.remove(), 2000);
       }
     } else if (mode === 'copy') {
       if (job.file_path) {
@@ -202,6 +189,17 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           // fallback
         }
       }
+    }
+    // Fire-and-forget logging after attempting to open to preserve user gesture for protocol launch
+    try {
+      const token = localStorage.getItem('token');
+      fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({})
+      }).catch(() => {});
+    } catch {
+      // ignore
     }
     closeOpenFileModal();
   };
