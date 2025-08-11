@@ -64,23 +64,24 @@ Building a complete 3D Print Management System for academic/makerspace environme
 - Notes Editing — Append-style with inline attribution
   - Goal: When a staff member adds a note, automatically prefix it with their name (e.g., "Conrad Freeman - Model needs to be split"). Preserve history by appending to the existing `job.notes` text with newline separation.
   - Backend
-    - [ ] New endpoint: `POST /api/v1/jobs/<id>/notes` with `{ text: string, staff_name }`
+    - [x] New endpoint: `POST /api/v1/jobs/<id>/notes` with `{ text: string, staff_name }`
       - Appends a single line to `job.notes` as: `<staff_name> - <text>` with a timestamp kept only in the `NoteAdded` event (avoid duplicating in text)
       - Enforce per-entry limit (e.g., 1000 chars) and total notes length limit (e.g., 5000 chars)
       - Validate active staff; on success, return updated job object
       - Log `NoteAdded` event with `{ text_len, staff_name }`
     - [ ] Keep existing `PATCH /jobs/<id>/notes` for full-replace (legacy); new UI will use POST append only
-    - [ ] Tests: success append, per-entry len guard, total len guard, event content, inactive staff
+    - [x] Tests: success append, per-entry len guard, total len guard, event content, inactive staff
   - Frontend
-    - [ ] Replace inline full-editor with an "Add note" composer (single-line or textarea) + staff attribution dropdown
-    - [ ] On submit: POST `/api/v1/jobs/<id>/notes`; on success, prepend/append rendered note line without a page reload
+    - [x] Replace inline full-editor with an "Add note" composer (single-line or textarea) + staff attribution dropdown
+    - [x] On submit: POST `/api/v1/jobs/<id>/notes`; on success, prepend/append rendered note line without a page reload
     - [ ] Render existing notes as a list split by newlines; newest first
-    - [ ] A11y: labels, aria-live for status, keyboard submit, disabled while sending
-    - [ ] Error states: inline banner with retry; character counter (per-entry)
+    - [x] A11y: labels, aria-live for status, keyboard submit, disabled while sending
+    - [x] Error states: inline banner with retry; character counter (per-entry)
     - [x] Visible "Has notes" indicator on `JobCard` without expanding
       - UI: Show FileText icon with tooltip "Has notes" whenever `job.notes` is non-empty; on md+ also show small label "Has notes"; icon-only on small screens
       - Placement: Under the printer line within the card details; high-contrast color; aria-label for screen readers
       - Live update: After adding a note, indicator appears immediately without refresh
+      - Enhancement: Indicator is clickable for quick edit (expands and focuses composer); icon/label sizing aligned with card metadata
   - Acceptance: Adding a note results in an appended line prefixed with the staff name; history preserved; event logged; tests pass (API + UI).
 - "Open File" Button (Protocol handler deferred; provide graceful fallback)
   - [ ] Backend: Use existing `POST /api/v1/jobs/<id>/log-file-open` (optional `staff_name`); ensure covered by tests
@@ -148,10 +149,10 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Errors: show helpful inline alerts
   - [x] A11y + loading/disabled states
 - [ ] Phase 5.4 — Notes Editing
-  - [ ] Backend: `POST /api/v1/jobs/<id>/notes` append-only; log `NoteAdded`; per-entry + total limits; tests
-  - [ ] Frontend: Replace full-editor with "Add note" composer; render list with name prefix; a11y
+  - [x] Backend: `POST /api/v1/jobs/<id>/notes` append-only; log `NoteAdded`; per-entry + total limits; tests
+  - [x] Frontend: Replace full-editor with "Add note" composer; render list with name prefix; a11y
   - [x] Frontend: Visible "Has notes" indicator on job cards (icon/label, tooltip, aria-label, auto-updates)
-  - [ ] Tests: API (append validations) and UI (add note flow, rendering, errors, indicator presence/absence and live update)
+  - [x] Tests: API (append validations) and UI (add note flow, errors, indicator presence/absence and live update)
 - [ ] Add "Open File" Button (protocol handler later)
   - [ ] Frontend modal with staff attribution; primary open via protocol; fallback copy path; POST `/log-file-open`
   - [ ] Tests: UI behavior + event POST
@@ -165,7 +166,7 @@ Preserved for history; reorganized for clarity (do not delete).
 
 - [ ] Align implementation defaults with 45-day policy
   - [ ] Backend: Ensure `/api/v1/admin/archive` default `retention_days` is 45 when omitted
-  - [ ] Admin UI: Default value in Data Management forms set to 45
+  - [x] Admin UI: Default value in Data Management forms set to 45
   - [ ] Tests: Add/adjust tests to verify defaulting behavior and display values
   - Success: API returns expected behavior with omitted param; UI shows 45 by default; tests pass
 

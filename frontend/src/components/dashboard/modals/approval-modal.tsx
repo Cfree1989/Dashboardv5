@@ -6,11 +6,12 @@ type Staff = { name: string; is_active: boolean };
 export interface ApprovalModalProps {
   jobId: string;
   material?: string | null;
+  currentPrinter?: string | null;
   onClose: () => void;
   onApproved: () => void; // parent removes job from list
 }
 
-export default function ApprovalModal({ jobId, material, onClose, onApproved }: ApprovalModalProps) {
+export default function ApprovalModal({ jobId, material, currentPrinter, onClose, onApproved }: ApprovalModalProps) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [staffName, setStaffName] = useState("");
@@ -23,6 +24,8 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
   const [authoritativeFilename, setAuthoritativeFilename] = useState<string>("");
   const [showChooser, setShowChooser] = useState(false);
   const [rescanning, setRescanning] = useState(false);
+  // Optional staff-side printer override
+  const [printer, setPrinter] = useState<string>(currentPrinter || "");
 
   const rate = useMemo(() => {
     const mat = (material || "").toLowerCase();
@@ -88,9 +91,18 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
       }
       setCandidateFiles(parsed);
       if (parsed.length > 0) {
-        // Keep current selection if still present, otherwise pick newest
+        // Prefer an existing file (mtime > 0). If none exist, leave empty so backend uses current path.
         const keep = parsed.find((f) => f.name === authoritativeFilename);
-        setAuthoritativeFilename(keep ? keep.name : (recommended && parsed.some(f => f.name === recommended) ? recommended : parsed[0].name));
+        if (keep) {
+          setAuthoritativeFilename(keep.name);
+        } else {
+          const preferred = (recommended && parsed.find(f => f.name === recommended && f.mtime > 0))
+            || parsed.find(f => f.mtime > 0)
+            || null;
+          setAuthoritativeFilename(preferred ? preferred.name : "");
+        }
+      } else {
+        setAuthoritativeFilename("");
       }
       if (forceShowChooser && parsed.length > 1) setShowChooser(true);
     } catch {
@@ -118,6 +130,8 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
           weight_g: parseFloat(weightG),
           time_hours: parseFloat(timeHours),
           authoritative_filename: authoritativeFilename || undefined,
+          // send only if changed or explicitly set
+          printer: printer && printer !== (currentPrinter || '') ? printer : undefined,
         }),
       });
       if (!res.ok) {
@@ -152,10 +166,11 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!!candidateFiles.length && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Using file: <span className="font-medium">{authoritativeFilename || candidateFiles[0]?.name}</span>
-                </div>
+              {authoritativeFilename && (
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Using file: <span className="font-medium">{authoritativeFilename}</span>
+                  </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -175,17 +190,18 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
                     </button>
                   )}
                 </div>
-              </div>
+                </div>
+              )}
               {showChooser && candidateFiles.length > 1 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select file</label>
                   <select
                     className="w-full border rounded-lg px-3 py-2 focus-ring"
                     value={authoritativeFilename}
-                    onChange={(e) => setAuthoritativeFilename(e.target.value)}
+                     onChange={(e) => setAuthoritativeFilename(e.target.value)}
                   >
                     {candidateFiles.map((f) => (
-                      <option key={f.name} value={f.name}>{f.name}</option>
+                      <option key={f.name} value={f.name}>{f.name}{f.mtime === 0 ? ' (not found)' : ''}</option>
                     ))}
                   </select>
                   <div className="mt-1">
@@ -203,8 +219,9 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
+            <label htmlFor="staffName" className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
             <select
+              id="staffName"
               className="w-full border rounded-lg px-3 py-2 focus-ring"
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}
@@ -220,6 +237,31 @@ export default function ApprovalModal({ jobId, material, onClose, onApproved }: 
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Printer override (optional) */}
+          <div>
+            <label htmlFor="printerOverride" className="block text-sm font-medium text-gray-700 mb-1">Printer (override if needed)</label>
+            <select
+              id="printerOverride"
+              className="w-full border rounded-lg px-3 py-2 focus-ring"
+              value={printer}
+              onChange={(e) => setPrinter(e.target.value)}
+            >
+              <option value="">{currentPrinter ? `Keep student choice (${currentPrinter})` : 'Select a printer'}</option>
+              {(material || '').toLowerCase() === 'resin' ? (
+                <>
+                  <option value="Formlabs Form 3">Formlabs Form 3</option>
+                </>
+              ) : (
+                <>
+                  <option value="Prusa MK4S">Prusa MK4S</option>
+                  <option value="Prusa XL">Prusa XL</option>
+                  <option value="Raise3D Pro 2 Plus">Raise3D Pro 2 Plus</option>
+                </>
+              )}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">This only changes the job’s assigned printer; it does not move files.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

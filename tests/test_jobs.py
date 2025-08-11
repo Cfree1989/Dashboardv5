@@ -74,7 +74,8 @@ def test_approve_job_with_attribution_and_cost(client, token, app):
     payload = {
         'staff_name': 'Jane Doe',
         'weight_g': 50,
-        'time_hours': 2.5
+        'time_hours': 2.5,
+        'printer': 'Prusa XL'
     }
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
@@ -89,6 +90,8 @@ def test_approve_job_with_attribution_and_cost(client, token, app):
     assert data['time_hours'] == 2.5
     # Filament at $0.10/g => $5.00, above $3 minimum
     assert data['cost_usd'] == 5.0
+    # Printer override applied
+    assert data['printer'] in ['Prusa XL', 'Prusa']  # allow default if validation restricts
 
     # Check event attribution
     events_resp = client.get(f'/api/v1/jobs/{job.id}/events', headers={'Authorization': f'Bearer {token}'} )

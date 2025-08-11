@@ -282,6 +282,8 @@ def approve_job(job_id):
     weight_g = data.get('weight_g')
     time_hours = data.get('time_hours')
     authoritative_filename = (data.get('authoritative_filename') or '').strip()
+    # Optional staff-side printer override
+    printer_override = (data.get('printer') or '').strip()
 
     if not staff_name:
         return jsonify({'message': 'staff_name is required'}), 400
@@ -323,6 +325,19 @@ def approve_job(job_id):
     job.last_updated_by = staff_name
     # Mark as reviewed to clear "NEW" indicator across statuses
     job.staff_viewed_at = datetime.utcnow()
+    # Optional: validate and apply printer override if provided
+    if printer_override:
+        # Allowed printer sets by material
+        allowed_by_material = {
+            'filament': { 'Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus' },
+            'resin': { 'Formlabs Form 3' },
+        }
+        allowed = allowed_by_material.get(material, set())
+        if allowed and printer_override not in allowed:
+            return jsonify({'message': 'Invalid printer for selected material'}), 400
+        previous_printer = job.printer
+        if printer_override and printer_override != previous_printer:
+            job.printer = printer_override
     # Optionally set authoritative file within same directory
     if authoritative_filename:
         current_dir = Path(job.file_path).parent
@@ -355,16 +370,25 @@ def approve_job(job_id):
     send_approval_email(job, confirmation_url)
 
     # Log events with proper attribution (staff_name + workstation_id)
-    evt1 = Event(
-        job_id=job.id,
-        event_type='StaffApproved',
-        details={
+    evt_details = {
             'confirmation_url': confirmation_url,
             'weight_g': weight_val,
             'time_hours': time_val,
             'cost_usd': float(final_cost_decimal),
             'authoritative_filename': authoritative_filename or job.display_name,
-        },
+        }
+    # If printer changed, include before/after in event details
+    try:
+        if printer_override:
+            evt_details['printer_before'] = previous_printer if 'previous_printer' in locals() else job.printer
+            evt_details['printer_after'] = job.printer
+    except Exception:
+        pass
+
+    evt1 = Event(
+        job_id=job.id,
+        event_type='StaffApproved',
+        details=evt_details,
         triggered_by=staff_name,
         workstation_id=g.workstation_id,
     )

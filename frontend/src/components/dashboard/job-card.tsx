@@ -29,9 +29,10 @@ interface JobCardProps {
   onReject?: (jobId: string) => void;
   onMarkReviewed?: (jobId: string) => void;
   onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
+  onModalOpenChange?: (open: boolean) => void; // pause auto-refresh while editing notes
 }
 
-export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction }: JobCardProps) {
+export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onModalOpenChange }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
@@ -68,7 +69,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     const created = new Date(createdAt);
     const now = new Date();
     const diffMinutes = Math.max(0, Math.floor((now.getTime() - created.getTime()) / 60000));
-    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 1) return 'Submitted just now';
     const roundUp = (value: number, increment: number) => Math.ceil(value / increment) * increment;
     let roundedMins: number;
     if (diffMinutes < 120) {
@@ -78,11 +79,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     }
     const hours = Math.floor(roundedMins / 60);
     const mins = roundedMins % 60;
-    if (hours === 0) return `About ${mins} min ago`;
-    if (mins === 0) return `About ${hours} hr ago`;
-    return `About ${hours} hr ${mins} min ago`;
+    if (hours === 0) return `Submitted ${mins} min ago`;
+    if (mins === 0) return `Submitted ${hours} hr ago`;
+    return `Submitted ${hours} hr ${mins} min ago`;
   };
-  const timeElapsed = job.created_at ? formatElapsed(job.created_at) : 'recently';
+  const timeElapsed = job.created_at ? formatElapsed(job.created_at) : 'Submitted recently';
 
   // Format created timestamp explicitly in Baton Rouge, Louisiana timezone (America/Chicago)
   const formatCreatedAtCentral = (createdAt?: string) => {
@@ -127,6 +128,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setNotesDraft("");
     setSaveMessage("");
     setSaveError("");
+    onModalOpenChange?.(true);
     // lazy-load staff
     try {
       setLoadingStaff(true);
@@ -148,6 +150,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setNotesStaffName("");
     setSaveMessage("");
     setSaveError("");
+    onModalOpenChange?.(false);
   };
 
   const saveNotes = async () => {
@@ -183,6 +186,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSaveMessage('Saved');
       setIsEditingNotes(false);
       setNotesDraft("");
+      onModalOpenChange?.(false);
     } catch (e) {
       setSaveError('Failed to add note. Please try again.');
     } finally {
@@ -230,32 +234,44 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
         <p className="text-gray-600 text-sm mb-3 truncate">{job.display_name || job.original_filename || 'Unknown file'}</p>
 
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-3 items-start">
+          {/* Email */}
           <div className="flex items-center text-sm text-gray-500">
             <Mail className="w-4 h-4 mr-1" />
             <span className="truncate">{job.student_email || 'No email'}</span>
           </div>
+          {/* Printer */}
+          <div className="flex items-center text-sm text-gray-500">
+            <Printer className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.printer || 'Not set'}</span>
+          </div>
+          {/* Color */}
+          <div className="flex items-center text-sm text-gray-500">
+            <Palette className="w-4 h-4 mr-1" />
+            <span className="truncate">{job.color || 'Not set'}</span>
+          </div>
+          {/* Notes indicator (fixed cell for grid consistency) */}
           <div className="text-sm text-gray-500">
-            <div className="flex items-center">
-              <Printer className="w-4 h-4 mr-1" />
-              <span className="truncate">{job.printer || 'Not set'}</span>
-            </div>
-            {jobNotes && (
+            {jobNotes ? (
               <button
                 type="button"
                 onClick={() => { setShowMore(true); beginEditNotes(); }}
-                className="flex items-center text-sm text-gray-500 hover:text-gray-700 mt-1 focus-ring btn-transition"
+                className="flex items-center text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition"
                 title="Has notes — click to add or edit"
                 aria-label="Has notes — click to add or edit"
               >
                 <FileText className="w-4 h-4 mr-1" />
                 <span className="hidden md:inline font-medium">Has notes</span>
               </button>
+            ) : (
+              <div
+                className="flex items-center text-sm text-gray-500 invisible select-none"
+                aria-hidden="true"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                <span className="hidden md:inline font-medium">Has notes</span>
+              </div>
             )}
-          </div>
-          <div className="flex items-center text-sm text-gray-500">
-            <Palette className="w-4 h-4 mr-1" />
-            <span className="truncate">{job.color || 'Not set'}</span>
           </div>
         </div>
 
@@ -299,17 +315,28 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               </div>
             )}
             {isEditingNotes && (
-              <div className="mt-3">
-                <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Notes</label>
-                <textarea
-                  id={`notes-${job.id}`}
-                  className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
-                  value={notesDraft}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  aria-describedby={`notes-status-${job.id}`}
-                />
-                <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+              <div className="mt-3 space-y-3">
+                {jobNotes && (
+                  <div>
+                    <span className="text-gray-500 text-sm">Existing notes:</span>
+                    <div className="bg-gray-50 p-2 rounded border mt-1">
+                      <p className="whitespace-pre-wrap text-sm text-gray-900">{jobNotes}</p>
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Add a new note</label>
+                  <textarea
+                    id={`notes-${job.id}`}
+                    className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
+                    value={notesDraft}
+                    onChange={(e) => setNotesDraft(e.target.value)}
+                    aria-describedby={`notes-status-${job.id}`}
+                    placeholder="Type your note to append…"
+                  />
+                  <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
                     <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
                     <select
@@ -330,7 +357,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName || notesDraft.length > MAX_NOTES_LEN} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
                   </div>
                 </div>
-                <div id={`notes-status-${job.id}`} className="mt-2 text-sm" aria-live="polite">
+                <div id={`notes-status-${job.id}`} className="mt-1 text-sm" aria-live="polite">
                   {saveMessage && <span className="text-green-600">{saveMessage}</span>}
                   {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
                   {notesDraft.length > MAX_NOTES_LEN && (

@@ -4,6 +4,7 @@ from .models.staff import Staff
 from .models.job import Job
 from .models.event import Event
 from datetime import datetime
+import random
 import uuid
 from . import db
 
@@ -83,3 +84,46 @@ def seed_demo_jobs_command():
 def init_app(app):
     app.cli.add_command(seed_data_command)
     app.cli.add_command(seed_demo_jobs_command)
+    app.cli.add_command(seed_uploaded_jobs_command)
+
+
+@click.command('seed-uploaded')
+@click.option('--count', default=10, show_default=True, help='Number of UPLOADED jobs to create')
+@with_appcontext
+def seed_uploaded_jobs_command(count: int):
+    """Seeds a number of mock jobs in the UPLOADED status for UI testing."""
+    colors = [
+        'True Red','True Orange','Light Orange','True Yellow','Dark Yellow','Lime Green','Green','Forest Green',
+        'Blue','Electric Blue','Midnight Purple','Light Purple','Clear','True White','Gray','True Black','Brown',
+        'Copper','Bronze','True Silver','True Gold'
+    ]
+    printers = ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus']
+    disciplines = ['Art','Architecture','Landscape Architecture','Interior Design','Engineering','Hobby/Personal']
+
+    created = 0
+    for idx in range(count):
+        jid = uuid.uuid4().hex
+        short = jid[:8]
+        job = Job(
+            id=jid,
+            short_id=short,
+            student_name=f'Mock Student {idx+1}',
+            student_email=f'mock{idx+1}@example.com',
+            discipline=random.choice(disciplines),
+            class_number='N/A',
+            original_filename=f'Mock_{short}.stl',
+            display_name=f'Mock_{short}.stl',
+            file_path=f'storage/Uploaded/Mock_{short}.stl',
+            metadata_path=f'storage/Uploaded/Mock_{short}_metadata.json',
+            printer=random.choice(printers),
+            color=random.choice(colors),
+            material='Filament',
+            status='UPLOADED',
+        )
+        db.session.add(job)
+        db.session.flush()
+        db.session.add(Event(job_id=job.id, event_type='JobCreated', details={}, triggered_by='seed', workstation_id='seed'))
+        created += 1
+
+    db.session.commit()
+    click.echo(f'Seeded {created} UPLOADED jobs.')

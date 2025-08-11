@@ -34,6 +34,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   const [error, setError] = useState('');
   const [approveJobId, setApproveJobId] = useState<string | null>(null);
   const [approveJobMaterial, setApproveJobMaterial] = useState<string | null>(null);
+  const [approveJobPrinter, setApproveJobPrinter] = useState<string | null>(null);
   const [statusJobId, setStatusJobId] = useState<string | null>(null);
   const [statusAction, setStatusAction] = useState<"mark-printing" | "mark-complete" | "mark-picked-up" | null>(null);
 
@@ -79,12 +80,14 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     const job = jobs.find(j => j.id === jobId);
     setApproveJobId(jobId);
     setApproveJobMaterial(job?.material || null);
+    setApproveJobPrinter(job?.printer || null);
     onModalOpenChange?.(true);
   };
 
   const closeApproveModal = () => {
     setApproveJobId(null);
     setApproveJobMaterial(null);
+    setApproveJobPrinter(null);
     onModalOpenChange?.(false);
   };
 
@@ -163,12 +166,14 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           onReject={handleReject}
           onMarkReviewed={handleMarkReviewed}
           onStatusAction={openStatusModal}
+          onModalOpenChange={onModalOpenChange}
         />
       ))}
       {approveJobId && (
         <ApprovalModal
           jobId={approveJobId}
           material={approveJobMaterial || undefined}
+          currentPrinter={approveJobPrinter || undefined}
           onClose={closeApproveModal}
           onApproved={handleApprovedSuccess}
         />

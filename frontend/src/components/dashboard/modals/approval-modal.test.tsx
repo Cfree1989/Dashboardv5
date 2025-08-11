@@ -41,6 +41,7 @@ describe('ApprovalModal', () => {
       <ApprovalModal
         jobId="1"
         material="Filament"
+        currentPrinter="Prusa MK4S"
         onClose={onClose}
         onApproved={onApproved}
       />
@@ -51,12 +52,16 @@ describe('ApprovalModal', () => {
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
 
     // Select staff
-    const select = screen.getByRole('combobox');
+    const select = screen.getByLabelText(/Performing Action As/i);
     fireEvent.change(select, { target: { value: 'Alice' } });
 
     // Enter weight and time
     fireEvent.change(screen.getByLabelText(/Weight \(grams\)/i), { target: { value: '50' } });
     fireEvent.change(screen.getByLabelText(/Time \(hours\)/i), { target: { value: '2.5' } });
+
+    // Optional: change printer
+    const printerSelect = screen.getByLabelText(/Printer \(override if needed\)/i);
+    fireEvent.change(printerSelect, { target: { value: 'Prusa XL' } });
 
     // Submit
     fireEvent.click(screen.getByRole('button', { name: /Approve/i }));
@@ -77,6 +82,7 @@ describe('ApprovalModal', () => {
     expect(body.staff_name).toBe('Alice');
     expect(body.weight_g).toBe(50);
     expect(body.time_hours).toBe(2.5);
+    expect(body.printer).toBe('Prusa XL');
   });
 });
 
