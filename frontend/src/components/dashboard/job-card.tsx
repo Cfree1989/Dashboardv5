@@ -173,7 +173,18 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       if (rawPath) {
         // Use 'print3d' scheme to avoid issues with leading-digit schemes in some browsers
         const uri = `print3d://open/?path=${encodeURIComponent(rawPath)}`;
-        // Use only a hidden iframe to invoke the custom protocol without navigating the SPA
+        // Strategy A: Programmatic anchor click
+        const a = document.createElement('a');
+        a.href = uri;
+        a.style.display = 'none';
+        a.rel = 'noopener';
+        a.target = '_self';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // Strategy B: window.open to _self (some browsers honor this better for custom protocols)
+        try { window.open(uri, '_self'); } catch { /* ignore */ }
+        // Strategy C: Hidden iframe as last resort
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = uri;

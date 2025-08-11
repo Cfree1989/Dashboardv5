@@ -4,6 +4,44 @@
 
 Building a complete 3D Print Management System for academic/makerspace environments.
 
+### Current Protocol Handler Issue Analysis
+
+The protocol handler system for opening 3D model files directly from the dashboard is experiencing cross-browser compatibility and registration issues:
+
+**Implemented Components:**
+- ✅ SlicerOpener.exe with robust path validation, multi-slicer support, GUI feedback, and logging
+- ✅ Frontend multi-strategy protocol invocation (anchor + window.open + iframe fallback)
+- ✅ Backend event logging endpoint `/log-file-open`
+- ✅ Configuration system with security validation and drive mapping support
+
+**Current Issues:**
+1. **500 Error on Logging**: The `/log-file-open` endpoint is returning 500 errors, blocking audit trail creation
+2. **Protocol Mismatch**: Frontend uses `print3d://` but register.bat only registers `3dprint://`
+3. **Cross-Tab Inconsistency**: Protocol invocation works in "Uploaded" tab but fails in other status tabs
+4. **Browser/Extension Interference**: Some browsers or extensions (like Yoroi) may intercept custom protocols
+
+**Working Elements:**
+- SlicerOpener.exe correctly processes URLs when the browser actually invokes the protocol
+- Path validation and slicer detection work reliably 
+- GUI feedback and logging systems function as designed
+- Copy-to-clipboard fallback provides reliable file access
+
+**Root Cause Hypothesis:**
+The issue appears to be at the browser-to-OS handoff layer rather than the protocol handler itself. The frontend generates correct URLs, but browser behavior varies between tabs due to SPA routing context, user gesture capture, or security policy differences.
+
+**Immediate Investigation Steps (for Executor):**
+1. **Debug 500 Error**: Check browser DevTools Network tab for `/log-file-open` response body to identify specific backend error
+2. **Protocol Registration Gap**: Verify which protocol scheme is actually registered by checking Windows registry entries
+3. **Path Format Differences**: Use "Copy File Path" on failing tabs vs working tabs to compare absolute/relative path formats
+4. **Browser Clean Test**: Test in Incognito/Private mode with extensions disabled to eliminate interference
+5. **Manual Protocol Test**: Test `print3d://open/?path=C:\\Dashboardv5\\storage\\ReadyToPrint\\...` directly in address bar
+
+**Quick Wins to Implement First:**
+1. **Add Debug Anchor**: Place real `<a href="print3d://...">Open (Debug)</a>` link next to existing button on failing tabs
+2. **SPA Router Bypass**: Modify click handler to use `e.preventDefault()` + `window.location.assign()` instead of programmatic elements  
+3. **Enhanced Launch Sequence**: Replace parallel strategy with sequential (anchor → setTimeout → window.open) approach
+4. **Browser Extension Detection**: Add `window.chrome?.runtime` logging to identify extension interference
+
 ### Core System Requirements
 1. Flask API-only backend (PostgreSQL)
 2. Next.js frontend (TypeScript)
@@ -30,13 +68,21 @@ Building a complete 3D Print Management System for academic/makerspace environme
 
 ### Active Workstreams (Open)
 
-1) File Tracking & Metadata
+1) **Protocol Handler Cross-Tab Debugging (PRIORITY)** — Fix inconsistent "Open File" behavior
+- [ ] 2.1 Fix `/log-file-open` 500 error (backend debugging)
+- [ ] 2.2 Register print3d:// protocol (update register.bat)
+- [ ] 2.3 Cross-tab protocol invocation improvements (browser compatibility)
+- [ ] 3.1 Add "Open (Debug)" link option (debugging tool)
+- [ ] 3.2 Frontend protocol invocation logging (diagnostics)
+- Target: Reliable protocol launching from all job status tabs with complete audit trail
+
+2) File Tracking & Metadata
 - [x] Metadata durability: keep DB `job.file_path` and `metadata.json.authoritative_filename` in sync across transitions; add tests
 - [x] Audit report endpoint: flags missing authoritative file, duplicate/stale siblings, directory/status mismatches
 - [x] Admin UI: Audit report view + safe actions (delete orphan, delete stale, mark reviewed) with events
 - [x] FS tests: transition path updates on disk + `metadata.json` sync using temp storage
 
-2) Incident — Missing Jobs After Reboot (triage + prevention)
+3) Incident — Missing Jobs After Reboot (triage + prevention)
 - [ ] Verify environment/DB in use
   - `docker compose ps`
   - `docker compose logs backend --no-log-prefix -n 100`
@@ -104,26 +150,71 @@ Building a complete 3D Print Management System for academic/makerspace environme
     - Tests: Simulate click → assert success pill appears then disappears (use fake timers)
     - Acceptance: Copy action shows non-blocking confirmation with no browser alert dialogs
 
-4) Protocol Handler (`3dprint://`)
-- [ ] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
-    - [ ] Step 1 — Repo scaffold and installer (Executor)
+4) Protocol Handler Cross-Tab Debugging & Fixes
+- [x] Build SlicerOpener with logging; integrate open/save awareness events; Approve modal already has rescan UX
+    - [x] Step 1 — Repo scaffold and installer (Complete)
       - [x] Add `SlicerOpener/SlicerOpener.py` with: config-driven paths+slicer mapping, robust path validation, GUI success/error, rotating file logging, multi-slicer chooser
       - [x] Add `SlicerOpener/config.example.ini`
       - [x] Add `SlicerOpener/register.bat` (admin) to write Windows registry keys for `3dprint://`
       - [x] Add `SlicerOpener/README.md` with build (PyInstaller) and workstation setup instructions
       - Success criteria: Files exist; code builds with PyInstaller; README covers install and troubleshooting
-    - [ ] Step 2 — Build + smoke-test on Windows (Executor)
+    - [ ] Step 2 — Critical Bug Fixes (Executor Priority)
+      - [ ] 2.1 Fix `/log-file-open` 500 error
+        - Issue: Backend endpoint may have token/DB issue causing 500 responses
+        - Root cause: Check Event model fields, DB connection, authentication middleware
+        - Test: Send manual POST to endpoint with valid token and verify response
+        - Success: Endpoint returns 200 with event logged correctly
+      - [ ] 2.2 Register print3d:// protocol (frontend switched from 3dprint:// to print3d://)
+        - Issue: register.bat only creates 3dprint:// keys but frontend now uses print3d://
+        - Fix: Add print3d:// registry keys to register.bat or create separate print3d-register.bat
+        - Test: Manual protocol link test in address bar: print3d://open/?path=C:\\path\\to\\file.stl
+        - Success: Protocol handler launches and processes print3d:// URLs
+      - [ ] 2.3 Cross-tab protocol invocation improvements
+        - Issue: Protocol works in "Uploaded" tab but fails in other tabs ("Pending", "ReadyToPrint", etc.)
+        - Investigation needed: 
+          * Test in clean browser profile/incognito with extensions disabled
+          * Compare file paths returned by "Copy File Path" across different tabs
+          * Check if SPA routing or page-specific JavaScript is interfering
+        - Fix approaches:
+          * Add real anchor element rendering option as debug tool
+          * Implement tab-specific launch strategy detection
+          * Add client-side protocol invocation logging for debugging
+        - **Technical Strategy**: Since the issue appears browser-specific rather than handler-specific, focus on frontend robustness:
+          * **SPA Router Bypass**: Use `e.preventDefault()` + `e.stopPropagation()` + `window.location.assign()` to prevent Next.js interception
+          * **Sequential Launch Strategy**: Replace parallel approach with timed sequence (anchor click → setTimeout → window.open fallback)
+          * **User Gesture Preservation**: Ensure clean event propagation and attach only to real button clicks
+          * **Protocol Detection**: Implement iframe-based protocol support testing with timeout fallback
+          * **Enhanced Logging**: Add browser/extension detection and timing diagnostics
+        - Success: Protocol launches consistently from all job status tabs
+    - [ ] Step 3 — Enhanced Debugging Tools (Executor)
+      - [ ] 3.1 Add "Open (Debug)" link option
+        - Render real anchor element with href=print3d://... for comparison testing
+        - **Implementation**: `<a href="print3d://..." style="margin-left: 10px">Open (Debug)</a>` alongside existing button
+        - Toggle-able via admin setting or always-present during development
+        - Success: Debug anchor bypasses SPA interference and provides reference behavior
+      - [ ] 3.2 Frontend protocol invocation logging
+        - Log attempted href, browser errors, and success/failure states
+        - Display invocation attempt details in browser console for troubleshooting
+        - Success: Clear visibility into what happens during protocol launch attempts
+      - [ ] 3.3 Path validation debugging
+        - Show exact file_path value and URI construction in UI
+        - Validate absolute vs relative path handling across job statuses
+        - Success: Clear indication of path format differences that may affect browser behavior
+    - [ ] Step 4 — Build + smoke-test on Windows (Executor)
       - [ ] Build one-file exe via PyInstaller; verify GUI dialogs, selection UI, and logging
       - [ ] Manual test from dashboard: click Open File → opens slicer (fallback works if protocol not installed)
-      - Success criteria: Slicer launches with sample files; logs contain validation entries
-    - [ ] Step 3 — Packaging (Planner/Executor)
-      - [ ] Provide signed zip with `SlicerOpener.exe`, `config.ini` template, and `register.bat`
+      - [ ] Test both 3dprint:// and print3d:// protocol schemes
+      - Success criteria: Slicer launches with sample files; logs contain validation entries; both protocols work
+    - [ ] Step 5 — Packaging (Planner/Executor)
+      - [ ] Provide signed zip with `SlicerOpener.exe`, `config.ini` template, and updated `register.bat`
+      - [ ] Include registration for both protocol schemes
       - [ ] Optional: add `.reg` alternative; icon polish
       - Success criteria: Single zip usable by staff; minimal steps
-    - [ ] Step 4 — Backend/Frontend touchups (Planner/Executor)
+    - [ ] Step 6 — Backend/Frontend touchups (Planner/Executor)
       - [ ] Confirm event type name alignment (`FileOpenedInSlicer`) and error-toasts consistency
       - [ ] Short in-app setup guide link for staff (admin-only)
-      - Success criteria: Clear UX; consistent events
+      - [ ] Remove debug tools once protocol launches consistently
+      - Success criteria: Clear UX; consistent events; clean production code
 
 5) Testing & Deployment
 - [ ] Expand unit/integration/e2e coverage
@@ -356,16 +447,26 @@ Preserved for history; reorganized for clarity (do not delete).
 - Acceptance: Smoother UX and stable ops with documented SLOs
 
 ## Next Steps Priority Queue
-1) Protocol handler (SlicerOpener) packaging and UX (Foundational)
-   - Package helper app with `config.ini`, path validation, GUI feedback, logging; Windows registry installer
-   - Deliver minimal viable handler to make "Open in Slicer" fully functional on staff machines
-2) E2E happy paths and deployment docs
-   - Write end-to-end tests for submit → approve → confirm → print → complete → pay/pickup
-   - Document production deploy (env vars, volumes, reverse proxy, CORS)
-3) Incident — Missing Jobs After Reboot (triage + prevention)
-   - Verify environment/DB, enforce Postgres, add guardrails; author runbook
-4) Admin Overrides (wire existing UI)
-   - Backend endpoints with guardrails and reason capture; frontend confirmations
-5) Analytics Dashboard (`/analytics`) after operations stabilize
+
+### Immediate Priority (Executor Tasks)
+1) **Protocol Handler Debug & Fix** — Critical for staff workflow efficiency
+   - Fix `/log-file-open` 500 error (likely authentication or database issue)
+   - Update register.bat to include print3d:// protocol registration
+   - Add debugging tools to identify browser-specific protocol invocation issues
+   - Test cross-tab consistency and implement workarounds for SPA interference
+   - Target: Reliable "Open File" functionality from all dashboard tabs
+
+### Medium Priority (Post-Protocol Fix)
+2) **Missing Jobs Incident Resolution** — System stability
+   - Verify database connection and prevent SQLite fallback
+   - Add backend diagnostics and runbook documentation
+3) **Admin Overrides Implementation** — Complete existing scaffolded UI
+   - Wire backend endpoints with proper guardrails and audit trails
+4) **E2E Testing & Deployment Documentation** — Production readiness
+   - Write comprehensive end-to-end tests for full workflow
+   - Document production deployment procedures
+
+### Future Priority
+5) **Analytics Dashboard** — Operational insights after core stability achieved
 
 
