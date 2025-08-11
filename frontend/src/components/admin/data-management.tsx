@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Archive, Trash2, AlertTriangle } from "lucide-react";
 
 export function DataManagementPanel() {
-  const [archiveDays, setArchiveDays] = useState(90);
+  const [archiveDays, setArchiveDays] = useState(45);
   const [pruneDays, setPruneDays] = useState(365);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isPruneOpen, setIsPruneOpen] = useState(false);

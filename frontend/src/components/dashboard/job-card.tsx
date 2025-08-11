@@ -241,10 +241,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <span className="truncate">{job.printer || 'Not set'}</span>
             </div>
             {jobNotes && (
-              <div className="flex items-center text-xs text-blue-700 mt-1" title="Has notes" aria-label="Has notes">
-                <FileText className="w-3 h-3 mr-1" />
-                <span className="hidden md:inline">Has notes</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => { setShowMore(true); beginEditNotes(); }}
+                className="flex items-center text-sm text-gray-500 hover:text-gray-700 mt-1 focus-ring btn-transition"
+                title="Has notes — click to add or edit"
+                aria-label="Has notes — click to add or edit"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                <span className="hidden md:inline font-medium">Has notes</span>
+              </button>
             )}
           </div>
           <div className="flex items-center text-sm text-gray-500">
