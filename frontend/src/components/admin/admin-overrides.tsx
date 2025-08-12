@@ -125,7 +125,7 @@ export function AdminOverridesPanel() {
           <div>
             <label htmlFor="action" className="text-sm text-gray-700">Action</label>
             <div className="mt-1">
-              <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+              <select id="action" value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                 <option value="">Select an action</option>
                 {actions.map((a) => (
                   <option key={a.value} value={a.value}>{a.label}</option>
@@ -141,7 +141,7 @@ export function AdminOverridesPanel() {
             <div>
               <label htmlFor="new-status" className="text-sm text-gray-700">New Status</label>
               <div className="mt-1">
-                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                <select id="new-status" value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                   <option value="">Select new status</option>
                   {statusOptions.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -156,7 +156,7 @@ export function AdminOverridesPanel() {
             <textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Explain why this override is necessary..." className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
 
-          <button onClick={onSubmit} disabled={!jobId.trim() || !selectedAction || !reason.trim() || !staffName.trim() || (selectedAction === "change_status" && !newStatus)} className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50">Execute Override</button>
+          <button aria-label="Execute Override" onClick={onSubmit} disabled={!jobId.trim() || !selectedAction || !reason.trim() || !staffName.trim() || (selectedAction === "change_status" && !newStatus)} className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50">Execute Override</button>
         </div>
       </div>
 
@@ -167,6 +167,14 @@ export function AdminOverridesPanel() {
               <SelectedIcon className="w-5 h-5" />
               <h3 className="font-semibold">Confirm Admin Override</h3>
             </div>
+            {errorMsg && (
+              <div
+                className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3"
+                role="alert"
+              >
+                {errorMsg}
+              </div>
+            )}
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3">
               <strong>Warning:</strong> This action will be logged and attributed. Proceed only if necessary.
             </div>
@@ -179,7 +187,7 @@ export function AdminOverridesPanel() {
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setIsConfirmOpen(false)} className="px-3 py-2 text-sm rounded border border-gray-300">Cancel</button>
-              <button onClick={executeOverride} disabled={isProcessing} className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50">{isProcessing ? "Processing…" : "Confirm Override"}</button>
+              <button aria-label="Confirm Override" onClick={executeOverride} disabled={isProcessing} className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50">{isProcessing ? "Processing…" : "Confirm Override"}</button>
             </div>
           </div>
         </div>

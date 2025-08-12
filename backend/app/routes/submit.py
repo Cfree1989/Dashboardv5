@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, abort
-from app import db
+from app import db, limiter
 from app.models.job import Job
 import os, hashlib, json
 from datetime import datetime
@@ -37,6 +37,7 @@ def _normalize_simple_label(value: str) -> str:
 
 
 @bp.route('', methods=['POST'])
+@limiter.limit("3 per hour")
 def submit_job():
     try:
         # Validate file presence

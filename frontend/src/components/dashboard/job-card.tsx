@@ -348,7 +348,25 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-gray-500">Job ID:</span>
-                <p className="text-gray-900">{job.short_id || (job.id?.slice(0,8) + '…')}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-gray-900 font-mono" title={job.id}>
+                    {job.short_id || (job.id?.slice(0,8) + '…')}
+                  </p>
+                  <button
+                    type="button"
+                    className="p-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 focus-ring"
+                    title="Copy full Job ID"
+                    aria-label="Copy Job ID"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(job.id || '');
+                        show('Job ID copied');
+                      } catch {}
+                    }}
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
               <div>
                 <span className="text-gray-500">Created:</span>
