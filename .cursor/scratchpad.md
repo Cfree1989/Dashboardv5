@@ -487,4 +487,119 @@ Preserved for history; reorganized for clarity (do not delete).
 ### Future Priority
 5) **Analytics Dashboard** — Operational insights after core stability achieved
 
+## Planner — Codebase Audit (Folder-by-Folder)
+
+Date: 2025-08-12
+
+— Inventory and verification of the current repository; discrepancies and remediation tasks captured below.
+
+- Backend (`backend/`)
+  - Structure: `app/` (models, routes, services, utils), `migrations/`, `run.py`, `requirements.txt` — present and coherent.
+  - Models: `Job`, `Event`, `Payment`, `Staff` match plan (includes `short_id`). Alembic migration `add_short_id_to_job.py` exists.
+  - Routes:
+    - Implemented: `auth`, `jobs` (approve/reject/notes append/candidate-files/mark-*/payment/delete/log-file-open), `submit` (submit + confirm), `staff` (CRUD-lite), `diag` (`/api/v1/_diag`), `admin` (audit: report/delete orphan/delete stale/mark-reviewed), `analytics` (stub events listing).
+    - Gaps vs plan: No `/api/v1/admin/archive` or `/api/v1/admin/prune` yet (UI is scaffolded only). `payment.py` blueprint exists but has no routes (logic is under `jobs.py`).
+  - Services:
+    - `file_service.STATUS_TO_DIR` missing mapping for `ARCHIVED`. Audit currently scans only active dirs.
+    - `email_service` references `email/submission_status.html` (template not present). Other templates (`approval_email.html`, `submission_confirmation.html`) exist.
+  - Utilities: `token_required` decorator wired; limiter initialized.
+  - Health: Public `/health` route provided in `run.py` (not `/api/v1/health`).
+  - Artifacts: `backend/instance/app.db` present locally; should be ignored. `backend/storage/` exists but unused (actual mount is repo `storage/` → `/app/storage`).
+
+- Frontend (`frontend/`)
+  - App Router pages present (`/login`, `/dashboard`, `/submit`, `/confirm/[token]`, error pages). `ToastProvider` wired in `app/layout.tsx`.
+  - Components: Dashboard modals and tests present; "Open File" uses `print3d://` anchor + copy fallback; notes append flow implemented.
+  - Lib/Types: `src/lib/` and `src/types/` currently empty (acceptable placeholders). Jest config maps `@/` alias, but code does not use it (no action required now).
+
+- SlicerOpener (`SlicerOpener/`)
+  - Source `SlicerOpener.py`, `config.example.ini`, `register.bat`, `README.md` — present and correct.
+  - Compiled artifacts/logs (`dist/`, `build/`, `SlicerOpener.exe`, `sliceropener.log`) are in-repo. Recommend ignoring binaries/logs in VCS and shipping via release package instead.
+
+- Storage (`storage/` at repo root)
+  - Status directories exist with a couple of sample files — OK for local dev; should not be required for tests.
+
+- Docs/Project Information
+  - `Project Information/V0 Code/` retained as reference only; not part of build. `docs/` scaffolding OK.
+
+- Misc
+  - `docker-compose.yml` mounts storage correctly, but includes hard-coded secrets (e.g., `SECRET_KEY`, `MAIL_*`). Should be moved to a `.env` file and excluded from VCS.
+  - `response.json` at repo root appears to be a stray error artifact (contains "Internal Server Error"). Safe to delete.
+  - `scripts/` is empty (placeholder).
+
+### Gaps and Remediation Plan
+
+1) Secrets hygiene (compose)
+   - Issue: Hard-coded secrets (`SECRET_KEY`, `MAIL_USERNAME`, `MAIL_PASSWORD`) committed in `docker-compose.yml`.
+   - Action: Move all secrets to `.env`; reference via `${VAR}` in compose; add `.env` to `.gitignore`.
+   - Success: No secrets in VCS; compose reads from `.env`; app boots using Postgres.
+
+2) Repository artifacts cleanup
+   - Issue: Compiled binaries/logs (`SlicerOpener.exe`, `dist/`, `build/`, `sliceropener.log`), local DB (`backend/instance/app.db`), and stray `response.json` present.
+   - Action: Add `.gitignore` entries; remove stray `response.json`; keep only `config.example.ini` (optionally `README.md`) under version control.
+   - Success: `git status` shows no compiled/log artifacts; repo is clean.
+
+3) Email template parity
+   - Issue: `email_service.send_status_update_email` references `email/submission_status.html` (missing).
+   - Action: Add minimal `backend/app/templates/email/submission_status.html` or adjust function to fallback without template.
+   - Success: Calling `send_status_update_email` does not error; unit test passes.
+
+4) Admin data management endpoints
+   - Issue: `/api/v1/admin/archive` and `/api/v1/admin/prune` not implemented; UI is placeholder.
+   - Action: Implement endpoints with defaults (45/365), guardrails, events; add tests; optionally wire basic frontend calls.
+   - Success: API returns preview + executes archive/prune with events; tests pass; UI can call endpoints.
+
+5) Archived mapping for file ops/audit
+   - Issue: `STATUS_TO_DIR` lacks `ARCHIVED` mapping; admin audit skips `Archived/`.
+   - Action: Add `ARCHIVED: 'Archived'`; update audit to include archived dir when appropriate.
+   - Success: Audit report includes archived items; no regressions in transitions.
+
+6) Payment blueprint hygiene
+   - Issue: `backend/app/routes/payment.py` is an empty blueprint while payment is implemented in `jobs.py`.
+   - Action: Remove unused blueprint or add a comment/narrow purpose to avoid confusion.
+   - Success: No dead blueprints registered; routes remain functional.
+
+7) Optional: Health endpoint alignment
+   - Issue: Health is at `/health` (public), plan mentions `/api/v1/health`.
+   - Action: Add alias route under API prefix returning same payload.
+   - Success: Both routes respond 200 in dev; tests cover at least one.
+
+### High-level Task Breakdown (Audit Remediations)
+
+- A. Secrets hygiene
+  - Steps: Create `.env`; move secrets; update compose; add `.gitignore` entry
+  - Success: `docker compose up -d --build` works; no secrets in git
+
+- B. Clean artifacts
+  - Steps: Add ignore rules; delete `response.json`; ensure `instance/app.db` not tracked
+  - Success: `git status` clean; CI not affected
+
+- C. Email template
+  - Steps: Add minimal `submission_status.html`; unit test send without error
+  - Success: Test passes; function safe to call
+
+- D. Admin archive/prune
+  - Steps: Implement endpoints + tests; wire to UI later
+  - Success: API tests green; manual smoke via curl
+
+- E. Archived mapping
+  - Steps: Add mapping; extend audit; run tests
+  - Success: Audit report lists archived where relevant
+
+- F. Payment blueprint
+  - Steps: Remove/annotate
+  - Success: No route registration for empty blueprint
+
+- G. Health alias (optional)
+  - Steps: Add `/api/v1/health`; test returns 200
+  - Success: Both endpoints OK
+
+### Project Status Board — Audit Fixes
+
+- [ ] A. Move secrets to `.env` and update `docker-compose.yml`
+- [ ] B. Add `.gitignore` for `SlicerOpener/dist`, `SlicerOpener/build`, `SlicerOpener.exe`, `SlicerOpener/*.log`, `backend/instance/*.db`, `storage/**` (except fixture readme), and remove `response.json`
+- [ ] C. Add `backend/app/templates/email/submission_status.html`
+- [ ] E. Add `ARCHIVED: 'Archived'` to `STATUS_TO_DIR` and include in audit
+- [ ] (Future) D. Implement `/api/v1/admin/archive` (default 45) and `/api/v1/admin/prune` (default 365) with tests
+- [ ] (Future) F. Tidy `payment.py` blueprint (remove or document placeholder)
+- [ ] (Future) G. Add `/api/v1/health` alias (optional)
 
