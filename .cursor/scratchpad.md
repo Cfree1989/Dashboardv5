@@ -67,7 +67,7 @@
 - **Backend**: Confirm `/api/v1/health` alias exists alongside `/health`
 
 ### Project Status Board — Pre-E2E
-- [ ] P1. Submit rate limiting — backend + tests
+- [x] P1. Submit rate limiting — backend + tests ✅ **COMPLETED**
 - [ ] P2. Expired/resend confirmation — backend + frontend + tests  
 - [ ] P3. Revert endpoints — backend + tests
 - [ ] P4. Delete requires lock — minimal locking + tests
@@ -102,7 +102,7 @@
 ## 🚀 Next Steps Priority
 
 ### Immediate (Pre-E2E)
-1. **P1**: Submit rate limiting (must-do)
+1. **P1**: Submit rate limiting (must-do) ✅ **COMPLETED**
 2. **P2-P7**: Optional Pre-E2E items
 3. **E2E**: Happy path integration test
 4. **Deployment**: Production docs
@@ -123,6 +123,7 @@
 - **Rate Limiting**: Flask-Limiter already configured, just need endpoint decorators
 - **Testing**: Use temp storage fixtures, mock filesystem operations
 - **Development**: Prefer `pytest -q` on Windows PowerShell (avoid `&&`)
+- **Flask-Limiter**: Returns HTML error pages by default, use `response.get_json()` with None check
 
 ## 🔧 Technical Notes
 
@@ -132,6 +133,15 @@
 - **Email**: Flask-Mail with Office 365 SMTP (best-effort send)
 - **Storage**: Shared network mount with status-based directories
 - **Docker**: Multi-container with PostgreSQL, Redis, worker
+
+## 📊 Current Status / Progress Tracking
+
+### P1. Submit Rate Limiting ✅ COMPLETED
+- **Backend**: Added `@limiter.limit("3 per hour")` decorator to `POST /api/v1/submit`
+- **Tests**: Created comprehensive test suite `tests/test_submit_rate_limit.py`
+- **Success Criteria**: ✅ 4th submission within hour returns 429 status code
+- **Test Results**: All 3 tests passing (3 per hour limit, IP-based tracking, error message validation)
+- **Implementation**: Flask-Limiter already configured, just needed endpoint decorator
 
 ---
 
