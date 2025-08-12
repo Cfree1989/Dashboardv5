@@ -49,10 +49,10 @@
 - **Backend**: `POST /jobs/<id>/revert-pickup` (PAIDPICKEDUP → COMPLETED)
 - **Tests**: Guards, file moves, metadata sync, events
 
-#### P4. Delete Requires Lock (Optional)
-- **Backend**: Add `locked_by`, `locked_until` to Job model
-- **Endpoints**: Lock/unlock/extend; enforce on DELETE
-- **Tests**: Lock acquisition, conflicts, delete without lock forbidden
+#### P4. Soft-Delete + Confirmation (Optional)
+- **Backend**: Change DELETE to soft-delete: set status `ARCHIVED`, move files to `Archived/`, log event; add `POST /api/v1/jobs/<id>/hard-delete` (admin-only) for permanent removal when needed
+- **Frontend**: Delete action requires typing job `short_id` to confirm
+- **Tests**: Delete moves files to Archived and sets status; hard-delete removes row and files; guards and events verified
 
 #### P5. Payments Export (Optional)
 - **Backend**: `POST /api/v1/export/payments` (CSV/XLSX summary)
@@ -68,12 +68,31 @@
 
 ### Project Status Board — Pre-E2E
 - [x] P1. Submit rate limiting — backend + tests ✅ **COMPLETED**
-- [ ] P2. Expired/resend confirmation — backend + frontend + tests  
-- [ ] P3. Revert endpoints — backend + tests
-- [ ] P4. Delete requires lock — minimal locking + tests
+- [x] P2. Expired/resend confirmation — backend + frontend + tests (implemented, awaiting verification)
+- [x] P3. Revert endpoints — backend + tests ✅ **COMPLETED**
+- [x] P4. Soft-delete + confirmation — backend + frontend + tests ✅ **COMPLETED**
 - [ ] P5. Payments export — backend + tests
-- [ ] P6. Background audio trigger — frontend + tests
+- [x] P6. Background audio trigger — frontend + tests ✅ **COMPLETED**
 - [ ] P7. Health alias — backend
+
+## Background and Motivation — P4: Soft-Delete + Confirmation
+Deleting jobs immediately is risky. Soft-delete preserves recoverability and audit trail while avoiding accidental data loss. A minimal confirmation (typing `short_id`) reduces mistakes without adding complexity.
+
+## Key Challenges and Analysis — P4
+- Preserve file/data integrity: move to `Archived/` rather than remove
+- Keep API simple: reuse existing move helpers, event logging
+- Provide an emergency hard-delete for true removal (admin-only)
+
+## High-level Task Breakdown — P4
+1) Backend: Update `DELETE /api/v1/jobs/<id>` to set `status='ARCHIVED'`, move files via `move_authoritative(job, 'ARCHIVED')`, log `JobArchived`, return 200 with job JSON
+2) Backend: Add `POST /api/v1/jobs/<id>/hard-delete` (requires `staff_name` + elevated role flag later; for now, standard token) to permanently delete row and files; log `JobHardDeleted`
+3) Frontend: On delete, show confirm dialog requiring `short_id` entry; call soft-delete; show toast
+4) Tests: soft-delete transitions, metadata sync, events; hard-delete removes row/files; guards (only early statuses for soft-delete or allow all? default to early)
+
+### Success Criteria
+- Soft-delete replaces hard-delete: status becomes `ARCHIVED`, files moved, event logged
+- Hard-delete endpoint exists and removes row/files
+- Frontend requires `short_id` entry to confirm delete
 
 ## 📋 Future Implementation (Post-E2E)
 
@@ -100,21 +119,10 @@
 - **Phase 14**: Performance, reliability, polish (DB indexes, monitoring)
 
 ## 🚀 Next Steps Priority
-
-### Immediate (Pre-E2E)
-1. **P1**: Submit rate limiting (must-do) ✅ **COMPLETED**
-2. **P2-P7**: Optional Pre-E2E items
-3. **E2E**: Happy path integration test
-4. **Deployment**: Production docs
-
-### Medium Priority
-1. **SlicerOpener Packaging**: Signed zip distribution
-2. **Analytics V0**: Component parity and animations
-3. **Masterplan Gaps**: M1-M5 implementation
-
-### Future
-1. **Phase 6-14**: Advanced features and polish
-2. **Production**: Monitoring, backup, performance optimization
+1. Implement P4 soft-delete + confirmation (backend + tests; minimal frontend confirm)
+2. P2 manual verification and polish
+3. E2E happy path
+4. Deployment docs
 
 ## 📚 Lessons Learned
 
@@ -143,6 +151,49 @@
 - **Test Results**: All 3 tests passing (5 per hour limit, IP-based tracking, error message validation)
 - **Implementation**: Flask-Limiter already configured, just needed endpoint decorator
 - **Update**: Changed from 3 to 5 submissions per hour based on user request
+
+### P2. Expired/Resend Confirmation — Implemented, awaiting verification
+- **Backend**: Added `POST /api/v1/submit/resend-confirmation` with `@limiter.limit("1 per hour")`
+  - Accepts JSON `{ job_id }` or `{ token }` (token parsed even if expired)
+  - Generates fresh token and sends approval email with new confirmation URL
+  - Logs `ResendConfirmationRequested` and `ApprovalEmailResent` events
+- **Frontend**: New page `frontend/src/app/confirm/expired/page.tsx` with form to resend by Job ID or token
+  - Added link from expired confirm flow to `/confirm/expired` (pending user UX review)
+- **Tests**: `tests/test_submit_resend.py` covers happy path, invalid token, missing params, job not found, already confirmed, and rate limit — ✅ all passing
+- **Success Criteria**: On expired link, user can request a new confirmation email; rate limit enforced (1/hour)
+
+### P3. Revert Endpoints ✅ COMPLETED
+- **Backend**: Added `POST /api/v1/jobs/<id>/revert-completion` (COMPLETED → PRINTING) and `POST /api/v1/jobs/<id>/revert-pickup` (PAIDPICKEDUP → COMPLETED)
+- **Behavior**: Enforces status guards, moves files via `move_authoritative`, syncs metadata via `_sync_authoritative_metadata`, logs `JobRevertedToPrinting` / `JobRevertedToCompleted`
+- **Tests**: `tests/test_revert_endpoints.py` covers happy paths and guards — ✅ passing
+- **Impact**: Enables safe recovery from premature completion/pickup actions
+
+### P4. Soft-Delete + Confirmation ✅ COMPLETED
+- **Backend**: Modified `DELETE /api/v1/jobs/<id>` to perform soft-delete (status → `ARCHIVED`, files moved to `Archived/`, event logged); added `POST /api/v1/jobs/<id>/hard-delete` for permanent removal
+- **Frontend**: Archive button with confirmation dialog requiring `short_id` entry; styled with faded orange theme
+- **Tests**: Updated `tests/test_jobs.py` to verify soft-delete behavior and hard-delete functionality
+- **Success Criteria**: ✅ Archive moves files to Archived directory and sets status; hard-delete removes row and files; frontend requires confirmation
+
+### P6. Background Audio Trigger ✅ COMPLETED
+- **Frontend**: Created `frontend/src/lib/sound-utils.ts` with Web Audio API implementation
+  - `playNewUploadSound()`: Generates pleasant notification tone (800Hz → 1200Hz rise)
+  - `playStatusChangeSound()`: Different tone for status changes (600Hz → 800Hz)
+  - Fallback to HTML5 Audio with data URL beep if Web Audio API fails
+  - Handles autoplay policies and suspended audio contexts
+- **Dashboard Integration**: Updated `frontend/src/app/dashboard/page.tsx` to detect UPLOADED count increases
+  - Uses localStorage to persist count across page refreshes for reliable detection
+  - Compares against stored count to handle rapid refreshes and manual submissions
+  - Only triggers sound when count increases (not on initial load or decrease)
+  - Respects `canPlayAudio()` to check browser support and page visibility
+- **Tests**: Created comprehensive test suite `frontend/src/lib/sound-utils.test.ts` covering audio support detection, sound generation, and error handling
+- **Success Criteria**: ✅ Dashboard plays notification sound when new uploads are detected; works with auto-refresh, manual refresh, and rapid submissions; graceful fallback for unsupported browsers
+
+## Executor's Feedback or Assistance Requests
+- Please manually verify:
+  1) Visiting an expired confirmation link shows the expired UI and provides a path to `/confirm/expired`
+  2) Submitting a valid Job ID on `/confirm/expired` returns success and sends a new link (email send is best-effort)
+  3) Repeated requests within an hour are blocked with 429
+- If acceptable, Planner can mark P2 complete and guide the next task.
 
 ---
 

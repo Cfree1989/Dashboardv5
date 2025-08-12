@@ -7,7 +7,7 @@ from uuid import uuid4
 from pathlib import Path
 from app.services.event_service import log_event
 from app.services.email_service import send_submission_confirmation_email, send_approval_email
-from app.services.token_service import generate_confirmation_token, verify_confirmation_token
+from app.services.token_service import generate_confirmation_token, verify_confirmation_token, _serializer
 from app.services.file_service import move_authoritative
 from app.routes.jobs import _sync_authoritative_metadata
 
@@ -199,3 +199,55 @@ def confirm_job(token: str):
         pass
     log_event(job.id, 'StudentConfirmed', {'status': job.status})
     return jsonify(job.to_dict()), 200
+
+
+@bp.route('/resend-confirmation', methods=['POST'])
+@limiter.limit("1 per hour")
+def resend_confirmation():
+    """Resend approval confirmation email. Accepts JSON body with either 'token' (preferred) or 'job_id'."""
+    data = request.get_json(silent=True) or {}
+    token = (data.get('token') or '').strip()
+    job_id = (data.get('job_id') or '').strip()
+
+    if not token and not job_id:
+        return jsonify({'message': 'token or job_id is required'}), 400
+
+    # Resolve job_id from token if provided, ignoring expiration
+    if token:
+        try:
+            payload = _serializer().loads(token)  # no max_age -> ignore expiration
+            job_id = payload.get('job_id')
+        except Exception:
+            return jsonify({'message': 'Invalid token'}), 400
+
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({'message': 'Job not found'}), 404
+
+    if job.student_confirmed:
+        return jsonify({'message': 'Job already confirmed'}), 400
+
+    # Generate fresh token and send email
+    new_token = generate_confirmation_token(job.id)
+    frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
+    confirmation_url = f"{frontend_url}/confirm/{new_token}"
+
+    # Attempt send; do not fail the endpoint if email not configured
+    sent = False
+    try:
+        sent = send_approval_email(job, confirmation_url)
+    except Exception:
+        sent = False
+
+    # Log events
+    log_event(job.id, 'ResendConfirmationRequested', {'via': 'token' if token else 'job_id'})
+    log_event(job.id, 'ApprovalEmailResent', {'confirmation_url': confirmation_url, 'sent': bool(sent)})
+
+    # Update last sent timestamp
+    try:
+        job.confirmation_last_sent_at = datetime.utcnow()
+        db.session.commit()
+    except Exception:
+        pass
+
+    return jsonify({'message': 'Confirmation email resent', 'job_id': job.id}), 200

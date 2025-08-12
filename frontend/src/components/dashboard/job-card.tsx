@@ -1,9 +1,10 @@
 "use client";
 import React, { useState } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
+import ConfirmDialog from './modals/confirm-dialog';
 
 interface Job {
   id: string;
@@ -81,6 +82,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const { show } = useToast();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -461,7 +464,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         )}
 
         <div className="flex flex-wrap items-center mt-4 gap-2">
-          <button onClick={() => setShowMore(!showMore)} className="text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition">
+          <button 
+            onClick={() => setShowMore(!showMore)} 
+            className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition whitespace-nowrap"
+          >
             {showMore ? "Show Less" : "Show More"}
           </button>
 
@@ -519,6 +525,24 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     <>
                       <XCircle className="w-4 h-4 mr-1" />
                       <span className="hidden sm:inline">Reject</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isDeleting}
+                  className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
+                  title="Archive job"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-600 border-t-transparent mr-1"></div>
+                      <span className="hidden sm:inline">Archiving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">Archive</span>
                     </>
                   )}
                 </button>
@@ -641,6 +665,37 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             </div>
           </div>
         </div>
+      )}
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Confirm Archive"
+          description="This will archive the job. You can later permanently delete it from the Admin area."
+          confirmLabel="Archive Job"
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={async () => {
+            try {
+              setIsDeleting(true);
+              const token = localStorage.getItem('token');
+              const res = await fetch(`/api/v1/jobs/${job.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+              if (!res.ok) {
+                const t = await res.text();
+                throw new Error(t || `Archive failed (${res.status})`);
+              }
+              show('Job archived');
+              onReject?.(job.id);
+            } catch (e) {
+              show('Failed to archive job');
+            } finally {
+              setIsDeleting(false);
+              setShowDeleteConfirm(false);
+            }
+          }}
+          requireTextMatch={{
+            label: 'Type the Job short ID to confirm',
+            expected: job.short_id || (job.id?.slice(0, 6) || ''),
+            placeholder: job.short_id || job.id?.slice(0, 6)
+          }}
+        />
       )}
     </div>
   );

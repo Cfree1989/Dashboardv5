@@ -1,10 +1,11 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import JobList from '../../components/dashboard/job-list';
 import { LastUpdated } from '../../components/dashboard/last-updated';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
+import { playNewUploadSound, canPlayAudio } from '../../lib/sound-utils';
 
 
 const statusOptions = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
@@ -16,6 +17,16 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [pauseRefresh, setPauseRefresh] = useState(false);
+  const previousUploadedCount = useRef<number>(0);
+  
+  // Initialize previous count from localStorage if available
+  useEffect(() => {
+    const stored = localStorage.getItem('lastUploadedCount');
+    if (stored) {
+      previousUploadedCount.current = parseInt(stored, 10) || 0;
+    }
+  }, []);
+
   useEffect(() => {
     const now = new Date();
     const ts = now.toLocaleTimeString();
@@ -46,6 +57,23 @@ export default function DashboardPage() {
         counts[s] = Array.isArray(data) ? data.length : (data.jobs || []).length;
       })
     );
+    
+    // Check for new uploads and play sound
+    const currentUploadedCount = counts['UPLOADED'] || 0;
+    const storedCount = parseInt(localStorage.getItem('lastUploadedCount') || '0', 10);
+    
+    // Use the higher of stored count or previous count to handle rapid refreshes
+    const effectivePreviousCount = Math.max(previousUploadedCount.current, storedCount);
+    
+    if (currentUploadedCount > effectivePreviousCount) {
+      // New uploads detected - play notification sound
+      if (canPlayAudio()) {
+        playNewUploadSound();
+      }
+    }
+    previousUploadedCount.current = currentUploadedCount;
+    localStorage.setItem('lastUploadedCount', currentUploadedCount.toString());
+    
     setStatusCounts(counts);
   };
   
@@ -100,7 +128,8 @@ export default function DashboardPage() {
         onStatusChange={updateStatus} 
         stats={statusCounts} 
       />
-      <JobList 
+      
+      <JobList
         filters={{ status }} 
         onJobsMutated={fetchCounts} 
         refreshToken={refreshTick}

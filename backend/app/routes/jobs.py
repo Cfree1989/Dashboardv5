@@ -260,11 +260,49 @@ def delete_job(job_id):
     job = Job.query.get(job_id)
     if not job:
         abort(404, description='Job not found')
+    # Allow soft-delete primarily for early statuses; keep guard as-is for now
     if job.status not in ('UPLOADED', 'PENDING'):
         return jsonify({'message': 'Job cannot be deleted in its current status'}), 403
+    before = job.status
+    job.status = 'ARCHIVED'
+    # Move file/metadata to Archived and sync metadata
+    move_authoritative(job, 'ARCHIVED')
+    db.session.add(job)
+    db.session.commit()
+    # Log event
+    evt = Event(job_id=job.id, event_type='JobArchived', details={'from': before, 'to': 'ARCHIVED'}, triggered_by=getattr(g, 'workstation_id', 'system'), workstation_id=getattr(g, 'workstation_id', 'system'))
+    db.session.add(evt)
+    db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'JobArchived')
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/hard-delete', methods=['POST'])
+@token_required
+def hard_delete_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip()
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    # Best-effort remove files
+    try:
+        p = Path(job.file_path)
+        if p.exists():
+            p.unlink(missing_ok=True)
+        mp = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
+        if mp and mp.exists():
+            mp.unlink(missing_ok=True)
+    except Exception:
+        pass
     db.session.delete(job)
     db.session.commit()
-    return '', 204 
+    evt = Event(job_id=job_id, event_type='JobHardDeleted', details={}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'system'))
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'deleted'}), 200
 
 
 @bp.route('/<job_id>/approve', methods=['POST'])
@@ -857,4 +895,54 @@ def reject_job(job_id):
     except Exception:
         pass
 
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/revert-completion', methods=['POST'])
+@token_required
+def revert_completion(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'COMPLETED':
+        return jsonify({'message': 'Job must be in COMPLETED to revert to PRINTING'}), 400
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    before = job.status
+    job.status = 'PRINTING'
+    job.last_updated_by = staff_name
+    move_authoritative(job, 'PRINTING')
+    db.session.add(job)
+    db.session.commit()
+    evt = Event(job_id=job.id, event_type='JobRevertedToPrinting', details={'from': before, 'to': 'PRINTING'}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToPrinting')
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/revert-pickup', methods=['POST'])
+@token_required
+def revert_pickup(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.status != 'PAIDPICKEDUP':
+        return jsonify({'message': 'Job must be in PAIDPICKEDUP to revert to COMPLETED'}), 400
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    before = job.status
+    job.status = 'COMPLETED'
+    job.last_updated_by = staff_name
+    move_authoritative(job, 'COMPLETED')
+    db.session.add(job)
+    db.session.commit()
+    evt = Event(job_id=job.id, event_type='JobRevertedToCompleted', details={'from': before, 'to': 'COMPLETED'}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToCompleted')
     return jsonify(job.to_dict()), 200

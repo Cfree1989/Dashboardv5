@@ -43,12 +43,18 @@ def test_job_crud(client, token, app):
     assert resp.status_code == 200
     assert any(item['id'] == job_id for item in resp.get_json())
 
-    # Delete job in UPLOADED status
-    resp = client.delete(f'/api/v1/jobs/{job_id}', headers={'Authorization': f'Bearer {token}'})
-    assert resp.status_code == 204
+    # Delete job in UPLOADED status -> soft-delete to ARCHIVED
+    resp = client.delete(f'/api/v1/jobs/{job_id}', headers={'Authorization': f'Bearer {token}'} )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['status'] == 'ARCHIVED'
+
+    # Hard delete the archived job
+    resp = client.post(f'/api/v1/jobs/{job_id}/hard-delete', json={'staff_name': 'Admin User'}, headers={'Authorization': f'Bearer {token}'} )
+    assert resp.status_code == 200
 
     # Delete again -> 404
-    resp = client.delete(f'/api/v1/jobs/{job_id}', headers={'Authorization': f'Bearer {token}'})
+    resp = client.delete(f'/api/v1/jobs/{job_id}', headers={'Authorization': f'Bearer {token}'} )
     assert resp.status_code == 404
 
     # Create job in non-deletable status
