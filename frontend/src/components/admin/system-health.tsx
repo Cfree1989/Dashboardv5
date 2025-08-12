@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, Trash2 } from "lucide-react";
+import { useToast } from "../ui/toast";
 
 type ServerAuditReport = {
   report_generated_at: string;
@@ -15,37 +16,34 @@ export function SystemHealthPanel() {
   const [isStarting, setIsStarting] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState<string>("");
+  const { show } = useToast();
 
-  useEffect(() => {
+  async function fetchReport() {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    async function fetchReport() {
-      try {
-        setLoadingReport(true);
-        setError("");
-        const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error("Failed to load audit report");
-        const data: ServerAuditReport = await res.json();
-        setLastReport(data);
-      } catch (e) {
-        setError("Failed to load audit report");
-      } finally {
-        setLoadingReport(false);
-      }
+    try {
+      setLoadingReport(true);
+      setError("");
+      const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Failed to load audit report");
+      const data: ServerAuditReport = await res.json();
+      setLastReport(data);
+      setCurrentAudit(null);
+    } catch (e) {
+      setError("Failed to load audit report");
+    } finally {
+      setLoadingReport(false);
     }
-    fetchReport();
-  }, []);
+  }
+
+  useEffect(() => { fetchReport(); }, []);
 
   const startAudit = async () => {
     setIsStarting(true);
+    setError("");
+    setCurrentAudit({ startedAt: new Date().toISOString() });
     try {
-      // For now, synchronous scan via report fetch
-      setCurrentAudit({ startedAt: new Date().toISOString() });
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const data: ServerAuditReport = await res.json();
-        setLastReport(data);
-      }
+      await fetchReport();
+      show("Audit completed");
     } finally {
       setIsStarting(false);
     }
@@ -90,8 +88,61 @@ export function SystemHealthPanel() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", issues }),
       });
+      show("Marked reviewed");
+      // Refresh the report so the UI can reflect any state (if desired in future)
+      await fetchReport();
     } catch {
       setError("Failed to mark as reviewed");
+    }
+  };
+
+  const repairMetadata = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/v1/admin/audit/repair-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
+      });
+      if (!res.ok) throw new Error();
+      show("Metadata repaired");
+      await fetchReport();
+    } catch {
+      setError("Failed to repair metadata");
+    }
+  };
+
+  const repairLocation = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/v1/admin/audit/repair-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
+      });
+      if (!res.ok) throw new Error();
+      show("Location repaired");
+      await fetchReport();
+    } catch {
+      setError("Failed to repair location");
+    }
+  };
+
+  const relinkFile = async (jobId: string) => {
+    const path = prompt('Enter full path to the authoritative file (under storage):');
+    if (!path) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/v1/admin/audit/relink-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", file_path: path })
+      });
+      if (!res.ok) throw new Error();
+      show("File relinked");
+      await fetchReport();
+    } catch {
+      setError("Failed to relink file");
     }
   };
 
@@ -112,6 +163,7 @@ export function SystemHealthPanel() {
               onClick={startAudit}
               disabled={isStarting || !!currentAudit}
               className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50"
+              title="Run a fresh integrity scan comparing storage to the database. Safe to click anytime."
             >
               {isStarting ? "Starting…" : "Start Audit"}
             </button>
@@ -158,6 +210,9 @@ export function SystemHealthPanel() {
             </div>
 
             <div className="text-sm text-gray-500 mb-4">Generated: {new Date(lastReport.report_generated_at).toLocaleString()}</div>
+            {typeof (lastReport as any).files_scanned === 'number' && (
+              <div className="text-sm text-gray-500 mb-2">Files scanned: {(lastReport as any).files_scanned}</div>
+            )}
 
             {(lastReport.orphaned_files?.length || 0) > 0 ? (
               <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
@@ -168,6 +223,7 @@ export function SystemHealthPanel() {
                 <button
                   onClick={cleanUpOrphans}
                   className="px-3 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50 flex items-center"
+                  title="Delete files on disk that are not referenced by any job. Safe cleanup."
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
                   Clean Up
@@ -188,7 +244,7 @@ export function SystemHealthPanel() {
                   {lastReport.stale_files.map((p) => (
                     <li key={p} className="flex items-center justify-between text-xs bg-yellow-50 border border-yellow-100 rounded px-2 py-1">
                       <span className="truncate mr-2" title={p}>{p}</span>
-                      <button onClick={() => deleteStale(p)} className="text-yellow-800 hover:underline">Delete</button>
+                      <button onClick={() => deleteStale(p)} className="text-yellow-800 hover:underline" title="Remove duplicate/stale copy. The job points to a different authoritative file.">Delete</button>
                     </li>
                   ))}
                 </ul>
@@ -204,7 +260,36 @@ export function SystemHealthPanel() {
                     <li key={`${b.job_id}-${idx}`} className="text-xs bg-red-50 border border-red-100 rounded px-2 py-2">
                       <div className="flex items-center justify-between">
                         <div className="font-medium text-red-800">Job {b.job_id}</div>
-                        <button onClick={() => markReviewed(b.job_id, b.issues || [])} className="text-red-800 hover:underline">Mark Reviewed</button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => repairLocation(b.job_id)}
+                            className="px-2 py-1 text-xs rounded-lg border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 focus-ring btn-transition"
+                            title="Move the job’s file and metadata into the folder that matches its current status. Use when you see dir_status_mismatch."
+                          >
+                            Repair Location
+                          </button>
+                          <button
+                            onClick={() => repairMetadata(b.job_id)}
+                            className="px-2 py-1 text-xs rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus-ring btn-transition"
+                            title="Create or fix metadata.json next to the authoritative file and sync status/file_path/display fields. Use for metadata_missing or metadata_mismatch."
+                          >
+                            Repair Metadata
+                          </button>
+                          <button
+                            onClick={() => relinkFile(b.job_id)}
+                            className="px-2 py-1 text-xs rounded-lg border border-gray-200 text-gray-800 bg-gray-50 hover:bg-gray-100 focus-ring btn-transition"
+                            title="Point this job to a specific file under storage (then it will be moved to the correct status folder). Use when the authoritative file was moved or renamed."
+                          >
+                            Relink File
+                          </button>
+                          <button
+                            onClick={() => markReviewed(b.job_id, b.issues || [])}
+                            className="px-2 py-1 text-xs rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 focus-ring btn-transition"
+                            title="Log that you acknowledged this issue; does not remove it from the list."
+                          >
+                            Mark Reviewed
+                          </button>
+                        </div>
                       </div>
                       <div className="text-red-700 mt-1">Issues: {b.issues?.join(', ') || 'unknown'}</div>
                       {b.file_path && <div className="text-gray-500">File: {b.file_path}</div>}

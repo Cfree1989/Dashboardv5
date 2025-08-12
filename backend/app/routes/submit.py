@@ -114,6 +114,7 @@ def submit_job():
             out_f.write(file_bytes)
 
         # Create metadata JSON
+        from pathlib import Path as _P
         metadata = {
             'student_name': student_name,
             'student_email': request.form.get('student_email'),
@@ -123,6 +124,9 @@ def submit_job():
             'color': raw_color,
             'material': raw_method,
             'status': 'UPLOADED',
+            'display_name': candidate_name,
+            'authoritative_filename': candidate_name,
+            'file_path': str(_P(candidate_path).resolve()),
             'created_at': datetime.utcnow().isoformat()
         }
         metadata_base = base_name if counter == 1 else f"{base_name}_{counter-1}"
@@ -140,8 +144,8 @@ def submit_job():
             class_number=request.form.get('class_number'),
             original_filename=file.filename,
             display_name=candidate_name,
-            file_path=candidate_path,
-            metadata_path=metadata_path,
+            file_path=str(Path(candidate_path).resolve()),
+            metadata_path=str(Path(metadata_path).resolve()),
             file_hash=file_hash,
             printer=request.form.get('printer'),
             color=raw_color,

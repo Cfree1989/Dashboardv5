@@ -59,6 +59,21 @@ def move_authoritative(job, to_status: str) -> None:
                 except Exception:
                     pass
             job.metadata_path = str(dest_meta.resolve())
+            # Keep metadata.json in sync: status, file_path, authoritative/display name
+            try:
+                import json
+                data = {}
+                if dest_meta.exists():
+                    with open(dest_meta, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                data['status'] = to_status
+                data['file_path'] = str(dest_file.resolve())
+                data['authoritative_filename'] = dest_file.name
+                data['display_name'] = dest_file.name
+                with open(dest_meta, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
     except Exception:
         # Non-fatal
         pass
