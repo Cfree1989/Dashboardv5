@@ -7,6 +7,7 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.services.token_service import generate_confirmation_token
 from app.services.email_service import send_approval_email
+from app.services.email_service import send_rejection_email, send_completion_email
 from app.services.event_service import log_event
 from app.models.staff import Staff
 from datetime import datetime
@@ -656,6 +657,14 @@ def mark_complete(job_id):
     evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
+    # Attempt completion email (best-effort)
+    try:
+        send_completion_email(job)
+        email_evt = Event(job_id=job.id, event_type='CompletionEmailSent', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
+        db.session.add(email_evt)
+        db.session.commit()
+    except Exception:
+        pass
     _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedComplete')
     return jsonify(job.to_dict()), 200
 
@@ -838,5 +847,13 @@ def reject_job(job_id):
     )
     db.session.add(evt)
     db.session.commit()
+    # Attempt rejection email (best-effort)
+    try:
+        send_rejection_email(job)
+        email_evt = Event(job_id=job.id, event_type='RejectionEmailSent', details={'reasons': reasons}, triggered_by=staff_name, workstation_id=g.workstation_id)
+        db.session.add(email_evt)
+        db.session.commit()
+    except Exception:
+        pass
 
     return jsonify(job.to_dict()), 200

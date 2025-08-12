@@ -167,3 +167,66 @@ def send_status_update_email(job, new_status: str) -> bool:
     return send_email(subject, [job.student_email], html_body, text_body)
 
 
+
+def send_rejection_email(job) -> bool:
+    """Send a rejection email to the student with reasons provided."""
+    subject = "3D Print Job Update: Not Approved"
+    reasons = getattr(job, 'reject_reasons', []) or []
+    # Text fallback
+    text_body_lines = [
+        f"Hello {job.student_name},",
+        "",
+        "We reviewed your 3D print submission but cannot proceed at this time.",
+    ]
+    if reasons:
+        text_body_lines.append("Reasons:")
+        for r in reasons:
+            text_body_lines.append(f"- {r}")
+        text_body_lines.append("")
+    text_body_lines.append("You are welcome to revise and resubmit when ready.")
+    text_body = "\n".join(text_body_lines)
+
+    try:
+        html_body = render_template(
+            "email/rejection_email.html",
+            job=job,
+            reasons=reasons,
+        )
+    except Exception:
+        list_html = "".join(f"<li>{r}</li>" for r in reasons) if reasons else ""
+        html_body = (
+            f"<h2>Submission Not Approved</h2>"
+            f"<p>Hello {job.student_name},</p>"
+            f"<p>We reviewed your submission <strong>{job.display_name}</strong> but cannot proceed at this time.</p>"
+            f"{('<p><strong>Reasons:</strong></p><ul>' + list_html + '</ul>') if reasons else ''}"
+            f"<p>You are welcome to revise and resubmit when ready.</p>"
+        )
+    return send_email(subject, [job.student_email], html_body, text_body)
+
+
+def send_completion_email(job) -> bool:
+    """Send a completion email to the student when the job is finished (ready for pickup)."""
+    subject = "Your 3D Print is Complete – Ready for Pickup"
+    text_body = (
+        "Your print is ready for pick up in the Fabrication Lab in room 145 Atkinson.\n\n"
+        "TigerCASH is the only form of payment in the lab.\n\n"
+        "Lab Hours:\n\n"
+        "M-F 8:30 – 4:30\n\n"
+        "Thank you."
+    )
+
+    try:
+        html_body = render_template(
+            "email/completion_email.html",
+            job=job,
+        )
+    except Exception:
+        html_body = (
+            f"<h2>Your 3D Print is Complete</h2>"
+            f"<p>Your print is ready for pick up in the Fabrication Lab in room 145 Atkinson.</p>"
+            f"<p>TigerCASH is the only form of payment in the lab.</p>"
+            f"<p><strong>Lab Hours:</strong></p>"
+            f"<p>M-F 8:30 – 4:30</p>"
+            f"<p>Thank you.</p>"
+        )
+    return send_email(subject, [job.student_email], html_body, text_body)

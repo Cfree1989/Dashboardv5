@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Submission Not Approved</title>
+  </head>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #111827;">
+    <h2 style="color: #111827;">Submission Not Approved</h2>
+    <p>Hello {{ job.student_name }},</p>
+    <p>We reviewed your submission <strong>{{ job.display_name }}</strong> but cannot proceed at this time.</p>
+    {% if reasons and reasons|length > 0 %}
+      <p><strong>Reasons:</strong></p>
+      <ul>
+        {% for reason in reasons %}
+          <li>{{ reason }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <p>You are welcome to revise and resubmit when ready.</p>
+  </body>
+  </html>
+
+

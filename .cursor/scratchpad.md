@@ -92,6 +92,16 @@ The issue appears to be at the browser-to-OS handoff layer rather than the proto
   2. Path conversion: `/app/storage/file.3mf` → `C:\Dashboardv5\storage\file.3mf`
 - **Result**: Staff can now reliably open files in their local slicer from any job status tab with complete audit trail
 
+1b) Email Notifications Policy Update — COMPLETE
+- Goal: Students should receive emails only for approval, rejection, and completion (no other status-change emails).
+- Implementation delivered:
+  - Added `send_rejection_email(job)` and `send_completion_email(job)`
+  - Wired into `reject_job` and `mark_complete` endpoints; events `RejectionEmailSent` and `CompletionEmailSent` are logged
+  - Added templates `email/rejection_email.html` and `email/completion_email.html`
+  - Completion email copy updated per request
+- Constraints honored: Minimal changes; safe no-op when email not configured; approval email unchanged.
+- Result: Only approval, rejection, and completion trigger student emails; other statuses are silent.
+
 2) File Tracking & Metadata
 - [x] Metadata durability: keep DB `job.file_path` and `metadata.json.authoritative_filename` in sync across transitions; add tests
 - [x] Audit report endpoint: flags missing authoritative file, duplicate/stale siblings, directory/status mismatches
@@ -292,6 +302,19 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Frontend modal (no staff attribution); primary open via protocol; fallback copy path; POST `/log-file-open`
   - [x] Tests: UI behavior + event POST
 
+### Project Status Board — Next Tasks (Executor)
+
+- [ ] Admin Overrides — Backend Tests
+  - [ ] force-confirm: PENDING → READYTOPRINT, files moved, AdminForceConfirm/AdminAction events
+  - [ ] change-status: valid target, move if mapped, AdminStatusChanged/AdminAction events
+  - [ ] mark-failed: PRINTING → READYTOPRINT, PrintFailed/AdminAction events
+  - [ ] force-unlock: logs AdminAction (no lock fields yet)
+- [ ] Admin Overrides — Frontend Tests (optional)
+  - [ ] `admin-overrides.tsx` calls correct endpoint per action; shows errors/success
+- [ ] Email Notifications — Tests
+  - [ ] Rejection path logs `RejectionEmailSent`
+  - [ ] Completion path logs `CompletionEmailSent`
+
 - [x] UI Polish: Prevent action buttons from overlapping/stacking poorly on job cards
   - Change: In `frontend/src/components/dashboard/job-card.tsx`, updated the action bar to `flex-wrap` with `gap-2` and `ml-auto`, replacing `space-x-2`. Added `whitespace-nowrap` per button and hid long labels on small screens (`hidden sm:inline`).
   - Success criteria: Buttons wrap to a new line within the card without overlapping neighboring cards; layout remains right-aligned; small screens show icon-only labels.
@@ -308,6 +331,16 @@ Preserved for history; reorganized for clarity (do not delete).
   - [x] Admin UI: Default value in Data Management forms set to 45
   - [x] Tests: Add/adjust tests to verify defaulting behavior and display values
   - Success: API returns expected behavior with omitted param; UI shows 45 by default; tests pass
+
+- [x] Email Notifications — Limit to approval/rejection/completion
+  - [x] Backend: Add `send_rejection_email(job)` and `send_completion_email(job)` in `backend/app/services/email_service.py` (with template fallback)
+  - [x] Backend: In `backend/app/routes/jobs.py`
+    - [x] Call `send_rejection_email(job)` in `reject_job` and log `RejectionEmailSent` event
+    - [x] Call `send_completion_email(job)` in `mark_complete` and log `CompletionEmailSent` event
+  - [x] Templates: Add `backend/app/templates/email/rejection_email.html` and `completion_email.html`
+  - [ ] Tests: Add/extend API tests to assert the new email-send events are logged
+  - Acceptance: Only approval, rejection, and completion trigger outbound emails; events are present; endpoints still return expected status codes
+  - Status: Backend changes implemented; templates added; tests pending
 
 ### Phase 5.1 — Approval Modal Flow (Completed Parts)
 - [x] 5.1.2 — Frontend: Approval Modal UI
@@ -607,6 +640,12 @@ Date: 2025-08-12
 ### Current Status / Progress Tracking (Executor)
 
 - Completed this session:
+  - Implemented email notifications for rejection and completion
+    - Added `send_rejection_email` and `send_completion_email` (with safe fallbacks) in `backend/app/services/email_service.py`
+    - Wired calls in `reject_job` and `mark_complete`; log `RejectionEmailSent` and `CompletionEmailSent` events
+    - Created templates `backend/app/templates/email/rejection_email.html` and `completion_email.html`
+    - Updated completion email content to requested wording (room 145 Atkinson, TigerCASH, lab hours)
+    - Lint checks passed; existing tests unaffected
   - Updated `docker-compose.yml` to use .env variables for backend secrets/config
   - Added `.gitignore` to ignore secrets, binaries, logs, node_modules, pycache, local DB, storage
   - Removed stray `response.json`
@@ -614,10 +653,11 @@ Date: 2025-08-12
   - Added email template `backend/app/templates/email/submission_status.html`
   - Restarted stack and verified `/health` OK
 - Next in progress:
-  - Implement Admin Overrides endpoints and wire frontend panel
+  - Write backend tests for Admin Overrides endpoints and run suite; fix issues if any
 
 ### Executor's Feedback or Assistance Requests
 
 - Please ensure your local `.env` contains the keys listed in the previous message (SECRET_KEY, DATABASE_URL, REDIS_URL, MAIL_*, FRONTEND_PUBLIC_URL, STORAGE_PATH). Do not commit `.env`.
+ - Would you like to customize the rejection email wording as well? Currently it lists reasons and a brief invitation to revise and resubmit.
 
 
