@@ -109,16 +109,16 @@ The issue appears to be at the browser-to-OS handoff layer rather than the proto
 - [x] FS tests: transition path updates on disk + `metadata.json` sync using temp storage
 
 3) Incident — Missing Jobs After Reboot (triage + prevention)
-- [ ] Verify environment/DB in use
+- [x] Verify environment/DB in use
   - `docker compose ps`
   - `docker compose logs backend --no-log-prefix -n 100`
-  - Health: `http://localhost:5000/health`
-  - DB truth: `docker compose exec db psql -U fablab_user -d 3d_print_system -c "select status, count(*) from job group by status;"`
-- [ ] Enforce Postgres usage and restore visibility
-- [ ] Backend guardrails (no SQLite fallback) + test
-- [ ] Backend diagnostics endpoint `_diag`
-- [ ] Frontend diagnostics panel (admin-only)
-- [ ] Runbook documentation
+  - Health: `http://localhost:5000/api/v1/health`
+  - DB truth: `docker compose exec db psql -U fablab_user -d 3d_print_system -c 'select status, count(*) from job group by status;'`
+- [x] Enforce Postgres usage and restore visibility
+- [x] Backend guardrails (no SQLite fallback) + test
+- [x] Backend diagnostics endpoint `_diag`
+- [x] Frontend diagnostics panel (admin-only)
+- [x] Runbook documentation (see `docs/runbook.md`)
 
 3) Payment & Pickup Workflow
 - [x] Backend: `POST /api/v1/jobs/:id/payment` (grams, txn_no, picked_up_by) → transition to `PAIDPICKEDUP`; persists Payment; logs event; moves files; tests pass
@@ -304,16 +304,23 @@ Preserved for history; reorganized for clarity (do not delete).
 
 ### Project Status Board — Next Tasks (Executor)
 
-- [ ] Admin Overrides — Backend Tests
-  - [ ] force-confirm: PENDING → READYTOPRINT, files moved, AdminForceConfirm/AdminAction events
-  - [ ] change-status: valid target, move if mapped, AdminStatusChanged/AdminAction events
-  - [ ] mark-failed: PRINTING → READYTOPRINT, PrintFailed/AdminAction events
-  - [ ] force-unlock: logs AdminAction (no lock fields yet)
+- [x] Admin Overrides — Backend Tests
+  - [x] force-confirm: PENDING → READYTOPRINT, files moved, AdminForceConfirm/AdminAction events
+  - [x] change-status: valid target, move if mapped, AdminStatusChanged/AdminAction events
+  - [x] mark-failed: PRINTING → READYTOPRINT, PrintFailed/AdminAction events
+  - [x] force-unlock: logs AdminAction (no lock fields yet)
 - [ ] Admin Overrides — Frontend Tests (optional)
   - [ ] `admin-overrides.tsx` calls correct endpoint per action; shows errors/success
-- [ ] Email Notifications — Tests
-  - [ ] Rejection path logs `RejectionEmailSent`
-  - [ ] Completion path logs `CompletionEmailSent`
+- [x] Analytics UI scaffolding
+  - [x] Added typed data layer (`frontend/src/types/analytics.ts`, `frontend/src/lib/analytics-api.ts`)
+  - [x] Implemented `/analytics` page with components: `OverviewCards`, `TrendCharts`, `ResourceMetrics`, `FinancialSummary`, and `AnalyticsFilters`
+  - [x] Frontend test for `/analytics` render passing
+  - [ ] Style charts with Recharts to match V0 screenshot (line/bar/pie)
+  - [ ] Add filters for printer/discipline and live refresh
+
+- [x] Email Notifications — Tests
+  - [x] Rejection path logs `RejectionEmailSent`
+  - [x] Completion path logs `CompletionEmailSent`
 
 - [x] UI Polish: Prevent action buttons from overlapping/stacking poorly on job cards
   - Change: In `frontend/src/components/dashboard/job-card.tsx`, updated the action bar to `flex-wrap` with `gap-2` and `ml-auto`, replacing `space-x-2`. Added `whitespace-nowrap` per button and hid long labels on small screens (`hidden sm:inline`).
@@ -659,7 +666,7 @@ Date: 2025-08-12
   - Added email template `backend/app/templates/email/submission_status.html`
   - Restarted stack and verified `/health` OK
 - Next in progress:
-  - Write backend tests for Admin Overrides endpoints and run suite; fix issues if any
+  - All backend tests green (45 passed). Proceed to next priority.
 
 ### Executor's Feedback or Assistance Requests
 

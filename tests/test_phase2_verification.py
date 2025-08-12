@@ -40,3 +40,16 @@ def test_analytics_events_list(client, token):
         evt['event_type'] == 'JobCreated' and evt['job_id'] == job_id
         for evt in events
     )
+
+
+def test_no_sqlite_fallback_guard_in_non_test_env(monkeypatch):
+    # Simulate production-like env: no TESTING flag and no DATABASE_URL env var
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    import app as app_pkg
+    # Create app should raise since DATABASE_URL is missing and not TESTING
+    try:
+        app_pkg.create_app()
+        raised = False
+    except RuntimeError as e:
+        raised = 'DATABASE_URL is not set' in str(e)
+    assert raised

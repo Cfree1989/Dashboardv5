@@ -57,7 +57,7 @@ def create_app():
         app.logger.info('Database engine: %s, uri=%s', engine_name, _sanitize(raw_uri))
     
     # Register blueprints
-    from .routes import auth, jobs, submit, payment, analytics, staff, diag, admin
+    from .routes import auth, jobs, submit, payment, analytics, staff, diag, admin, health
     app.register_blueprint(auth.bp)
     app.register_blueprint(jobs.bp)
     app.register_blueprint(submit.bp)
@@ -66,6 +66,7 @@ def create_app():
     app.register_blueprint(staff.bp)
     app.register_blueprint(diag.bp)
     app.register_blueprint(admin.bp)
+    app.register_blueprint(health.bp)
 
     # Initialize seed command
     from . import seed

@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle, Clock, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Trash2, ActivitySquare, Database, Mail } from "lucide-react";
 import { useToast } from "../ui/toast";
 
 type ServerAuditReport = {
@@ -17,6 +17,8 @@ export function SystemHealthPanel() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState<string>("");
   const { show } = useToast();
+  const [diag, setDiag] = useState<any | null>(null);
+  const [health, setHealth] = useState<any | null>(null);
 
   async function fetchReport() {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -35,7 +37,20 @@ export function SystemHealthPanel() {
     }
   }
 
-  useEffect(() => { fetchReport(); }, []);
+  useEffect(() => {
+    fetchReport();
+    (async () => {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const d = await fetch('/api/v1/_diag', { headers: { Authorization: `Bearer ${token}` }});
+        if (d.ok) setDiag(await d.json());
+      } catch {}
+      try {
+        const h = await fetch('/api/v1/health');
+        if (h.ok) setHealth(await h.json());
+      } catch {}
+    })();
+  }, []);
 
   const startAudit = async () => {
     setIsStarting(true);
@@ -154,6 +169,22 @@ export function SystemHealthPanel() {
           <h2 className="text-base font-semibold text-gray-900">System Integrity Audit</h2>
         </div>
         <div className="p-5">
+          {/* Environment & Health summary */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-3 rounded-lg border">
+              <div className="flex items-center text-sm text-gray-600"><ActivitySquare className="w-4 h-4 mr-2"/>Health</div>
+              <div className={`text-lg font-semibold ${health?.status === 'ok' ? 'text-green-700' : 'text-red-700'}`}>{health?.status || 'unknown'}</div>
+            </div>
+            <div className="p-3 rounded-lg border">
+              <div className="flex items-center text-sm text-gray-600"><Database className="w-4 h-4 mr-2"/>DB Engine</div>
+              <div className="text-lg font-semibold">{diag?.db_engine || 'unknown'}</div>
+              {diag?.migration_head && <div className="text-xs text-gray-500">alembic: {diag.migration_head}</div>}
+            </div>
+            <div className="p-3 rounded-lg border">
+              <div className="flex items-center text-sm text-gray-600"><Mail className="w-4 h-4 mr-2"/>Email</div>
+              <div className="text-lg font-semibold">{diag?.email_configured ? 'configured' : 'not set'}</div>
+            </div>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-gray-900">Run System Audit</h3>

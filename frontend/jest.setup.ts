@@ -13,5 +13,14 @@ if (!(global as any).fetch) {
   (global as any).fetch = jest.fn();
 }
 
+// Polyfill ResizeObserver for libraries like Recharts in jsdom
+if (typeof (global as any).ResizeObserver === 'undefined') {
+  (global as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as any;
+}
+
 
 

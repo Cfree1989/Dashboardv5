@@ -360,11 +360,7 @@ def approve_job(job_id):
         job.file_path = str(candidate_path.resolve())
         job.display_name = authoritative_filename
     job.status = 'PENDING'
-    # Move files/metadata to Pending to keep storage in sync with status
-    try:
-        move_authoritative(job, 'PENDING')
-    except Exception:
-        pass
+    # Do not physically move files on approval; keep them in Uploaded until student confirms.
     db.session.add(job)
     db.session.commit()
 
