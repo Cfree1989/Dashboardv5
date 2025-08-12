@@ -137,11 +137,12 @@
 ## 📊 Current Status / Progress Tracking
 
 ### P1. Submit Rate Limiting ✅ COMPLETED
-- **Backend**: Added `@limiter.limit("3 per hour")` decorator to `POST /api/v1/submit`
+- **Backend**: Added `@limiter.limit("5 per hour")` decorator to `POST /api/v1/submit`
 - **Tests**: Created comprehensive test suite `tests/test_submit_rate_limit.py`
-- **Success Criteria**: ✅ 4th submission within hour returns 429 status code
-- **Test Results**: All 3 tests passing (3 per hour limit, IP-based tracking, error message validation)
+- **Success Criteria**: ✅ 6th submission within hour returns 429 status code
+- **Test Results**: All 3 tests passing (5 per hour limit, IP-based tracking, error message validation)
 - **Implementation**: Flask-Limiter already configured, just needed endpoint decorator
+- **Update**: Changed from 3 to 5 submissions per hour based on user request
 
 ---
 

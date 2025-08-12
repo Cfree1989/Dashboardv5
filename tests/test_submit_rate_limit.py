@@ -39,11 +39,11 @@ def create_test_file():
     return BytesIO(content), "test.stl"
 
 
-def test_submit_rate_limit_3_per_hour(client, temp_storage):
-    """Test that only 3 submissions are allowed per hour"""
+def test_submit_rate_limit_5_per_hour(client, temp_storage):
+    """Test that only 5 submissions are allowed per hour"""
     
-    # Submit 3 jobs - should all succeed
-    for i in range(3):
+    # Submit 5 jobs - should all succeed
+    for i in range(5):
         file_data, filename = create_test_file()
         response = client.post('/api/v1/submit', 
                              data={
@@ -61,13 +61,13 @@ def test_submit_rate_limit_3_per_hour(client, temp_storage):
         assert response.status_code == 201, f"Submission {i+1} should succeed, got {response.status_code}"
         assert 'id' in response.json
     
-    # 4th submission should be rate limited
+    # 6th submission should be rate limited
     file_data, filename = create_test_file()
     response = client.post('/api/v1/submit',
                          data={
                              'file': (file_data, filename),
-                             'student_name': 'Test Student 4',
-                             'student_email': 'test4@example.com',
+                             'student_name': 'Test Student 6',
+                             'student_email': 'test6@example.com',
                              'discipline': 'Engineering',
                              'class_number': '101',
                              'printer': 'Printer1',
@@ -76,7 +76,7 @@ def test_submit_rate_limit_3_per_hour(client, temp_storage):
                          },
                          content_type='multipart/form-data')
     
-    assert response.status_code == 429, f"4th submission should be rate limited, got {response.status_code}"
+    assert response.status_code == 429, f"6th submission should be rate limited, got {response.status_code}"
     # Check response content - Flask-Limiter might return HTML or JSON
     response_data = response.get_json()
     if response_data:
@@ -89,8 +89,8 @@ def test_submit_rate_limit_3_per_hour(client, temp_storage):
 def test_rate_limit_respects_different_ips(client, temp_storage):
     """Test that rate limiting is per IP address"""
     
-    # Submit 3 jobs from one IP
-    for i in range(3):
+    # Submit 5 jobs from one IP
+    for i in range(5):
         file_data, filename = create_test_file()
         response = client.post('/api/v1/submit',
                              data={
@@ -106,13 +106,13 @@ def test_rate_limit_respects_different_ips(client, temp_storage):
                              content_type='multipart/form-data')
         assert response.status_code == 201
     
-    # 4th submission from same IP should be rate limited
+    # 6th submission from same IP should be rate limited
     file_data, filename = create_test_file()
     response = client.post('/api/v1/submit',
                          data={
                              'file': (file_data, filename),
-                             'student_name': 'Test Student 4',
-                             'student_email': 'test4@example.com',
+                             'student_name': 'Test Student 6',
+                             'student_email': 'test6@example.com',
                              'discipline': 'Engineering',
                              'class_number': '101',
                              'printer': 'Printer1',
@@ -127,8 +127,8 @@ def test_rate_limit_respects_different_ips(client, temp_storage):
 def test_rate_limit_error_message(client, temp_storage):
     """Test that rate limit error returns appropriate message"""
     
-    # Submit 3 jobs to hit limit
-    for i in range(3):
+    # Submit 5 jobs to hit limit
+    for i in range(5):
         file_data, filename = create_test_file()
         client.post('/api/v1/submit',
                    data={
@@ -143,13 +143,13 @@ def test_rate_limit_error_message(client, temp_storage):
                    },
                    content_type='multipart/form-data')
     
-    # 4th submission should return rate limit error
+    # 6th submission should return rate limit error
     file_data, filename = create_test_file()
     response = client.post('/api/v1/submit',
                          data={
                              'file': (file_data, filename),
-                             'student_name': 'Test Student 4',
-                             'student_email': 'test4@example.com',
+                             'student_name': 'Test Student 6',
+                             'student_email': 'test6@example.com',
                              'discipline': 'Engineering',
                              'class_number': '101',
                              'printer': 'Printer1',
