@@ -184,18 +184,18 @@ The issue appears to be at the browser-to-OS handoff layer rather than the proto
       - [x] Add `SlicerOpener/register.bat` (admin) to write Windows registry keys for `3dprint://`
       - [x] Add `SlicerOpener/README.md` with build (PyInstaller) and workstation setup instructions
       - Success criteria: Files exist; code builds with PyInstaller; README covers install and troubleshooting
-    - [ ] Step 2 — Critical Bug Fixes (Executor Priority)
-      - [ ] 2.1 Fix `/log-file-open` 500 error
+    - [x] Step 2 — Critical Bug Fixes (Executor Priority) — COMPLETED
+      - [x] 2.1 Fix `/log-file-open` 500 error
         - Issue: Backend endpoint may have token/DB issue causing 500 responses
         - Root cause: Check Event model fields, DB connection, authentication middleware
         - Test: Send manual POST to endpoint with valid token and verify response
         - Success: Endpoint returns 200 with event logged correctly
-      - [ ] 2.2 Register print3d:// protocol (frontend switched from 3dprint:// to print3d://)
+      - [x] 2.2 Register print3d:// protocol (frontend switched from 3dprint:// to print3d://)
         - Issue: register.bat only creates 3dprint:// keys but frontend now uses print3d://
         - Fix: Add print3d:// registry keys to register.bat or create separate print3d-register.bat
         - Test: Manual protocol link test in address bar: print3d://open/?path=C:\\path\\to\\file.stl
         - Success: Protocol handler launches and processes print3d:// URLs
-      - [ ] 2.3 Cross-tab protocol invocation improvements
+      - [x] 2.3 Cross-tab protocol invocation improvements
         - Issue: Protocol works in "Uploaded" tab but fails in other tabs ("Pending", "ReadyToPrint", etc.)
         - Investigation needed: 
           * Test in clean browser profile/incognito with extensions disabled
@@ -212,24 +212,24 @@ The issue appears to be at the browser-to-OS handoff layer rather than the proto
           * **Protocol Detection**: Implement iframe-based protocol support testing with timeout fallback
           * **Enhanced Logging**: Add browser/extension detection and timing diagnostics
         - Success: Protocol launches consistently from all job status tabs
-    - [ ] Step 3 — Enhanced Debugging Tools (Executor)
-      - [ ] 3.1 Add "Open (Debug)" link option
+    - [x] Step 3 — Enhanced Debugging Tools (Executor) — COMPLETED
+      - [x] 3.1 Add "Open (Debug)" link option
         - Render real anchor element with href=print3d://... for comparison testing
         - **Implementation**: `<a href="print3d://..." style="margin-left: 10px">Open (Debug)</a>` alongside existing button
         - Toggle-able via admin setting or always-present during development
         - Success: Debug anchor bypasses SPA interference and provides reference behavior
-      - [ ] 3.2 Frontend protocol invocation logging
+      - [x] 3.2 Frontend protocol invocation logging
         - Log attempted href, browser errors, and success/failure states
         - Display invocation attempt details in browser console for troubleshooting
         - Success: Clear visibility into what happens during protocol launch attempts
-      - [ ] 3.3 Path validation debugging
+      - [x] 3.3 Path validation debugging
         - Show exact file_path value and URI construction in UI
         - Validate absolute vs relative path handling across job statuses
         - Success: Clear indication of path format differences that may affect browser behavior
-    - [ ] Step 4 — Build + smoke-test on Windows (Executor)
-      - [ ] Build one-file exe via PyInstaller; verify GUI dialogs, selection UI, and logging
-      - [ ] Manual test from dashboard: click Open File → opens slicer (fallback works if protocol not installed)
-      - [ ] Test both 3dprint:// and print3d:// protocol schemes
+    - [x] Step 4 — Build + smoke-test on Windows (Executor) — COMPLETED
+      - [x] Build one-file exe via PyInstaller; verify GUI dialogs, selection UI, and logging
+      - [x] Manual test from dashboard: click Open File → opens slicer (fallback works if protocol not installed)
+      - [x] Test both 3dprint:// and print3d:// protocol schemes
       - Success criteria: Slicer launches with sample files; logs contain validation entries; both protocols work
     - [ ] Step 5 — Packaging (Planner/Executor)
       - [ ] Provide signed zip with `SlicerOpener.exe`, `config.ini` template, and updated `register.bat`
@@ -507,6 +507,12 @@ Preserved for history; reorganized for clarity (do not delete).
 
 **🎯 KEY BREAKTHROUGH**: The issue was **user gesture preservation**, not SPA routing. Modal JavaScript buttons broke the browser's user gesture chain required for custom protocol launching. Replacing with real anchor elements fixed the issue completely.
 
+### Immediate Next Priority
+
+- Admin Overrides — Backend Tests
+  - Validate: force-confirm, change-status, mark-failed, force-unlock endpoints
+  - Success: All tests green; correct events logged; file moves executed where applicable
+
 ### Medium Priority (Post-Protocol Fix)
 2) **Missing Jobs Incident Resolution** — System stability
    - Verify database connection and prevent SQLite fallback
@@ -533,8 +539,8 @@ Date: 2025-08-12
     - Implemented: `auth`, `jobs` (approve/reject/notes append/candidate-files/mark-*/payment/delete/log-file-open), `submit` (submit + confirm), `staff` (CRUD-lite), `diag` (`/api/v1/_diag`), `admin` (audit: report/delete orphan/delete stale/mark-reviewed), `analytics` (stub events listing).
     - Gaps vs plan: No `/api/v1/admin/archive` or `/api/v1/admin/prune` yet (UI is scaffolded only). `payment.py` blueprint exists but has no routes (logic is under `jobs.py`).
   - Services:
-    - `file_service.STATUS_TO_DIR` missing mapping for `ARCHIVED`. Audit currently scans only active dirs.
-    - `email_service` references `email/submission_status.html` (template not present). Other templates (`approval_email.html`, `submission_confirmation.html`) exist.
+    - `file_service.STATUS_TO_DIR` missing mapping for `ARCHIVED`. Audit currently scans only active dirs. (Resolved: mapping added; audit includes Archived.)
+    - `email_service` references `email/submission_status.html` (template not present). Other templates (`approval_email.html`, `submission_confirmation.html`) exist. (Resolved: template added.)
   - Utilities: `token_required` decorator wired; limiter initialized.
   - Health: Public `/health` route provided in `run.py` (not `/api/v1/health`).
   - Artifacts: `backend/instance/app.db` present locally; should be ignored. `backend/storage/` exists but unused (actual mount is repo `storage/` → `/app/storage`).
@@ -554,10 +560,10 @@ Date: 2025-08-12
 - Docs/Project Information
   - `Project Information/V0 Code/` retained as reference only; not part of build. `docs/` scaffolding OK.
 
-- Misc
-  - `docker-compose.yml` mounts storage correctly, but includes hard-coded secrets (e.g., `SECRET_KEY`, `MAIL_*`). Should be moved to a `.env` file and excluded from VCS.
-  - `response.json` at repo root appears to be a stray error artifact (contains "Internal Server Error"). Safe to delete.
-  - `scripts/` is empty (placeholder).
+  - Misc
+    - `docker-compose.yml` mounts storage correctly, but includes hard-coded secrets (e.g., `SECRET_KEY`, `MAIL_*`). Should be moved to a `.env` file and excluded from VCS. (Resolved: secrets moved to .env; .gitignore updated.)
+    - `response.json` at repo root appears to be a stray error artifact (contains "Internal Server Error"). Safe to delete. (Resolved: removed.)
+    - `scripts/` is empty (placeholder).
 
 ### Gaps and Remediation Plan
 
@@ -576,10 +582,10 @@ Date: 2025-08-12
    - Action: Add minimal `backend/app/templates/email/submission_status.html` or adjust function to fallback without template.
    - Success: Calling `send_status_update_email` does not error; unit test passes.
 
-4) Admin data management endpoints
-   - Issue: `/api/v1/admin/archive` and `/api/v1/admin/prune` not implemented; UI is placeholder.
-   - Action: Implement endpoints with defaults (45/365), guardrails, events; add tests; optionally wire basic frontend calls.
-   - Success: API returns preview + executes archive/prune with events; tests pass; UI can call endpoints.
+4) Admin data management endpoints — (Resolved)
+   - Implemented: `/api/v1/admin/archive` (default 45) and `/api/v1/admin/prune` (default 365) with guardrails and events.
+   - Tests present: see `tests/test_admin_archive_prune.py`.
+   - Success: Endpoints functional; tests pass.
 
 5) Archived mapping for file ops/audit
    - Issue: `STATUS_TO_DIR` lacks `ARCHIVED` mapping; admin audit skips `Archived/`.
@@ -633,7 +639,7 @@ Date: 2025-08-12
 - [x] C. Add `backend/app/templates/email/submission_status.html`
 - [x] C. Add `backend/app/templates/email/submission_status.html`
 - [x] E. Add `ARCHIVED: 'Archived'` to `STATUS_TO_DIR` and include in audit
-- [ ] (Future) D. Implement `/api/v1/admin/archive` (default 45) and `/api/v1/admin/prune` (default 365) with tests
+- [x] D. Implement `/api/v1/admin/archive` (default 45) and `/api/v1/admin/prune` (default 365) with tests
 - [ ] (Future) F. Tidy `payment.py` blueprint (remove or document placeholder)
 - [ ] (Future) G. Add `/api/v1/health` alias (optional)
 
