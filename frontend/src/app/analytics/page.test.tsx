@@ -33,7 +33,8 @@ describe('/analytics page', () => {
   it('renders overview and trends', async () => {
     renderWithProviders(<AnalyticsPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Analytics/)).toBeInTheDocument();
+      // Header is handled globally; just verify core sections render
+      expect(screen.getByText(/Overview/)).toBeInTheDocument();
       expect(screen.getByText(/UPLOADED/)).toBeInTheDocument();
       expect(screen.getByText(/Trends —/)).toBeInTheDocument();
     });

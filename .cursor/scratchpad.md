@@ -533,6 +533,119 @@ Preserved for history; reorganized for clarity (do not delete).
 ### Future Priority
 5) **Analytics Dashboard** — Operational insights after core stability achieved
 
+## Background and Motivation — Analytics V0 Parity
+
+We want the current `/analytics` page to closely mirror the original V0 design and behavior (see `Project Information/V0 Code/…` and screenshot). The live page has drifted in layout, component responsibilities, and props. Aligning it will improve clarity and match stakeholder expectations.
+
+### Key Challenges and Analysis (Analytics)
+- Props/data shape mismatches between current components and V0:
+  - `FinancialSummary` currently expects the whole `AnalyticsData`; V0 expects `FinancialData` only and renders KPIs + revenue line.
+  - `TrendCharts` in V0 renders three charts: Submissions & Approvals, Printing Throughput, and a wide Average Lead Time. Our page splits throughput/lead-time elsewhere.
+  - `ResourceMetrics` in V0 focuses on Printer Utilization (stacked), Material Consumption, and Queue Age Distribution (pie). Ours shows different charts and lacks utilization.
+  - Filters: V0 uses a unified control bar with period (segmented), discipline, and printer. Current page has period-only component plus ad‑hoc selects.
+- Data availability differences:
+  - Storage usage: V0 shows percent plus GB used/limit; backend currently exposes only `storage_usage_percent` (often null). We’ll show percent when present and omit GB text when unknown.
+  - Printer utilization: Backend returns per-printer daily counts (not hours). We will display stacked bars of per-printer counts labeled “Jobs” (close visual match to V0), with room to switch to hours later if API adds it.
+- Tests depend on headings/labels; updates will require test adjustments.
+
+### High-level Task Breakdown — Analytics V0 Parity (TDD where practical)
+
+1) Unify Filters UI to V0 style
+   - Edits:
+     - Replace `frontend/src/components/analytics/analytics-filters.tsx` props with `{ filters, onFiltersChange }` to manage `period | discipline | printer` together, styled as segmented buttons + selects (Tailwind; avoid shadcn deps).
+     - Update `frontend/src/app/analytics/page.tsx` to hold a single `filters` state and pass through; remove separate local selects.
+   - Success criteria:
+     - Period buttons toggle active state; selects update values; changing any filter triggers data reload.
+     - Jest: Simulate period click → asserts fetch called again; discipline/printer select changes also trigger reload.
+
+2 Overview cards to V0 layout (4 KPIs)
+   - Edits: Rework `frontend/src/components/analytics/overview-cards.tsx` to show four cards only: Total Submissions, In Queue, Avg Turnaround (h), Storage Usage.
+     - Compute In Queue as sum of `byStatus` for `UPLOADED|PENDING|READYTOPRINT|PRINTING` if not explicitly provided.
+     - If only percent is available for storage, show percent; omit GB text when unknown.
+   - Success criteria: Exactly four cards render; numbers format correctly; no undefined labels.
+
+3 Trend charts to V0 grouping
+   - Edits: Update `frontend/src/components/analytics/trend-charts.tsx` to render the three charts in one component:
+     - Submissions & Approvals (from `data.trends`)
+     - Printing Throughput (from `data.resources.printingThroughput`)
+     - Average Lead Time (from `data.resources.averageLeadTime`)
+     - Adjust props to accept `{ trends, resources }` or pass the combined `AnalyticsData`.
+   - Success criteria: All three chart headings present; charts render with data from API; empty-state messaging when arrays are empty.
+   - Tests: Assert presence of the three headings; smoke render with mocked data.
+
+4 Resource metrics to V0 (Utilization + Material + Queue Age pie)
+   - Edits: Rebuild `frontend/src/components/analytics/resource-metrics.tsx` to:
+     - Show stacked bar “Printer Utilization” using `resources.printerUtilization` (transform current `UtilizationSeries` to per-printer series; use counts as values).
+     - “Material Consumption” two figures (filament/resin grams).
+     - “Queue Age Distribution” as a pie; derive array from `resources.queueAgeBuckets`.
+   - Success criteria: Utilization bars stack by printer; material figures visible; pie chart shows correct slices.
+
+6) Financial summary to V0
+   - Edits: Change `frontend/src/components/analytics/financial-summary.tsx` to accept only `financial` (V0 shape) and render:
+     - KPIs: Total Revenue (sum of `revenueByPeriod`), Avg Ticket Size, Payment Rate = paid/(paid+unpaid).
+     - “Revenue Over Time” line chart using `financial.revenueByPeriod`.
+   - Data mapping: Extend `frontend/src/lib/analytics-api.ts` to also expose a V0‑compatible `financial` object:
+     - Map `resources.revenueOverTime` → `financial.revenueByPeriod` (usd),
+     - Map `resources.avgTicketUsd` → `financial.averageTicketSize`,
+     - Map `resources.paymentCount` and `overview.byStatus` to `paymentCounts` as `{ paid, unpaid }` approximation or leave unpaid as `(completed+paidpickedup)-paid` when available; else unpaid = 0.
+   - Success criteria: KPIs show; revenue line renders.
+
+7) Wiring and page composition
+   - Edits: In `frontend/src/app/analytics/page.tsx`:
+     - Use the unified `filters` state from step 1.
+     - Layout sections in V0 order: Overview → TrendCharts → two-column grid with ResourceMetrics (left) and FinancialSummary (right).
+   - Success criteria: Visual order matches screenshot; no console errors; responsive layout behaves.
+
+8) Tests and type updates
+   - Update `frontend/src/app/analytics/page.test.tsx` to reflect V0 headings and component text (e.g., “Submissions & Approvals Over Time”, “Printing Throughput”, “Average Lead Time”, “Printer Utilization”, “Revenue Over Time”).
+   - Keep existing mock fetch shape; extend mocks if needed for utilization/pie/material values.
+   - Success criteria: Tests green locally.
+
+9) Nice-to-haves (post-parity)
+   - Replace `window.location.href` with Next.js router; add skeleton loaders for all sections; tooltips and legends polish; add empty-state messaging parity.
+
+### Risks / Open Questions
+- Storage GB used/limit not currently available from API; we’ll show percent only for now.
+- Printer utilization values are counts, not true “hours”; acceptable for visual parity.
+- Payment unpaid counts may require additional API data for perfect accuracy; we will approximate as needed and annotate in code.
+
+### Project Status Board — Analytics V0 Parity
+- [x] A1. Unify filters component and page wiring
+- [ ] A3. Overview cards simplified to 4 KPIs
+- [ ] A4. Trend charts render 3 panels (subs/approvals, throughput, lead time)
+- [ ] A5. Resource metrics: utilization (stacked), material, queue age pie
+- [ ] A6. Financial summary: KPIs + revenue line (V0 props)
+- [ ] A7. Update API mapping to supply `financial` V0 shape
+- [ ] A8. Tests updated and passing (page + components)
+
+## Plan Addition — Animations for Analytics
+
+### Background
+Recharts provides built‑in animations on mount and data changes. To ensure consistent, visible transitions when filters change, we will explicitly enable animation props and drive re‑mounts via a key derived from the active filters. We will also add a gentle fade on chart containers and honor `prefers-reduced-motion`.
+
+### High-level Task Breakdown — Animations
+1) Introduce `refreshKey` tied to filters
+   - Compute `const refreshKey = JSON.stringify(filters)` in `app/analytics/page.tsx`.
+   - Pass to `OverviewCards`, `TrendCharts`, `ResourceMetrics`, `FinancialSummary` as prop.
+2) Apply `key` and animation props
+   - In each chart component, put `key={refreshKey}` on the chart container and set `isAnimationActive` with `animationDuration={600}` and `animationEasing="ease-in-out"` on `Line`, `Bar`, `Area`, `Pie`.
+3) Fade‑in on load
+   - Wrap chart sections in a div with `transition-opacity duration-300` and toggle `opacity-0` while `loading`.
+4) Respect reduced motion
+   - Add `useReducedMotion()` helper; when true, disable animations and fades.
+5) Tests
+   - Keep assertions structural; no reliance on animation timing. Ensure no new console errors in CI.
+
+### Project Status Board — Animations
+- [ ] AN1. Add `refreshKey` and plumb to components
+- [ ] AN2. Add animation props + `key` in `TrendCharts`
+- [ ] AN3. Add animation props + `key` in `ResourceMetrics`
+- [ ] AN4. Add animation props + `key` in `FinancialSummary`
+- [ ] AN5. Fade‑in containers driven by `loading`
+- [ ] AN6. Implement `useReducedMotion` and wire it
+- [ ] AN7. Verify UX; keep tests green
+
+
 ## Planner — Codebase Audit (Folder-by-Folder)
 
 Date: 2025-08-12

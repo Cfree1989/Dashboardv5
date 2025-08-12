@@ -1,6 +1,6 @@
 import React from 'react';
 import type { OverviewData } from '../../types/analytics';
-import { BarChart3, Clock, Inbox, ShieldAlert } from 'lucide-react';
+import { BarChart3, Clock, Inbox } from 'lucide-react';
 
 type Props = { data: OverviewData };
 
@@ -10,11 +10,10 @@ export function OverviewCards({ data }: Props) {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold">Overview</h2>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Kpi label="Total Submissions" value={formatNumber(data.totalSubmissions)} icon={<BarChart3 size={16} />} />
         <Kpi label="In Queue" value={formatNumber(data.inQueue)} icon={<Inbox size={16} />} />
         <Kpi label="Avg Turnaround (h)" value={data.avgTurnaroundHours != null ? String(data.avgTurnaroundHours) : '--'} icon={<Clock size={16} />} />
-        <Kpi label="Rejections (30d)" value={formatNumber(data.recentRejections30d)} icon={<ShieldAlert size={16} />} />
         {data.storageUsagePercent != null && (
           <Kpi label="Storage Usage" value={`${data.storageUsagePercent}%`} />
         )}

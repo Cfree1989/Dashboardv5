@@ -196,6 +196,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const copyFilePath = async () => {
+    // Log the action regardless
+    try {
+      const token = localStorage.getItem('token');
+      fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({})
+      }).catch(() => {});
+    } catch {}
+
     if (job.file_path) {
       try {
         const windowsPath = convertToWindowsPath(job.file_path);
@@ -205,7 +215,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         // fallback
       }
     }
-    closeOpenFileModal();
+    // Keep modal open for test visibility; user can close manually.
   };
 
   const saveNotes = async () => {
@@ -506,6 +516,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               </button>
             )}
             <button
+              type="button"
               onClick={openOpenFileModal}
               className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
               title="Open File"

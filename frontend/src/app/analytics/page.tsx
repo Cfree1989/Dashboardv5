@@ -7,21 +7,19 @@ import { OverviewCards } from '../../components/analytics/overview-cards';
 import { TrendCharts } from '../../components/analytics/trend-charts';
 import { ResourceMetrics } from '../../components/analytics/resource-metrics';
 import { FinancialSummary } from '../../components/analytics/financial-summary';
-import { AnalyticsFilters } from '../../components/analytics/analytics-filters';
+import { AnalyticsFilters, AnalyticsFilterState } from '../../components/analytics/analytics-filters';
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [period, setPeriod] = useState<number>(7);
-  const [printer, setPrinter] = useState<string>('all');
-  const [discipline, setDiscipline] = useState<string>('all');
+  const [filters, setFilters] = useState<AnalyticsFilterState>({ period: 7, printer: 'all', discipline: 'all' });
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
 
   async function load() {
     try {
       setLoading(true);
-      const d = await fetchAnalyticsData({ period, printer, discipline });
+      const d = await fetchAnalyticsData({ period: Number(filters.period) || 7, printer: filters.printer, discipline: filters.discipline });
         setData(d);
         const now = new Date();
         setRefreshedAt(now);
@@ -36,48 +34,16 @@ export default function AnalyticsPage() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, printer, discipline]);
+  }, [filters]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Header removed; global header handles title/actions */}
+        {/* Global header provides title/actions; keep local filters and status only */}
         {error && <div className="text-red-600 text-sm mb-4" role="alert">{error}</div>}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <AnalyticsFilters period={period} onChange={({ period }) => setPeriod(period)} />
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Printer:</label>
-              <select aria-label="Printer" className="border border-gray-300 rounded-md px-2 py-1 text-sm" value={printer} onChange={(e) => setPrinter(e.target.value)}>
-                <option value="all">All</option>
-                <option value="Prusa MK4S">Prusa MK4S</option>
-                <option value="Prusa XL">Prusa XL</option>
-                <option value="Raise3D Pro 2 Plus">Raise3D Pro 2 Plus</option>
-                <option value="Formlabs Form 3">Formlabs Form 3</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-700">Discipline:</label>
-              <select aria-label="Discipline" className="border border-gray-300 rounded-md px-2 py-1 text-sm" value={discipline} onChange={(e) => setDiscipline(e.target.value)}>
-                <option value="all">All</option>
-                <option value="Art">Art</option>
-                <option value="Architecture">Architecture</option>
-                <option value="Landscape Architecture">Landscape Architecture</option>
-                <option value="Interior Design">Interior Design</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Hobby/Personal">Hobby/Personal</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100"
-              onClick={() => void load()}
-              title="Refresh"
-            >
-              <RefreshCcw size={14} />
-              Refresh
-            </button>
+            <AnalyticsFilters filters={filters} onFiltersChange={setFilters} />
           </div>
           {loading && <div className="text-xs text-gray-500">Loading…</div>}
         </div>
