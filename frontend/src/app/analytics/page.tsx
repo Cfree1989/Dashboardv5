@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { RefreshCcw, LayoutDashboard, Shield, LogOut } from 'lucide-react';
-import Link from 'next/link';
+import { RefreshCcw } from 'lucide-react';
 import { fetchAnalyticsData } from '../../lib/analytics-api';
 import type { AnalyticsData } from '../../types/analytics';
 import { OverviewCards } from '../../components/analytics/overview-cards';
@@ -42,24 +41,7 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
-          <div className="flex items-center gap-2">
-            {refreshedAt && (
-              <span className="text-xs text-gray-500" aria-label="last-updated">Last updated {refreshedAt.toLocaleTimeString()}</span>
-            )}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100"
-              onClick={() => void load()}
-              title="Refresh"
-            >
-              <RefreshCcw size={14} />
-              Refresh
-            </button>
-            {/* Logout moved to global header */}
-          </div>
-        </div>
+        {/* Header removed; global header handles title/actions */}
         {error && <div className="text-red-600 text-sm mb-4" role="alert">{error}</div>}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
@@ -87,6 +69,15 @@ export default function AnalyticsPage() {
                 <option value="Other">Other</option>
               </select>
             </div>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100"
+              onClick={() => void load()}
+              title="Refresh"
+            >
+              <RefreshCcw size={14} />
+              Refresh
+            </button>
           </div>
           {loading && <div className="text-xs text-gray-500">Loading…</div>}
         </div>

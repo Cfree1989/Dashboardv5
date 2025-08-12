@@ -39,30 +39,33 @@ export function HeaderNav() {
           {lastUpdated && (
             <span className="text-xs text-gray-500">Last updated: {lastUpdated}</span>
           )}
-          {pathname !== '/dashboard' && (
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-white hover:bg-gray-900"
-            >
-              <LayoutDashboard size={16} /> Dashboard
-            </Link>
-          )}
-          {pathname !== '/admin' && (
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-white hover:bg-gray-900"
-            >
-              <Shield size={16} /> Admin
-            </Link>
-          )}
-          {pathname !== '/analytics' && (
-            <Link
-              href="/analytics"
-              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-white hover:bg-green-700"
-            >
-              <BarChart3 size={16} /> Analytics
-            </Link>
-          )}
+          <Link
+            href="/dashboard"
+            aria-current={pathname.startsWith('/dashboard') ? 'page' : undefined}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-orange-600 bg-orange-500 ${
+              pathname.startsWith('/dashboard') ? 'border-l-8 border-orange-200 pl-2' : ''
+            }`}
+          >
+            <LayoutDashboard size={16} /> Dashboard
+          </Link>
+          <Link
+            href="/admin"
+            aria-current={pathname.startsWith('/admin') ? 'page' : undefined}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-purple-600 bg-purple-500 ${
+              pathname.startsWith('/admin') ? 'border-l-8 border-purple-200 pl-2' : ''
+            }`}
+          >
+            <Shield size={16} /> Admin
+          </Link>
+          <Link
+            href="/analytics"
+            aria-current={pathname.startsWith('/analytics') ? 'page' : undefined}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-green-700 bg-green-600 ${
+              pathname.startsWith('/analytics') ? 'border-l-8 border-green-300 pl-2' : ''
+            }`}
+          >
+            <BarChart3 size={16} /> Analytics
+          </Link>
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
@@ -73,7 +76,7 @@ export function HeaderNav() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-white hover:bg-red-700"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-white hover:bg-red-600"
             onClick={onLogout}
             title="Logout"
           >
