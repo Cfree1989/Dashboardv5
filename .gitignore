@@ -1,3 +1,25 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Local DB
+backend/instance/*.db
+
+# SlicerOpener artifacts
+SlicerOpener/dist/
+SlicerOpener/build/
+SlicerOpener/*.exe
+SlicerOpener/*.log
+
+# Storage content (optional for dev; keep if using real files)
+storage/
+
 # Dependencies
 node_modules/
 __pycache__/

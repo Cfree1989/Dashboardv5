@@ -12,6 +12,7 @@ STATUS_TO_DIR = {
     'PRINTING': 'Printing',
     'COMPLETED': 'Completed',
     'PAIDPICKEDUP': 'PaidPickedUp',
+    'ARCHIVED': 'Archived',
 }
 
 

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>3D Print Job Status Update</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #111827; }
+      .container { max-width: 640px; margin: 0 auto; padding: 16px; }
+      .btn { display: inline-block; background: #2563eb; color: #fff; padding: 10px 16px; border-radius: 8px; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Your 3D Print Job Status Changed</h2>
+      <p>Hello {{ job.student_name }},</p>
+      <p>
+        The status of your 3D print job <strong>{{ job.display_name }}</strong> has changed to:
+        <strong>{{ status }}</strong>.
+      </p>
+      <p>If you have any questions, please reply to this email.</p>
+      <p style="color:#6b7280; font-size: 12px;">This is an automated message from the CoAD FabLab.</p>
+    </div>
+  </body>
+</html>
+
+

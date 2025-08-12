@@ -595,11 +595,29 @@ Date: 2025-08-12
 
 ### Project Status Board — Audit Fixes
 
-- [ ] A. Move secrets to `.env` and update `docker-compose.yml`
-- [ ] B. Add `.gitignore` for `SlicerOpener/dist`, `SlicerOpener/build`, `SlicerOpener.exe`, `SlicerOpener/*.log`, `backend/instance/*.db`, `storage/**` (except fixture readme), and remove `response.json`
-- [ ] C. Add `backend/app/templates/email/submission_status.html`
-- [ ] E. Add `ARCHIVED: 'Archived'` to `STATUS_TO_DIR` and include in audit
+- [x] A. Move secrets to `.env` and update `docker-compose.yml`
+- [x] B. Add `.gitignore` for `SlicerOpener/dist`, `SlicerOpener/build`, `SlicerOpener.exe`, `SlicerOpener/*.log`, `backend/instance/*.db`, `storage/**` (except fixture readme), and remove `response.json`
+- [x] C. Add `backend/app/templates/email/submission_status.html`
+- [x] C. Add `backend/app/templates/email/submission_status.html`
+- [x] E. Add `ARCHIVED: 'Archived'` to `STATUS_TO_DIR` and include in audit
 - [ ] (Future) D. Implement `/api/v1/admin/archive` (default 45) and `/api/v1/admin/prune` (default 365) with tests
 - [ ] (Future) F. Tidy `payment.py` blueprint (remove or document placeholder)
 - [ ] (Future) G. Add `/api/v1/health` alias (optional)
+
+### Current Status / Progress Tracking (Executor)
+
+- Completed this session:
+  - Updated `docker-compose.yml` to use .env variables for backend secrets/config
+  - Added `.gitignore` to ignore secrets, binaries, logs, node_modules, pycache, local DB, storage
+  - Removed stray `response.json`
+  - Added `ARCHIVED: 'Archived'` to `STATUS_TO_DIR`
+  - Added email template `backend/app/templates/email/submission_status.html`
+  - Restarted stack and verified `/health` OK
+- Next in progress:
+  - Implement Admin Overrides endpoints and wire frontend panel
+
+### Executor's Feedback or Assistance Requests
+
+- Please ensure your local `.env` contains the keys listed in the previous message (SECRET_KEY, DATABASE_URL, REDIS_URL, MAIL_*, FRONTEND_PUBLIC_URL, STORAGE_PATH). Do not commit `.env`.
+
 

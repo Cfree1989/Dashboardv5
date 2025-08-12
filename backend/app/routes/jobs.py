@@ -16,6 +16,7 @@ from pathlib import Path
 import shutil
 from decimal import Decimal, ROUND_HALF_UP
 from app.services.file_service import move_authoritative
+from app.services.file_service import STATUS_TO_DIR
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -497,6 +498,140 @@ def mark_printing(job_id):
     db.session.add(evt)
     db.session.commit()
     _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPrinting')
+    return jsonify(job.to_dict()), 200
+
+
+# --- Admin Overrides ---
+
+def _validate_reason(data):
+    reason = (data.get('reason') or '').strip()
+    if not reason:
+        return None, jsonify({'message': 'reason is required'}), 400
+    return reason, None, None
+
+
+@bp.route('/<job_id>/admin/force-unlock', methods=['POST'])
+@token_required
+def admin_force_unlock(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    reason, err_resp, err_code = _validate_reason(data)
+    if err_resp:
+        return err_resp, err_code
+    # No lock fields yet; log action for audit
+    evt = Event(
+        job_id=job.id,
+        event_type='AdminAction',
+        details={'action': 'force_unlock', 'reason': reason, 'note': 'No server-side lock fields present'},
+        triggered_by=staff_name,
+        workstation_id=g.workstation_id,
+    )
+    db.session.add(evt)
+    db.session.commit()
+    return jsonify({'message': 'unlock processed', 'lock_support': 'not_implemented'}), 200
+
+
+@bp.route('/<job_id>/admin/force-confirm', methods=['POST'])
+@token_required
+def admin_force_confirm(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    reason, err_resp, err_code = _validate_reason(data)
+    if err_resp:
+        return err_resp, err_code
+    if job.status != 'PENDING':
+        return jsonify({'message': 'Job must be in PENDING to force confirm'}), 400
+    # Transition to READYTOPRINT and move files
+    job.status = 'READYTOPRINT'
+    job.last_updated_by = staff_name
+    move_authoritative(job, 'READYTOPRINT')
+    db.session.add(job)
+    db.session.commit()
+    # Log specific and admin events
+    evt1 = Event(job_id=job.id, event_type='AdminForceConfirm', details={'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt1)
+    db.session.commit()
+    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'force_confirm', 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt2)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/admin/change-status', methods=['POST'])
+@token_required
+def admin_change_status(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    reason, err_resp, err_code = _validate_reason(data)
+    if err_resp:
+        return err_resp, err_code
+    new_status = (data.get('new_status') or '').strip().upper()
+    if not new_status:
+        return jsonify({'message': 'new_status is required'}), 400
+    allowed_statuses = set(list(STATUS_TO_DIR.keys()) + ['REJECTED'])
+    if new_status not in allowed_statuses:
+        return jsonify({'message': 'Invalid new_status'}), 400
+    before = job.status
+    job.status = new_status
+    job.last_updated_by = staff_name
+    # Move files only if mapping exists for the target status
+    if new_status in STATUS_TO_DIR:
+        move_authoritative(job, new_status)
+    db.session.add(job)
+    db.session.commit()
+    # Log events
+    evt = Event(job_id=job.id, event_type='AdminStatusChanged', details={'from': before, 'to': new_status, 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'change_status', 'from': before, 'to': new_status, 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt2)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+
+@bp.route('/<job_id>/admin/mark-failed', methods=['POST'])
+@token_required
+def admin_mark_failed(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    reason, err_resp, err_code = _validate_reason(data)
+    if err_resp:
+        return err_resp, err_code
+    if job.status != 'PRINTING':
+        return jsonify({'message': 'Job must be in PRINTING to mark failed'}), 400
+    # Move back to READYTOPRINT
+    job.status = 'READYTOPRINT'
+    job.last_updated_by = staff_name
+    move_authoritative(job, 'READYTOPRINT')
+    db.session.add(job)
+    db.session.commit()
+    # Log failure and admin action
+    evt = Event(job_id=job.id, event_type='PrintFailed', details={'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt)
+    db.session.commit()
+    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'mark_failed', 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
+    db.session.add(evt2)
+    db.session.commit()
     return jsonify(job.to_dict()), 200
 
 

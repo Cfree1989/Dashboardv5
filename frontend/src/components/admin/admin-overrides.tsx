@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { AlertTriangle, Unlock, CheckCircle, RotateCcw, XCircle } from "lucide-react";
+import { useToast } from "../ui/toast";
 
 export function AdminOverridesPanel() {
   const [jobId, setJobId] = useState("");
@@ -9,6 +10,10 @@ export function AdminOverridesPanel() {
   const [newStatus, setNewStatus] = useState("");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [staffName, setStaffName] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const { show } = useToast();
 
   const actions = [
     { value: "unlock", label: "Force Unlock", icon: Unlock, description: "Remove any locks on the job" },
@@ -20,21 +25,69 @@ export function AdminOverridesPanel() {
   const statusOptions = ["UPLOADED", "PENDING", "READYTOPRINT", "PRINTING", "COMPLETED", "PAIDPICKEDUP", "REJECTED"];
 
   const onSubmit = () => {
-    if (!jobId.trim() || !selectedAction || !reason.trim()) return;
-    if (selectedAction === "change_status" && !newStatus) return;
+    setErrorMsg("");
+    if (!jobId.trim() || !selectedAction || !reason.trim() || !staffName.trim()) {
+      setErrorMsg("Job ID, Staff Name, Action, and Reason are required.");
+      return;
+    }
+    if (selectedAction === "change_status" && !newStatus) {
+      setErrorMsg("New Status is required for Change Status action.");
+      return;
+    }
     setIsConfirmOpen(true);
   };
 
   const executeOverride = async () => {
     setIsProcessing(true);
+    setErrorMsg("");
+    setSuccessMsg("");
     try {
-      // TODO: call admin override endpoints when available
-      await new Promise((r) => setTimeout(r, 1000));
+      const token = localStorage.getItem("token");
+      const base = `/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin`;
+      let path = "";
+      let body: Record<string, any> = { staff_name: staffName.trim(), reason: reason.trim() };
+      switch (selectedAction) {
+        case "unlock":
+          path = `${base}/force-unlock`;
+          break;
+        case "confirm":
+          path = `${base}/force-confirm`;
+          break;
+        case "change_status":
+          path = `${base}/change-status`;
+          body.new_status = newStatus.trim();
+          break;
+        case "mark_failed":
+          path = `${base}/mark-failed`;
+          break;
+        default:
+          setErrorMsg("Unknown action selected.");
+          setIsProcessing(false);
+          return;
+      }
+      const res = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        setErrorMsg(text || "Override failed.");
+        return;
+      }
+      setSuccessMsg("Override executed successfully.");
+      show("Admin override completed");
       setJobId("");
       setSelectedAction("");
       setReason("");
       setNewStatus("");
+      setStaffName("");
       setIsConfirmOpen(false);
+    } catch (e) {
+      setErrorMsg("Network error executing override.");
     } finally {
       setIsProcessing(false);
     }
@@ -53,9 +106,20 @@ export function AdminOverridesPanel() {
           <p className="text-sm text-gray-600 mt-1">Use these tools carefully. All actions are logged and require confirmation.</p>
         </div>
         <div className="p-5 space-y-4">
+          {errorMsg && (
+            <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg px-3 py-2 text-sm" role="alert">{errorMsg}</div>
+          )}
+          {successMsg && (
+            <div className="bg-green-50 text-green-700 border border-green-200 rounded-lg px-3 py-2 text-sm" role="status">{successMsg}</div>
+          )}
           <div>
             <label htmlFor="job-id" className="text-sm text-gray-700">Job ID</label>
             <input id="job-id" value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="Enter the job ID to modify" className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+          </div>
+
+          <div>
+            <label htmlFor="staff-name" className="text-sm text-gray-700">Performing Action As (Staff Name)</label>
+            <input id="staff-name" value={staffName} onChange={(e) => setStaffName(e.target.value)} placeholder="Enter your staff name" className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
 
           <div>
@@ -92,7 +156,7 @@ export function AdminOverridesPanel() {
             <textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Explain why this override is necessary..." className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm" />
           </div>
 
-          <button onClick={onSubmit} disabled={!jobId.trim() || !selectedAction || !reason.trim() || (selectedAction === "change_status" && !newStatus)} className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50">Execute Override</button>
+          <button onClick={onSubmit} disabled={!jobId.trim() || !selectedAction || !reason.trim() || !staffName.trim() || (selectedAction === "change_status" && !newStatus)} className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50">Execute Override</button>
         </div>
       </div>
 
@@ -110,6 +174,7 @@ export function AdminOverridesPanel() {
               <div><strong>Job ID:</strong> {jobId}</div>
               <div><strong>Action:</strong> {actions.find((a) => a.value === selectedAction)?.label}</div>
               {selectedAction === "change_status" && (<div><strong>New Status:</strong> {newStatus}</div>)}
+                <div><strong>Staff:</strong> {staffName}</div>
               <div><strong>Reason:</strong> {reason}</div>
             </div>
             <div className="flex justify-end gap-2">
