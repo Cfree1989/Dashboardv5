@@ -56,27 +56,8 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">Admin Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <Link href="/dashboard" className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/analytics" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-              Analytics
-            </Link>
-            <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                router.push("/login");
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
+        {/* Header moved to global layout; keep page title for accessibility if needed */}
+        <h1 className="sr-only">Admin Dashboard</h1>
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar Navigation */}

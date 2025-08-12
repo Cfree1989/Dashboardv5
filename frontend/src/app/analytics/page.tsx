@@ -23,8 +23,10 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       const d = await fetchAnalyticsData({ period, printer, discipline });
-      setData(d);
-      setRefreshedAt(new Date());
+        setData(d);
+        const now = new Date();
+        setRefreshedAt(now);
+        try { localStorage.setItem('lastUpdated', now.toLocaleTimeString()); } catch {}
     } catch {
       setError('Failed to load analytics');
     } finally {
@@ -41,23 +43,7 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
-            <nav className="flex items-center gap-2 ml-4">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100"
-              >
-                <LayoutDashboard size={14} /> Dashboard
-              </Link>
-              <Link
-                href="/admin"
-                className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100"
-              >
-                <Shield size={14} /> Admin
-              </Link>
-            </nav>
-          </div>
+          <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
           <div className="flex items-center gap-2">
             {refreshedAt && (
               <span className="text-xs text-gray-500" aria-label="last-updated">Last updated {refreshedAt.toLocaleTimeString()}</span>
@@ -71,19 +57,7 @@ export default function AnalyticsPage() {
               <RefreshCcw size={14} />
               Refresh
             </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-600 hover:bg-red-50"
-              onClick={() => {
-                try { localStorage.removeItem('token'); } catch {}
-                if (typeof window !== 'undefined' && window?.location) {
-                  try { window.location.assign('/login'); } catch { window.location.href = '/login'; }
-                }
-              }}
-              title="Logout"
-            >
-              <LogOut size={14} /> Logout
-            </button>
+            {/* Logout moved to global header */}
           </div>
         </div>
         {error && <div className="text-red-600 text-sm mb-4" role="alert">{error}</div>}

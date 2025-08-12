@@ -17,7 +17,10 @@ export default function DashboardPage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [pauseRefresh, setPauseRefresh] = useState(false);
   useEffect(() => {
-    setLastUpdated(new Date().toLocaleTimeString());
+    const now = new Date();
+    const ts = now.toLocaleTimeString();
+    setLastUpdated(ts);
+    try { localStorage.setItem('lastUpdated', ts); } catch {}
   }, []);
   
   const [status, setStatus] = useState(searchParams.get('status') || statusOptions[0]);
@@ -54,7 +57,9 @@ export default function DashboardPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (pauseRefresh) return;
-      setLastUpdated(new Date().toLocaleTimeString());
+      const ts = new Date().toLocaleTimeString();
+      setLastUpdated(ts);
+      try { localStorage.setItem('lastUpdated', ts); } catch {}
       setRefreshTick((t) => t + 1);
       fetchCounts();
     }, 45000);
@@ -63,7 +68,9 @@ export default function DashboardPage() {
   
   const refreshPage = async () => {
     setIsRefreshing(true);
-    setLastUpdated(new Date().toLocaleTimeString());
+    const ts = new Date().toLocaleTimeString();
+    setLastUpdated(ts);
+    try { localStorage.setItem('lastUpdated', ts); } catch {}
     setRefreshTick((t) => t + 1);
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -85,38 +92,8 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">3D Print Dashboard</h1>
-        <div className="flex items-center space-x-4">
-          <LastUpdated lastUpdated={lastUpdated} />
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 focus-ring btn-transition"
-          >
-            Admin
-          </Link>
-          <button 
-            onClick={refreshPage} 
-            disabled={isRefreshing}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center focus-ring btn-transition"
-          >
-            {isRefreshing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                Refreshing...
-              </>
-            ) : (
-              'Refresh'
-            )}
-          </button>
-          <button 
-            onClick={logout} 
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus-ring btn-transition"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+      {/* Header moved to global layout; keep page title hidden for a11y consistency */}
+      <h1 className="sr-only">3D Print Job Dashboard</h1>
 
       <StatusTabs 
         currentStatus={status} 
