@@ -36,7 +36,9 @@ describe('/analytics page', () => {
       // Header is handled globally; just verify core sections render
       expect(screen.getByText(/Overview/)).toBeInTheDocument();
       expect(screen.getByText(/UPLOADED/)).toBeInTheDocument();
-      expect(screen.getByText(/Trends —/)).toBeInTheDocument();
+      expect(screen.getByText(/Submissions & Approvals/)).toBeInTheDocument();
+      expect(screen.getByText(/Printer Utilization/)).toBeInTheDocument();
+      expect(screen.getByText(/Revenue Over Time/)).toBeInTheDocument();
     });
   });
 });

@@ -611,7 +611,7 @@ We want the current `/analytics` page to closely mirror the original V0 design a
 
 ### Project Status Board — Analytics V0 Parity
 - [x] A1. Unify filters component and page wiring
-- [ ] A3. Overview cards simplified to 4 KPIs
+- [x] A3. Overview cards simplified to 4 KPIs
 - [ ] A4. Trend charts render 3 panels (subs/approvals, throughput, lead time)
 - [ ] A5. Resource metrics: utilization (stacked), material, queue age pie
 - [ ] A6. Financial summary: KPIs + revenue line (V0 props)

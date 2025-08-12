@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCcw } from 'lucide-react';
 import { fetchAnalyticsData } from '../../lib/analytics-api';
 import type { AnalyticsData } from '../../types/analytics';
@@ -8,6 +8,7 @@ import { TrendCharts } from '../../components/analytics/trend-charts';
 import { ResourceMetrics } from '../../components/analytics/resource-metrics';
 import { FinancialSummary } from '../../components/analytics/financial-summary';
 import { AnalyticsFilters, AnalyticsFilterState } from '../../components/analytics/analytics-filters';
+import { useReducedMotion } from '../../lib/use-reduced-motion';
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -15,6 +16,8 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [filters, setFilters] = useState<AnalyticsFilterState>({ period: 7, printer: 'all', discipline: 'all' });
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+  const reduceMotion = useReducedMotion();
+  const refreshKey = useMemo(() => JSON.stringify(filters), [filters]);
 
   async function load() {
     try {
@@ -60,14 +63,28 @@ export default function AnalyticsPage() {
             </div>
           </div>
         )}
-        {data && <OverviewCards data={data.overview} />}
-
-        {data && <TrendCharts data={data.trends} />}
-
-        {data && <ResourceMetrics data={data.resources} />}
         {data && (
-          <div className="mt-6">
-            <FinancialSummary data={data} />
+          <div className={`transition-opacity duration-300 ${loading || reduceMotion ? '' : 'opacity-100'}`}>
+            <OverviewCards data={data.overview} />
+          </div>
+        )}
+
+        {data && (
+          <div className={`transition-opacity duration-300 ${loading || reduceMotion ? '' : 'opacity-100'}`}>
+            <TrendCharts trends={data.trends} resources={data.resources} period={Number(filters.period) || 7} key={refreshKey} />
+          </div>
+        )}
+
+        {data && (
+          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 transition-opacity duration-300 ${loading || reduceMotion ? '' : 'opacity-100'}`}>
+            {/* Left 2/3: Utilization + Material + Queue Pie stacked vertically */}
+            <div className="lg:col-span-2 space-y-6">
+              <ResourceMetrics data={data.resources} />
+            </div>
+            {/* Right 1/3: Financial metrics */}
+            <div>
+              <FinancialSummary data={data} />
+            </div>
           </div>
         )}
       </div>

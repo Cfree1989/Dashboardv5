@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AnalyticsData } from '../../types/analytics';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from 'recharts';
 
 type Props = { data: AnalyticsData };
 
@@ -19,19 +19,20 @@ export function FinancialSummary({ data }: Props) {
         <div className="font-medium text-gray-700 mb-2">Revenue Over Time</div>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data.resources.revenueOverTime.map((p) => ({ date: p.date, revenue: p.cents / 100 }))}
+            <LineChart
+              data={data.financial.revenueByPeriod.map((p) => ({ date: p.period, revenue: p.revenueUsd }))}
               margin={{ left: 8, right: 8, top: 8, bottom: 8 }}
+              key="revenue"
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Area type="monotone" dataKey="revenue" stroke="#7c3aed" fill="#c4b5fd" />
-            </AreaChart>
+              <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive animationDuration={600} animationEasing="ease-in-out" />
+            </LineChart>
           </ResponsiveContainer>
         </div>
-        {data.resources.revenueOverTime.length === 0 && <div className="text-gray-500 text-sm mt-2">No data</div>}
+        {data.financial.revenueByPeriod.length === 0 && <div className="text-gray-500 text-sm mt-2">No data</div>}
       </div>
     </div>
   );
