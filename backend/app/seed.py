@@ -19,6 +19,7 @@ def seed_data_command():
     staff_members = [
         Staff(name='John Doe', is_active=True),
         Staff(name='Jane Smith', is_active=True),
+        Staff(name='Admin User', is_active=True),
         Staff(name='Peter Jones', is_active=False)
     ]
 

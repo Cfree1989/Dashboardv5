@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Mail, Clock, AlertCircle } from "lucide-react";
+import { Mail, Clock, AlertCircle, Edit3, Save, X } from "lucide-react";
 
 export function EmailToolsPanel() {
   const [jobId, setJobId] = useState("");
@@ -8,13 +8,26 @@ export function EmailToolsPanel() {
   const [isResending, setIsResending] = useState(false);
   const [lastSent, setLastSent] = useState<Date | null>(null);
   const [rateLimit, setRateLimit] = useState<{ remaining: number; resetTime: Date | null }>({ remaining: 10, resetTime: null });
+  const [templates, setTemplates] = useState<{ approval: string; rejection: string; completion: string }>({ approval: '', rejection: '', completion: '' });
+  const [editing, setEditing] = useState<{ key: 'approval'|'rejection'|'completion'|null }>({ key: null });
 
   const handleResend = async () => {
     if (!jobId.trim() || !emailType) return;
     setIsResending(true);
     try {
-      // TODO: call POST /jobs/:id/admin/resend-email when backend exists
-      await new Promise((r) => setTimeout(r, 1200));
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch(`/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin/resend-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ staff_name: 'Admin User' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to resend');
+      }
       setLastSent(new Date());
       setRateLimit((prev) => ({ remaining: Math.max(0, prev.remaining - 1), resetTime: new Date(Date.now() + 60000) }));
       setJobId("");
@@ -77,9 +90,60 @@ export function EmailToolsPanel() {
           {lastSent && (
             <div className="text-sm text-green-600 text-center">Email sent successfully at {lastSent.toLocaleTimeString()}</div>
           )}
-        </div>
       </div>
     </div>
+
+    {/* Email Templates Editor (Lightweight UI; persistence TBD) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <Edit3 className="w-5 h-5 text-purple-500" />
+            Email Templates
+          </h2>
+          <p className="text-sm text-gray-600">Edit the default text used when sending emails. HTML is derived from templates; these fields are for quick text updates.</p>
+        </div>
+        <div className="p-5 space-y-5">
+          {(['approval','rejection','completion'] as const).map((k) => (
+            <div key={k} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-800 capitalize">{k} template (text)</label>
+                {editing.key === k ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex items-center px-2 py-1 text-xs rounded bg-gray-800 text-white hover:bg-black"
+                      onClick={() => setEditing({ key: null })}
+                    >
+                      <Save className="w-3 h-3 mr-1" /> Save
+                    </button>
+                    <button
+                      className="inline-flex items-center px-2 py-1 text-xs rounded border hover:bg-gray-50"
+                      onClick={() => setEditing({ key: null })}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="inline-flex items-center px-2 py-1 text-xs rounded border hover:bg-gray-50"
+                    onClick={() => setEditing({ key: k })}
+                  >
+                    <Edit3 className="w-3 h-3 mr-1" /> Edit
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={templates[k]}
+                onChange={(e) => setTemplates((prev) => ({ ...prev, [k]: e.target.value }))}
+                disabled={editing.key !== k}
+                placeholder={`Custom ${k} text (optional)`}
+                className="w-full min-h-[80px] border border-gray-300 rounded px-3 py-2 text-sm disabled:opacity-60"
+              />
+              <p className="text-xs text-gray-500">Note: These text fields are local to this session. Persisting templates to the server can be added next.</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      </div>
   );
 }
 

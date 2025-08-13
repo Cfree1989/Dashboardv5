@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive, ChevronDown, ChevronUp } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, EyeOff, ExternalLink, Copy, Archive, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
@@ -81,12 +81,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
+  const [isResendingConfirm, setIsResendingConfirm] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const { show } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [adminStaffName, setAdminStaffName] = useState<string>("");
+  const [showResendModal, setShowResendModal] = useState(false);
+  const [resendStaffName, setResendStaffName] = useState<string>("");
   const notesHeaderRef = useRef<HTMLHeadingElement | null>(null);
   const notesSectionId = `notes-section-${job.id}`;
   const notesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -98,6 +102,48 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setTimeout(() => notesTextareaRef.current?.focus(), 0);
     }
   }, [isEditingNotes]);
+
+  // Load staff for admin actions
+  useEffect(() => {
+    const loadStaff = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Failed to load staff');
+        const data = await res.json();
+        const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
+        if (activeStaff.length > 0) {
+          setAdminStaffName(activeStaff[0].name);
+        }
+      } catch (e) {
+        // Fallback to 'Admin User' if staff loading fails
+        setAdminStaffName('Admin User');
+      }
+    };
+    loadStaff();
+  }, []);
+
+  // Ensure staff list is populated when opening the resend modal
+  useEffect(() => {
+    const ensureStaffForResend = async () => {
+      try {
+        setLoadingStaff(true);
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
+        setStaff(activeStaff);
+      } catch {
+        // no-op; dropdown will remain with placeholder
+      } finally {
+        setLoadingStaff(false);
+      }
+    };
+    if (showResendModal && staff.length === 0) {
+      ensureStaffForResend();
+    }
+  }, [showResendModal]);
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -113,24 +159,26 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const ageColor = job.created_at ? getAgeColor(job.created_at) : "text-gray-500";
 
-  // Custom elapsed formatter: 10-min increments up to 2h, then round up to 30-min increments
+  // Exact elapsed formatter: days, hours, minutes (no rounding)
   const formatElapsed = (createdAt: string) => {
     const created = new Date(createdAt);
     const now = new Date();
-    const diffMinutes = Math.max(0, Math.floor((now.getTime() - created.getTime()) / 60000));
-    if (diffMinutes < 1) return 'Submitted just now';
-    const roundUp = (value: number, increment: number) => Math.ceil(value / increment) * increment;
-    let roundedMins: number;
-    if (diffMinutes < 120) {
-      roundedMins = roundUp(diffMinutes, 10);
-    } else {
-      roundedMins = roundUp(diffMinutes, 30);
-    }
-    const hours = Math.floor(roundedMins / 60);
-    const mins = roundedMins % 60;
-    if (hours === 0) return `Submitted ${mins} min ago`;
-    if (mins === 0) return `Submitted ${hours} hr ago`;
-    return `Submitted ${hours} hr ${mins} min ago`;
+    const diffMs = Math.max(0, now.getTime() - created.getTime());
+    const totalMinutes = Math.floor(diffMs / 60000);
+    if (totalMinutes < 1) return 'Submitted just now';
+
+    const minutesPerDay = 60 * 24;
+    const days = Math.floor(totalMinutes / minutesPerDay);
+    const hours = Math.floor((totalMinutes % minutesPerDay) / 60);
+    const minutes = totalMinutes % 60;
+
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+
+    if (parts.length === 0) return 'Submitted just now';
+    return `Submitted ${parts.join(' ')} ago`;
   };
   const timeElapsed = job.created_at ? formatElapsed(job.created_at) : 'Submitted recently';
 
@@ -286,7 +334,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
        ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
      `}
      >
-       <div className="p-4 overflow-visible">
+       <div className="p-4">
 		{currentStatus === 'UPLOADED' && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
 				<span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
@@ -549,8 +597,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                        aria-label="Mark as unreviewed (shows NEW badge again)"
                        className="flex items-center px-3 py-1 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 hover:text-orange-950 focus-ring btn-transition whitespace-nowrap"
                      >
-                       <Eye className="w-4 h-4 mr-1" />
-                       <span className="hidden sm:inline">Unreviewed</span>
+                                               <EyeOff className="w-4 h-4 mr-1" />
+                        <span className="hidden sm:inline">Unreviewed</span>
                      </button>
                    </TooltipTrigger>
                    <TooltipContent side="top">Marks this job as unreviewed (shows NEW badge again)</TooltipContent>
@@ -590,27 +638,24 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                      </>
                    )}
                  </button>
-                 <button
-                   onClick={() => setShowDeleteConfirm(true)}
-                   disabled={isDeleting}
-                   className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
-                   title="Archive job"
-                 >
-                   {isDeleting ? (
-                     <>
-                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-600 border-t-transparent mr-1"></div>
-                       <span className="hidden sm:inline">Archiving...</span>
-                     </>
-                   ) : (
-                     <>
-                       <Archive className="w-4 h-4 mr-1" />
-                       <span className="hidden sm:inline">Archive</span>
-                     </>
-                   )}
-                 </button>
                </>
              )}
-             {currentStatus === "READYTOPRINT" && (
+                             {currentStatus === "PENDING" && (
+                 <button
+                   onClick={() => {
+                     setShowResendModal(true);
+                     setResendStaffName("");
+                     onModalOpenChange?.(true);
+                   }}
+                   className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
+                   title="Resend confirmation email"
+                   aria-label="Resend confirmation email"
+                 >
+                   <Mail className="w-4 h-4 mr-1" />
+                   <span className="hidden sm:inline">Resend</span>
+                 </button>
+               )}
+              {currentStatus === "READYTOPRINT" && (
                <button
                  onClick={() => onStatusAction?.(job.id, "mark-printing")}
                  className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
@@ -647,6 +692,26 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                  <span className="hidden sm:inline">Mark Paid/Picked Up</span>
                </button>
              )}
+              {(["UPLOADED","PENDING","READYTOPRINT","PRINTING","COMPLETED"].includes(currentStatus)) && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isDeleting}
+                  className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
+                  title="Archive job"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-600 border-t-transparent mr-1"></div>
+                      <span className="hidden sm:inline">Archiving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">Archive</span>
+                    </>
+                  )}
+                </button>
+              )}
            </div>
          </div>
 
@@ -770,10 +835,92 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             label: 'Type the Job short ID to confirm',
             expected: job.short_id || (job.id?.slice(0, 6) || ''),
             placeholder: job.short_id || job.id?.slice(0, 6)
-          }}
-        />
-      )}
-    </div>
-    </TooltipProvider>
-  );
+                     }}
+         />
+       )}
+       {showResendModal && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center">
+           <div className="absolute inset-0 bg-black/40" onClick={() => {
+             setShowResendModal(false);
+             onModalOpenChange?.(false);
+           }} />
+           <div className="relative bg-white w-full max-w-md rounded-xl shadow-lg border border-gray-200 p-6">
+             <h3 className="text-lg font-semibold text-gray-900 mb-2">Resend Confirmation Email</h3>
+             <p className="text-sm text-gray-600 mb-4">This will send a new confirmation email to the student for job <span className="font-mono">{job.short_id || job.id?.slice(0,8)}</span>.</p>
+             
+             <div className="space-y-4">
+               <div>
+                 <label htmlFor={`resendStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
+                 <select
+                   id={`resendStaff-${job.id}`}
+                   className="w-full border rounded-lg px-3 py-2 focus-ring text-sm"
+                   value={resendStaffName}
+                   onChange={(e) => setResendStaffName(e.target.value)}
+                   disabled={loadingStaff}
+                 >
+                   <option value="" disabled>{loadingStaff ? 'Loading staff...' : 'Select your name'}</option>
+                   {staff.map(s => (
+                     <option key={s.name} value={s.name}>{s.name}</option>
+                   ))}
+                 </select>
+               </div>
+               
+               <div className="flex items-center justify-end space-x-2">
+                 <button 
+                   onClick={() => {
+                     setShowResendModal(false);
+                     onModalOpenChange?.(false);
+                   }} 
+                   className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition"
+                 >
+                   Cancel
+                 </button>
+                 <button 
+                   onClick={async () => {
+                     if (!resendStaffName) {
+                       show('Please select your name');
+                       return;
+                     }
+                     
+                     try {
+                       setIsResendingConfirm(true);
+                       const token = localStorage.getItem('token');
+                       const res = await fetch(`/api/v1/jobs/${job.id}/admin/resend-email`, {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                         body: JSON.stringify({ staff_name: resendStaffName })
+                       });
+                       if (!res.ok) {
+                         const data = await res.json().catch(() => ({} as any));
+                         throw new Error(data.message || 'Failed to resend');
+                       }
+                       show('Confirmation email resent successfully');
+                       setShowResendModal(false);
+                       onModalOpenChange?.(false);
+                     } catch (e) {
+                       show('Failed to resend confirmation email');
+                     } finally {
+                       setIsResendingConfirm(false);
+                     }
+                   }}
+                   disabled={isResendingConfirm || !resendStaffName}
+                   className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition"
+                 >
+                   {isResendingConfirm ? (
+                     <>
+                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                       Resending...
+                     </>
+                   ) : (
+                     'Resend Email'
+                   )}
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+     </TooltipProvider>
+   );
 }

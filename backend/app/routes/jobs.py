@@ -1,6 +1,6 @@
 from flask import Blueprint
 from flask import request, jsonify, abort, g
-from app import db
+from app import db, limiter
 from app.models.job import Job
 from app.utils.decorators import token_required
 from app.models.event import Event
@@ -643,6 +643,63 @@ def admin_change_status(job_id):
     db.session.commit()
     return jsonify(job.to_dict()), 200
 
+
+@bp.route('/<job_id>/admin/resend-email', methods=['POST'])
+@token_required
+@limiter.limit("1 per hour")
+def admin_resend_email(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    if err_resp:
+        return err_resp, err_code
+    if job.student_confirmed:
+        return jsonify({'message': 'Job already confirmed'}), 400
+
+    # Generate fresh token and send approval email
+    token = generate_confirmation_token(job.id)
+    frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
+    confirmation_url = f"{frontend_url}/confirm/{token}"
+    sent = False
+    try:
+        send_approval_email(job, confirmation_url)
+        sent = True
+    except Exception:
+        sent = False
+
+    # Update last sent timestamp
+    try:
+        job.confirmation_last_sent_at = datetime.utcnow()
+        db.session.add(job)
+        db.session.commit()
+    except Exception:
+        pass
+
+    # Log events with staff attribution
+    evt1 = Event(
+        job_id=job.id,
+        event_type='ApprovalEmailResentByStaff',
+        details={'confirmation_url': confirmation_url, 'sent': bool(sent)},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', None),
+    )
+    db.session.add(evt1)
+    db.session.commit()
+
+    # Also record a generic admin action for audit grouping
+    evt2 = Event(
+        job_id=job.id,
+        event_type='AdminAction',
+        details={'action': 'resend_email'},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', None),
+    )
+    db.session.add(evt2)
+    db.session.commit()
+
+    return jsonify({'message': 'Confirmation email resent', 'job_id': job.id}), 200
 
 @bp.route('/<job_id>/admin/mark-failed', methods=['POST'])
 @token_required

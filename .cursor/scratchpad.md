@@ -195,9 +195,10 @@
 
 ### UI1. JobCard Layout Improvements ✅ COMPLETED
 - **Collapse Arrow**: Successfully moved to bottom center of card with proper styling and accessibility
-- **Focus Ring**: Fixed clipping issue by adding `px-1` padding to textarea container
+- **Focus Ring**: Fixed clipping issue by adding `px-1` padding to textarea container (removed `overflow-visible` that was breaking grid layout)
 - **Notes Section**: Positioned in expanded details area with proper structure and workflow
 - **Additional Details**: Includes Discipline and Class fields as planned
+- **Grid Layout**: Fixed 2-cards-per-row issue by removing `overflow-visible` from job card container
 - **Status**: All layout improvements completed and working well, site fully functional
 
 ## Executor's Feedback or Assistance Requests
@@ -215,6 +216,8 @@
 - Moved collapse arrow to bottom center of job cards
 - Fixed focus ring clipping issues
 - Maintained proper card grid layout
+- Resend modal now loads active staff names on open; added validation before sending
+- Archive button now available on all job cards from `UPLOADED` through `COMPLETED`
 
 ### Next Steps
 - All core UI improvements completed
@@ -257,19 +260,19 @@
 
 #### **Phase 1: Analytics Enhancements (High Priority)**
 - [ ] **A1. Analytics Dashboard Parity**
-  - [ ] Unify filters across all analytics components
-  - [ ] Standardize overview cards design
-  - [ ] Implement consistent trend charts
-  - [ ] Add resource metrics visualization
-  - [ ] Create financial summary components
-  - [ ] Add animations with `refreshKey`
-  - [ ] Implement fade-in transitions
-  - [ ] Add reduced motion support
+  - [x] Unify filters across all analytics components
+  - [x] Standardize overview cards design
+  - [x] Implement consistent trend charts
+  - [x] Add resource metrics visualization
+  - [x] Create financial summary components
+  - [x] Add animations with `refreshKey`
+  - [x] Implement fade-in transitions
+  - [x] Add reduced motion support
 
 - [ ] **A2. Analytics Backend Endpoints**
-  - [ ] Create `/api/v1/analytics/overview` endpoint
-  - [ ] Create `/api/v1/analytics/trends` endpoint
-  - [ ] Create `/api/v1/analytics/resources` endpoint
+  - [x] Create `/api/v1/analytics/overview` endpoint
+  - [x] Create `/api/v1/analytics/trends` endpoint
+  - [x] Create `/api/v1/analytics/resources` endpoint
   - [ ] Create `/api/v1/analytics/financial` endpoint
   - [ ] Add proper data aggregation and caching
   - [ ] Implement date range filtering
@@ -278,14 +281,15 @@
 #### **Phase 2: Admin Features (Medium Priority)**
 - [ ] **M1. Submission Form Improvements**
   - [ ] Improve UX parity with masterplan
-  - [ ] Add form validation enhancements
-  - [ ] Implement better error handling
+  - [x] Add form validation enhancements
+  - [x] Implement better error handling
 
 
 - [ ] **M3. Admin Email Tools**
-  - [ ] Add resend email functionality
-  - [ ] Implement rate-limited email resend
-  - [ ] Create email management interface
+  - [x] Add resend email functionality (POST /api/v1/jobs/<id>/admin/resend-email)
+  - [x] Implement rate-limited email resend (1/hour)
+  - [x] Wire admin UI panel to endpoint
+  - [x] Add resend modal with staff selection and confirmation
   - [ ] Add email template management
 
 - [ ] **M4. Stats Endpoints**
@@ -405,10 +409,6 @@
 
 ### 🎯 IMMEDIATE NEXT STEPS (Choose One)
 
-**Option A: Analytics Enhancements**
-- Start with A1. Analytics Dashboard Parity
-- Focus on unifying the analytics UI components
-- Estimated effort: 2-3 weeks
 
 **Option B: Admin Features**
 - Start with M1. Submission Form Improvements

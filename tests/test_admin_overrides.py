@@ -133,3 +133,27 @@ def test_admin_force_unlock_logs_action(client, token, app, tmp_path):
     assert 'AdminAction' in types
 
 
+def test_admin_resend_email_endpoint(client, token, app, tmp_path):
+    os.environ['STORAGE_PATH'] = str(tmp_path)
+    # Create a PENDING job (awaiting student confirmation)
+    file_path, meta_path = _write_files(tmp_path, 'UPLOADED')
+    job_id = _create_job(app, file_path, meta_path, status='PENDING')
+    _add_staff(client, token)
+
+    resp = client.post(
+        f'/api/v1/jobs/{job_id}/admin/resend-email',
+        json={'staff_name': 'Admin User'},
+        headers={'Authorization': f'Bearer {token}'},
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['job_id'] == job_id
+
+    # Rate limit should block immediate second call
+    resp2 = client.post(
+        f'/api/v1/jobs/{job_id}/admin/resend-email',
+        json={'staff_name': 'Admin User'},
+        headers={'Authorization': f'Bearer {token}'},
+    )
+    assert resp2.status_code == 429
+
