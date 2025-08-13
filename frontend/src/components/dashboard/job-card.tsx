@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive } from "lucide-react";
+import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 import ConfirmDialog from './modals/confirm-dialog';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 interface Job {
   id: string;
@@ -89,6 +90,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const notesHeaderRef = useRef<HTMLHeadingElement | null>(null);
   const notesSectionId = `notes-section-${job.id}`;
   const notesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const detailsSectionId = `details-section-${job.id}`;
 
   // Focus the textarea when entering edit mode for quick typing
   useEffect(() => {
@@ -277,6 +279,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   // Removed autosave; composer uses explicit submit to POST append
 
   return (
+    <TooltipProvider>
     <div
       className={`
       bg-white rounded-xl shadow-sm border transition-all card-hover
@@ -284,26 +287,33 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     `}
     >
       <div className="p-4">
-        {currentStatus === 'UPLOADED' && isUnreviewed && (
+		{currentStatus === 'UPLOADED' && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
-            <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
-            <button
-              onClick={handleMarkReviewed}
-              disabled={isMarkingReviewed}
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center disabled:opacity-50 focus-ring btn-transition"
-            >
-              {isMarkingReviewed ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent mr-1"></div>
-                  Marking...
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3 h-3 mr-1" />
-                  Mark as Reviewed
-                </>
-              )}
-            </button>
+				<span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleMarkReviewed}
+                  disabled={isMarkingReviewed}
+                  className="text-xs text-gray-500 hover:text-gray-700 flex items-center disabled:opacity-50 focus-ring btn-transition"
+                  title="Mark as reviewed (hides NEW badge)"
+                  aria-label="Mark as reviewed (hides NEW badge)"
+                >
+                  {isMarkingReviewed ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent mr-1"></div>
+                      Marking...
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3 h-3 mr-1" />
+                      Reviewed
+                    </>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="left">Marks this job as reviewed (hides NEW badge)</TooltipContent>
+            </Tooltip>
           </div>
         )}
 
@@ -361,9 +371,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </div>
         </div>
 
-        
 
-        {showMore && (
+        <div
+          id={detailsSectionId}
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${showMore ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}
+          aria-hidden={!showMore}
+          aria-labelledby={notesSectionId}
+        >
           <div className="mt-3 pt-3 border-t border-gray-100">
             {/* Staff Notes section */}
             <div id={notesSectionId}>
@@ -520,29 +534,38 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               </div>
             )}
           </div>
-        )}
+        </div>
 
         <div className="flex flex-wrap items-center mt-4 gap-2">
           <button 
             onClick={() => setShowMore(!showMore)} 
             className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition whitespace-nowrap"
+            aria-expanded={showMore}
+            aria-controls={detailsSectionId}
+            aria-label={showMore ? 'Collapse details' : 'Expand details'}
+            title={showMore ? 'Collapse' : 'Expand'}
           >
-            {showMore ? "Show Less" : "Show More"}
+            {showMore ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
           <div className="flex flex-wrap gap-2 ml-auto">
             {currentStatus === "UPLOADED" && (
               <>
-                {!!job.staff_viewed_at && (
-                  <button
-                    onClick={handleReapplyNew}
-                    title="Mark as Unreviewed"
-                    aria-label="Mark as Unreviewed"
-                    className="flex items-center px-3 py-1 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 hover:text-yellow-800 focus-ring btn-transition whitespace-nowrap"
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    <span className="hidden sm:inline">Mark as Unreviewed</span>
-                  </button>
+				{!!job.staff_viewed_at && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleReapplyNew}
+                      title="Mark as unreviewed (shows NEW badge again)"
+                      aria-label="Mark as unreviewed (shows NEW badge again)"
+                      className="flex items-center px-3 py-1 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 hover:text-orange-950 focus-ring btn-transition whitespace-nowrap"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">Unreviewed</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Marks this job as unreviewed (shows NEW badge again)</TooltipContent>
+                </Tooltip>
                 )}
                 <button
                   onClick={handleApprove}
@@ -748,5 +771,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }

@@ -59,8 +59,8 @@ describe('JobList component', () => {
     render(<JobList filters={{ status: 'UPLOADED' }} />);
 
     await waitFor(() => expect(screen.getAllByText('Note Job').length).toBeGreaterThan(0));
-    // Expand card
-    fireEvent.click(screen.getByText('Show More'));
+    // Expand card (toggle now uses an icon-only button with accessible label)
+    fireEvent.click(screen.getByRole('button', { name: /Expand details/i }));
     // Begin edit by clicking the notes area
     // If placeholder is present, click it; otherwise click the clickable notes container
     const placeholder = screen.queryByText(/No notes added yet/i);
@@ -169,8 +169,8 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getAllByText('Test Job').length).toBeGreaterThan(0));
     // NEW badge visible
     expect(screen.getByText('NEW')).toBeInTheDocument();
-    // Click Mark as Reviewed button
-    fireEvent.click(screen.getByText(/Mark as Reviewed/i));
+    // Click Reviewed button (renamed from "Mark as Reviewed")
+    fireEvent.click(screen.getByText(/Reviewed/i));
     await waitFor(() => expect(screen.getByText(/Performing Action As/i)).toBeInTheDocument());
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
     const select = screen.getByRole('combobox');
