@@ -82,6 +82,85 @@
 - [x] P6. Background audio trigger — frontend + tests ✅ **COMPLETED**
 - [x] P7. Health alias — backend ✅ **COMPLETED**
 
+### UI2. Dashboard Sorting (Planner)
+
+#### Background & Motivation
+- Staff need consistent control over how jobs are ordered within each dashboard tab (status filter). The primary needs are sorting by submitted time, student name, and printer, with minimal risk of regressions and minimal code changes.
+
+#### Key Challenges & Constraints
+- Keep changes localized (do not refactor tabs or data fetching).
+- Ensure stable, deterministic sort and predictable tie-breakers.
+- Maintain accessibility and responsiveness of the existing layout.
+- Avoid API changes; implement client-side sorting only.
+
+#### Minimal-Touch Files (proposed)
+- frontend/src/components/dashboard/job-list.tsx (add sort UI and logic)
+- frontend/src/components/dashboard/job-list.test.tsx (tests)
+- Optional: No change to `status-tabs.tsx`, `page.tsx`, or backend.
+
+#### Success Criteria (Feature)
+- A compact sort control appears above the list in every status tab.
+- Options: Time (newest → oldest / oldest → newest), Name (A→Z / Z→A), Printer (A→Z / Z→A).
+- Sorting works consistently, is stable, and does not disturb layout.
+- Selection persists per user via localStorage and restores on reload.
+- All unit tests pass; build succeeds with no linter errors.
+
+#### High-level Task Breakdown (Granular)
+1) S1 – Read-only scan (no code changes)
+   - Locate render point in `job-list.tsx` for header controls.
+   - Confirm data fields available: `created_at`, `student_name`, `printer`.
+   - Define default: Time desc (newest first).
+   - Success: Notes recorded in this scratchpad.
+
+2) S2 – Introduce sort state and UI (dropdown + direction toggle)
+   - Add internal state: `sortBy` ∈ {time, name, printer}, `sortDir` ∈ {asc, desc}.
+   - Render compact control at top-right of `job-list` header.
+   - Success: Control renders and updates state on interaction.
+
+3) S3 – Implement stable client-side sort
+   - Derive `sortedJobs` from props using `useMemo` and comparator per `sortBy`/`sortDir`.
+   - Tie-breakers: `created_at` then `student_name` then `printer`.
+   - Handle missing values safely.
+   - Success: Visual order changes as expected.
+
+3a) S3a – Motion-safe fade on sort (UX polish)
+   - Wrap the list container with a 150–200ms opacity transition to soften reordering.
+   - Use existing `frontend/src/lib/use-reduced-motion.ts` to respect reduced motion and disable animation when preferred.
+   - No new dependencies; single-file change (`job-list.tsx`).
+   - Success: Subtle fade during sort change; no layout shift or performance issues.
+
+4) S4 – Persist selection
+   - Write to localStorage on change; read on mount with sane fallback.
+   - Key: `dashboard.sort.v1`.
+   - Success: Selection restored after reload.
+
+5) S5 – Tests
+   - Update `job-list.test.tsx` with datasets to assert sorting by time/name/printer both directions.
+   - Success: Tests pass locally.
+
+6) S6 – Build & Lint
+   - Run `npm run build` in frontend; ensure no type/lint errors.
+   - Success: Green build.
+
+7) S7 – Manual QA
+   - Verify in each tab (UPLOADED, PENDING, READYTOPRINT, PRINTING, COMPLETED) that sorting UI appears and works without layout regressions.
+   - Success: No visual overlap; keyboard accessible.
+
+8) S8 – Documentation
+   - Add short usage note to this scratchpad under Current Status.
+   - Success: Checklist updated and marked complete.
+
+#### Risks & Mitigations
+- Risk: Large lists and sort perf — Mitigation: `useMemo` and simple comparators.
+- Risk: Missing data cause crashes — Mitigation: Safe accessors and defaults.
+- Risk: Layout shift — Mitigation: Compact UI aligned to existing header area.
+
+#### Rollback Plan
+- Feature is isolated to `job-list.tsx` and test; revert those files to prior revision if needed.
+
+#### Estimated Effort
+- 2–4 hours including tests and QA.
+
 ## 📋 Future Implementation (Post-E2E)
 
 ### Analytics V0 Parity

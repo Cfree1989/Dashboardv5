@@ -1,11 +1,13 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
 import ApprovalModal from './modals/approval-modal';
 import StatusChangeModal from './modals/status-change-modal';
 import PaymentModal from './modals/payment-modal';
 import { JobListSkeleton } from './job-card-skeleton';
+import { useReducedMotion } from '../../lib/use-reduced-motion';
+import { ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, X as XIcon } from "lucide-react";
 
 interface Job {
   id: string;
@@ -19,6 +21,7 @@ interface Job {
   created_at?: string;
   notes?: string;
   staff_viewed_at?: string;
+  class_number?: string;
 }
 
 interface JobListFilters {
@@ -27,7 +30,7 @@ interface JobListFilters {
   printer?: string;
   discipline?: string;
 }
-export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void }) {
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, onSearchChange }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, onSearchChange?: (value: string) => void }) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,6 +40,117 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   const [approveJobPrinter, setApproveJobPrinter] = useState<string | null>(null);
   const [statusJobId, setStatusJobId] = useState<string | null>(null);
   const [statusAction, setStatusAction] = useState<"mark-printing" | "mark-complete" | "mark-picked-up" | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  type SortBy = 'time' | 'name' | 'printer' | 'color' | 'class';
+  type SortDir = 'asc' | 'desc';
+  const [sortBy, setSortBy] = useState<SortBy>('time');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [isFading, setIsFading] = useState(false);
+  const [expandAllSignal, setExpandAllSignal] = useState(0);
+  const [collapseAllSignal, setCollapseAllSignal] = useState(0);
+  const [allOpen, setAllOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Load persisted sort on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('dashboard.sort.v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.sortBy === 'time' || parsed.sortBy === 'name' || parsed.sortBy === 'printer')) {
+          setSortBy(parsed.sortBy);
+        }
+        if (parsed && (parsed.sortDir === 'asc' || parsed.sortDir === 'desc')) {
+          setSortDir(parsed.sortDir);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Persist selection and trigger a gentle fade
+  useEffect(() => {
+    try { localStorage.setItem('dashboard.sort.v1', JSON.stringify({ sortBy, sortDir })); } catch {}
+    if (!prefersReducedMotion) {
+      setIsFading(true);
+      const t = setTimeout(() => setIsFading(false), 180);
+      return () => clearTimeout(t);
+    }
+  }, [sortBy, sortDir, prefersReducedMotion]);
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Gentle fade on search as well
+  useEffect(() => {
+    if (!prefersReducedMotion) {
+      setIsFading(true);
+      const t = setTimeout(() => setIsFading(false), 150);
+      return () => clearTimeout(t);
+    }
+  }, [debouncedSearch, prefersReducedMotion]);
+
+  // Notify parent so it can compute cross-tab matches
+  useEffect(() => {
+    onSearchChange?.(debouncedSearch);
+  }, [debouncedSearch, onSearchChange]);
+
+  // Reset bulk state on status change to avoid confusion
+  useEffect(() => {
+    setAllOpen(false);
+  }, [filters?.status]);
+
+  function compareStrings(a?: string, b?: string): number {
+    const aa = (a || '').toLowerCase();
+    const bb = (b || '').toLowerCase();
+    if (aa < bb) return -1;
+    if (aa > bb) return 1;
+    return 0;
+  }
+
+  const sortedJobs = useMemo(() => {
+    const copy = [...jobs];
+    copy.sort((a, b) => {
+      // base comparisons
+      let cmp = 0;
+      if (sortBy === 'time') {
+        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        cmp = at === bt ? 0 : (at < bt ? -1 : 1);
+      } else if (sortBy === 'name') {
+        const an = a.student_name || a.display_name || '';
+        const bn = b.student_name || b.display_name || '';
+        cmp = compareStrings(an, bn);
+      } else if (sortBy === 'printer') {
+        cmp = compareStrings(a.printer, b.printer);
+      } else if (sortBy === 'color') {
+        cmp = compareStrings(a.color, b.color);
+      } else if (sortBy === 'class') {
+        cmp = compareStrings(a.class_number, b.class_number);
+      }
+      if (cmp === 0) {
+        // Tie-breakers for stability: time desc, then name asc, then printer asc, then id asc
+        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+        cmp = bt - at; // newer first
+        if (cmp === 0) {
+          cmp = compareStrings(a.student_name || a.display_name, b.student_name || b.display_name);
+          if (cmp === 0) {
+            cmp = compareStrings(a.printer, b.printer);
+            if (cmp === 0) {
+              cmp = compareStrings(a.id, b.id);
+            }
+          }
+        }
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return copy;
+  }, [jobs, sortBy, sortDir]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -51,7 +165,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         // Build query string based on filters
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
-        if (filters?.search) params.append('search', filters.search);
+        const qSearch = debouncedSearch || (filters?.search || "");
+        if (qSearch) params.append('search', qSearch);
         if (filters?.printer) params.append('printer', filters.printer);
         if (filters?.discipline) params.append('discipline', filters.discipline);
         const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''), {
@@ -74,7 +189,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       }
     }
     fetchJobs();
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken]);
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken, debouncedSearch]);
 
   const openApproveModal = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
@@ -156,8 +271,85 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {jobs.map(job => (
+    <div>
+      {/* Bulk actions + Search + Sort controls */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-50 bg-white"
+            onClick={() => {
+              if (allOpen) {
+                setCollapseAllSignal(v => v + 1);
+              } else {
+                setExpandAllSignal(v => v + 1);
+              }
+              setAllOpen(v => !v);
+            }}
+            aria-label={allOpen ? "Collapse all cards" : "Open all cards"}
+            title={allOpen ? "Collapse all" : "Open all"}
+          >
+            {allOpen ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+            <span className="sr-only">{allOpen ? 'Collapse all' : 'Open all'}</span>
+          </button>
+
+          {/* Search input */}
+          <div className="relative">
+            <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or email"
+              className="pl-7 pr-7 py-1.5 text-sm border rounded w-48 md:w-64 focus-ring"
+              aria-label="Search jobs by name or email"
+            />
+            {search && (
+              <button
+                type="button"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
+                aria-label="Clear search"
+                onClick={() => setSearch("")}
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+        <label htmlFor="sortBy" className="text-sm text-gray-600">Sort by:</label>
+        <select
+          id="sortBy"
+          className="border rounded px-2 py-1 text-sm"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortBy)}
+        >
+          <option value="time">Time</option>
+          <option value="name">Name</option>
+          <option value="printer">Printer</option>
+          <option value="color">Color</option>
+          <option value="class">Class</option>
+        </select>
+        <button
+          type="button"
+          aria-label="Toggle sort direction"
+          className="inline-flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-50 bg-white"
+          onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+          title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+        >
+          {sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+          <span className="sr-only">{sortDir === 'asc' ? 'Ascending' : 'Descending'}</span>
+        </button>
+        </div>
+      </div>
+
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-200 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
+      {sortedJobs.map(job => (
         <JobCard 
           key={job.id} 
           job={job} 
@@ -167,8 +359,11 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           onMarkReviewed={handleMarkReviewed}
           onStatusAction={openStatusModal}
           onModalOpenChange={onModalOpenChange}
+          expandSignal={expandAllSignal}
+          collapseSignal={collapseAllSignal}
         />
       ))}
+      </div>
       {approveJobId && (
         <ApprovalModal
           jobId={approveJobId}

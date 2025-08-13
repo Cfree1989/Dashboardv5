@@ -36,6 +36,8 @@ interface JobCardProps {
   onMarkReviewed?: (jobId: string) => void;
   onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
   onModalOpenChange?: (open: boolean) => void; // pause auto-refresh while editing notes
+  expandSignal?: number;
+  collapseSignal?: number;
 }
 
 /**
@@ -66,7 +68,7 @@ function convertToWindowsPath(filePath: string): string {
   return `C:\\Dashboardv5\\storage\\${filePath}`.replace(/\//g, '\\');
 }
 
-export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onModalOpenChange }: JobCardProps) {
+export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
@@ -102,6 +104,21 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setTimeout(() => notesTextareaRef.current?.focus(), 0);
     }
   }, [isEditingNotes]);
+
+  // Respond to global expand/collapse signals
+  useEffect(() => {
+    if (typeof expandSignal === 'number') {
+      // Open details
+      setShowMore(true);
+    }
+  }, [expandSignal]);
+
+  useEffect(() => {
+    if (typeof collapseSignal === 'number') {
+      // Close details
+      setShowMore(false);
+    }
+  }, [collapseSignal]);
 
   // Load staff for admin actions
   useEffect(() => {

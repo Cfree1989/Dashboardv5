@@ -37,15 +37,19 @@ export default function DashboardPage() {
   
   const [status, setStatus] = useState(searchParams.get('status') || statusOptions[0]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [crossTabMatches, setCrossTabMatches] = useState<Record<string, number>>({});
+  const [globalSearch, setGlobalSearch] = useState("");
   
   const fetchCounts = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     const counts: Record<string, number> = {};
+    const matches: Record<string, number> = {};
     try {
       await Promise.all(
         statusOptions.map(async (s) => {
           const params = new URLSearchParams({ status: s });
+          if (globalSearch.trim()) params.set('search', globalSearch.trim());
           const res = await fetch('/api/v1/jobs?' + params.toString(), {
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -56,7 +60,9 @@ export default function DashboardPage() {
           }
           if (!res.ok) return;
           const data = await res.json();
-          counts[s] = Array.isArray(data) ? data.length : (data.jobs || []).length;
+          const arr = Array.isArray(data) ? data : (data.jobs || []);
+          counts[s] = arr.length;
+          matches[s] = arr.length; // when globalSearch is set, this serves as match count per tab
         })
       );
     } catch {
@@ -83,6 +89,7 @@ export default function DashboardPage() {
     hasInitializedCounts.current = true;
     
     setStatusCounts(counts);
+    if (globalSearch.trim()) setCrossTabMatches(matches); else setCrossTabMatches({});
   };
   
   useEffect(() => {
@@ -102,7 +109,7 @@ export default function DashboardPage() {
       fetchCounts();
     }, 45000);
     return () => clearInterval(interval);
-  }, [pauseRefresh]);
+  }, [pauseRefresh, globalSearch]);
   
   const refreshPage = async () => {
     setIsRefreshing(true);
@@ -136,7 +143,7 @@ export default function DashboardPage() {
       <StatusTabs 
         currentStatus={status} 
         onStatusChange={updateStatus} 
-        stats={statusCounts} 
+        stats={Object.fromEntries(statusOptions.map(s => [s, (statusCounts[s] || 0) + (globalSearch ? 0 : 0)]))}
       />
       
       <JobList
@@ -144,6 +151,7 @@ export default function DashboardPage() {
         onJobsMutated={fetchCounts} 
         refreshToken={refreshTick}
         onModalOpenChange={setPauseRefresh}
+        onSearchChange={setGlobalSearch}
       />
     </div>
   );

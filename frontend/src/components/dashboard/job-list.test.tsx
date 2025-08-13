@@ -39,6 +39,36 @@ describe('JobList component', () => {
     expect(screen.getAllByText('Another Job').length).toBeGreaterThan(0);
   });
 
+  it('sorts jobs by name ascending and descending', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ jobs: [
+        { id: '1', display_name: 'Zebra', student_name: 'Zoe' },
+        { id: '2', display_name: 'Alpha', student_name: 'Amy' },
+        { id: '3', display_name: 'Mike', student_name: 'Mike' },
+      ] })
+    });
+    render(<JobList filters={{ status: 'UPLOADED' }} />);
+    await waitFor(() => expect(screen.getAllByText(/Zebra|Alpha|Mike/).length).toBeGreaterThan(0));
+
+    // Change sort to Name asc
+    fireEvent.change(screen.getByLabelText(/Sort by:/i), { target: { value: 'name' } });
+    // Toggle direction to asc if currently desc (initial default is time/desc, but direction toggle is stateful per control)
+    const dirBtn = screen.getByRole('button', { name: /Toggle sort direction/i });
+    if (dirBtn.textContent === 'Desc') {
+      fireEvent.click(dirBtn);
+    }
+
+    // Expect first card to be Alpha (Amy)
+    const cards = screen.getAllByText(/Zebra|Alpha|Mike/);
+    expect(cards[0].textContent).toMatch(/Alpha|Amy/);
+
+    // Toggle to desc and expect Zebra first
+    fireEvent.click(dirBtn);
+    const cardsDesc = screen.getAllByText(/Zebra|Alpha|Mike/);
+    expect(cardsDesc[0].textContent).toMatch(/Zebra|Zoe/);
+  });
+
   it('shows error message on fetch failure', async () => {
     jest.spyOn(global, 'fetch').mockRejectedValue(new Error('Fetch error'));
     render(<JobList filters={{}} />);
