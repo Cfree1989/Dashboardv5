@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card.tsx';
 import ApprovalModal from './modals/approval-modal';
@@ -30,7 +30,7 @@ interface JobListFilters {
   printer?: string;
   discipline?: string;
 }
-export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, onSearchChange }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, onSearchChange?: (value: string) => void }) {
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, searchValue?: string, onSearchInput?: (value: string) => void }) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,8 +50,9 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   const [expandAllSignal, setExpandAllSignal] = useState(0);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
   const [allOpen, setAllOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const controllerRef = useRef<AbortController | null>(null);
 
   // Load persisted sort on mount
   useEffect(() => {
@@ -79,25 +80,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
   }, [sortBy, sortDir, prefersReducedMotion]);
 
-  // Debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  // Gentle fade on search as well
-  useEffect(() => {
-    if (!prefersReducedMotion) {
-      setIsFading(true);
-      const t = setTimeout(() => setIsFading(false), 150);
-      return () => clearTimeout(t);
-    }
-  }, [debouncedSearch, prefersReducedMotion]);
-
-  // Notify parent so it can compute cross-tab matches
-  useEffect(() => {
-    onSearchChange?.(debouncedSearch);
-  }, [debouncedSearch, onSearchChange]);
+  // Gentle fade on sort changes only
 
   // Reset bulk state on status change to avoid confusion
   useEffect(() => {
@@ -158,19 +141,31 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       router.push('/login');
       return;
     }
+    // cancel any in-flight
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     async function fetchJobs() {
-      setLoading(true);
+      if (hasLoaded) {
+        setIsFetching(true);
+      } else {
+        setLoading(true);
+      }
       setError('');
       try {
         // Build query string based on filters
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
-        const qSearch = debouncedSearch || (filters?.search || "");
+        const qSearch = (filters?.search || "").trim();
         if (qSearch) params.append('search', qSearch);
         if (filters?.printer) params.append('printer', filters.printer);
         if (filters?.discipline) params.append('discipline', filters.discipline);
         const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''), {
           headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal,
         });
         if (res.status === 401) {
           localStorage.removeItem('token');
@@ -182,14 +177,26 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         }
         const data = await res.json();
         setJobs(Array.isArray(data) ? data : (data.jobs || []));
-      } catch (err) {
+        setHasLoaded(true);
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return; // ignore aborted
+        }
         setError('Failed to load jobs');
       } finally {
-        setLoading(false);
+        if (controllerRef.current === controller) {
+          setLoading(false);
+          setIsFetching(false);
+        }
       }
     }
     fetchJobs();
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken, debouncedSearch]);
+    return () => {
+      if (controllerRef.current === controller) {
+        controllerRef.current.abort();
+      }
+    };
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken]);
 
   const openApproveModal = (jobId: string) => {
     const job = jobs.find(j => j.id === jobId);
@@ -254,27 +261,36 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     })();
   };
 
-  if (loading) return <JobListSkeleton />;
-  
-  if (error) return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-      <p className="text-red-600">{error}</p>
-    </div>
-  );
-  
-  if (jobs.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-        <p className="text-gray-500">No jobs found for this status.</p>
-      </div>
-    );
-  }
+  if (!hasLoaded && loading) return <JobListSkeleton />;
 
   return (
     <div>
-      {/* Bulk actions + Search + Sort controls */}
+      {/* Search + Bulk actions + Sort controls */}
       <div className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-2">
+          {/* Search input (controlled by page) */}
+          <div className="relative">
+            <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              value={searchValue || ""}
+              onChange={(e) => onSearchInput?.(e.target.value)}
+              placeholder="Search name or email"
+              className="pl-7 pr-7 py-1.5 text-sm border rounded w-48 md:w-64 focus-ring"
+              aria-label="Search jobs by name or email"
+            />
+            {searchValue ? (
+              <button
+                type="button"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
+                aria-label="Clear search"
+                onClick={() => onSearchInput?.("")}
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            ) : null}
+          </div>
+
           <button
             type="button"
             className="inline-flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-50 bg-white"
@@ -296,29 +312,6 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             )}
             <span className="sr-only">{allOpen ? 'Collapse all' : 'Open all'}</span>
           </button>
-
-          {/* Search input */}
-          <div className="relative">
-            <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or email"
-              className="pl-7 pr-7 py-1.5 text-sm border rounded w-48 md:w-64 focus-ring"
-              aria-label="Search jobs by name or email"
-            />
-            {search && (
-              <button
-                type="button"
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
-                aria-label="Clear search"
-                onClick={() => setSearch("")}
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
-            )}
-          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -348,22 +341,35 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-200 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-      {sortedJobs.map(job => (
-        <JobCard 
-          key={job.id} 
-          job={job} 
-          currentStatus={filters?.status}
-          onApprove={openApproveModal}
-          onReject={handleReject}
-          onMarkReviewed={handleMarkReviewed}
-          onStatusAction={openStatusModal}
-          onModalOpenChange={onModalOpenChange}
-          expandSignal={expandAllSignal}
-          collapseSignal={collapseAllSignal}
-        />
-      ))}
-      </div>
+      {isFetching && (
+        <div className="mb-2 text-xs text-gray-500" aria-live="polite">Updating results…</div>
+      )}
+      {error && (
+        <div className="mb-2 text-sm text-red-600" role="alert">{error}</div>
+      )}
+
+      {sortedJobs.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <p className="text-gray-500">No jobs found for this status.</p>
+        </div>
+      ) : (
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-200 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
+        {sortedJobs.map(job => (
+          <JobCard 
+            key={job.id} 
+            job={job} 
+            currentStatus={filters?.status}
+            onApprove={openApproveModal}
+            onReject={handleReject}
+            onMarkReviewed={handleMarkReviewed}
+            onStatusAction={openStatusModal}
+            onModalOpenChange={onModalOpenChange}
+            expandSignal={expandAllSignal}
+            collapseSignal={collapseAllSignal}
+          />
+        ))}
+        </div>
+      )}
       {approveJobId && (
         <ApprovalModal
           jobId={approveJobId}

@@ -161,6 +161,80 @@
 #### Estimated Effort
 - 2–4 hours including tests and QA.
 
+### UI3. Global Search UX Stabilization (Planner)
+
+#### Background & Motivation
+- Current search behavior is jarring: when a query returns no results in the current tab, the entire header (including the search box) disappears; while typing, frequent re-renders interrupt the input. We also want search to report matches across all tabs without switching tabs automatically.
+
+#### Key Issues (Root Causes)
+- Early return in `JobList` when `jobs.length === 0` removes the header/controls.
+- Search state lives within `JobList`, which is remounted as data changes – causing focus loss and typing interruptions.
+- Single `loading` flag replaces the list with a skeleton during search updates, producing heavy reflows.
+- No request cancellation – rapid typing can race responses and flash stale data.
+- Cross-tab match computation exists but is not surfaced in the UI.
+
+#### Proposed Approach (Minimal, Safe)
+- Make search truly global (page-level): move the input and debouncing to `frontend/src/app/dashboard/page.tsx`.
+  - Persist to `localStorage` as `dashboard.globalSearch.v1`.
+  - Debounce 350–400ms; treat IME composition respectfully (no premature searches).
+- Feed `filters.search` down to `JobList`; remove `JobList`’s internal search state.
+- In `JobList`:
+  - Never early return for empty results; always render header/controls. Show an inline empty-state message instead.
+  - Distinguish initial load vs searching: keep prior list while searching and show a light inline spinner; use skeleton only on first load.
+  - Add `AbortController` to cancel in-flight fetches when a new search starts.
+  - Keep subtle fade animation but do not affect input focus.
+- Cross-tab indicators:
+  - Page-level fetch (already implemented) computes per-status match counts when a global search exists.
+  - Update `StatusTabs` to accept optional `matchCounts` prop and show a small secondary badge (e.g., orange) with match counts; add `aria-label="X matches for current search"`.
+  - Above the list, optionally show “Matches in other tabs” chips (click to switch tabs).
+
+#### Files Touched (Expected)
+- `frontend/src/app/dashboard/page.tsx` (move search input + debounce + persist + matchCounts UI wiring)
+- `frontend/src/components/dashboard/status-tabs.tsx` (optional `matchCounts` badge)
+- `frontend/src/components/dashboard/job-list.tsx` (remove internal search state; keep header on empty; add abort + isSearching handling)
+- Tests: `frontend/src/components/dashboard/job-list.test.tsx` and a small test for `status-tabs` badges
+
+#### Success Criteria
+- Search input never disappears and never loses focus while typing.
+- Empty current tab shows a clear message and retains controls; tabs with matches are visibly indicated with counts.
+- Typing feels smooth (no stutter); old requests are canceled; only latest results render.
+- No layout regressions; grid remains 3-per-row on large screens.
+- No new linter/type errors; build is green.
+
+#### High-level Task Breakdown
+1) S0 – Audit current files (read-only)
+   - Confirm early return path and internal search state in `job-list.tsx`.
+   - Verify page-level match counting logic.
+   - Output: notes added here.
+2) S1 – Page-level search control
+   - Add controlled input + 400ms debounce + localStorage persist in `page.tsx`.
+   - Pass `filters={{ status, search: globalSearch }}` to `JobList`.
+3) S2 – Remove internal search from `JobList`
+   - Use `filters.search` exclusively; keep header/controls always rendered.
+   - Replace early returns with inline empty-state.
+   - Add `AbortController` for fetches; introduce `isSearching` separate from initial `loading`.
+4) S3 – Cross-tab indicators
+   - Extend `StatusTabs` with optional `matchCounts`; render a subtle second badge when `globalSearch` is active.
+   - Optional: “Matches in other tabs” chips above the list.
+5) S4 – UX polish
+   - Maintain fade only on list changes; do not touch input focus.
+   - Add aria-live for empty-state/spinner messages.
+6) S5 – Tests & Build
+   - Update `job-list.test.tsx` to assert header exists when 0 results and no focus loss.
+   - Add simple `status-tabs` badge test.
+   - Run build and fix any lints/types.
+
+#### Risks & Mitigations
+- Race conditions: solved via `AbortController` and last-write-wins guards.
+- Layout regressions: minimal DOM changes; preserve existing structure.
+- Performance: debounce + keep-list-while-searching avoids thrash.
+
+#### Rollback Plan
+- Revert changes to the three touched files; restore previous search behavior.
+
+#### Estimated Effort
+- 2–4 hours including tests and QA.
+
 ## 📋 Future Implementation (Post-E2E)
 
 ### Analytics V0 Parity

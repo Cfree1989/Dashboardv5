@@ -4,6 +4,8 @@ interface StatusTabsProps {
   currentStatus: string
   onStatusChange: (status: string) => void
   stats: Record<string, number>
+  matchCounts?: Record<string, number>
+  searchActive?: boolean
 }
 
 interface TabConfig {
@@ -11,7 +13,7 @@ interface TabConfig {
   title: string
 }
 
-export function StatusTabs({ currentStatus, onStatusChange, stats }: StatusTabsProps) {
+export function StatusTabs({ currentStatus, onStatusChange, stats, matchCounts, searchActive }: StatusTabsProps) {
   const tabs: TabConfig[] = [
     { key: "UPLOADED", title: "Uploaded" },
     { key: "PENDING", title: "Pending" },
@@ -43,10 +45,10 @@ export function StatusTabs({ currentStatus, onStatusChange, stats }: StatusTabsP
           <span
             className={`
             ml-2 px-2 py-1 text-xs font-semibold rounded-full
-            ${currentStatus === tab.key ? "bg-blue-500 text-white" : "bg-blue-100 text-blue-800"}
+            ${currentStatus === tab.key ? (searchActive ? "bg-orange-500 text-white" : "bg-blue-500 text-white") : (searchActive ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800")}
           `}
           >
-            {stats[tab.key] || 0}
+            {searchActive && matchCounts ? (matchCounts[tab.key] || 0) : (stats[tab.key] || 0)}
           </span>
         </button>
       ))}

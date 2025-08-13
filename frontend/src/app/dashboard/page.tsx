@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [crossTabMatches, setCrossTabMatches] = useState<Record<string, number>>({});
   const [globalSearch, setGlobalSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   
   const fetchCounts = async () => {
     const token = localStorage.getItem('token');
@@ -46,10 +47,10 @@ export default function DashboardPage() {
     const counts: Record<string, number> = {};
     const matches: Record<string, number> = {};
     try {
+      // Always compute raw counts without search (used for audio + default badges)
       await Promise.all(
         statusOptions.map(async (s) => {
           const params = new URLSearchParams({ status: s });
-          if (globalSearch.trim()) params.set('search', globalSearch.trim());
           const res = await fetch('/api/v1/jobs?' + params.toString(), {
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -62,9 +63,25 @@ export default function DashboardPage() {
           const data = await res.json();
           const arr = Array.isArray(data) ? data : (data.jobs || []);
           counts[s] = arr.length;
-          matches[s] = arr.length; // when globalSearch is set, this serves as match count per tab
         })
       );
+
+      // Compute match counts only when a search term exists
+      if (globalSearch.trim()) {
+        const term = globalSearch.trim();
+        await Promise.all(
+          statusOptions.map(async (s) => {
+            const params = new URLSearchParams({ status: s, search: term });
+            const res = await fetch('/api/v1/jobs?' + params.toString(), {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const arr = Array.isArray(data) ? data : (data.jobs || []);
+            matches[s] = arr.length;
+          })
+        );
+      }
     } catch {
       // Swallow network errors; counts remain partial/empty
     }
@@ -78,7 +95,7 @@ export default function DashboardPage() {
     // Use the higher of stored count or previous count to handle rapid refreshes
     const effectivePreviousCount = Math.max(previousUploadedCount.current, storedCount);
     
-    if (hasInitializedCounts.current && currentUploadedCount > effectivePreviousCount) {
+    if (!debouncedSearch && hasInitializedCounts.current && currentUploadedCount > effectivePreviousCount) {
       // New uploads detected - play notification sound
       if (canPlayAudio()) {
         playNewUploadSound();
@@ -98,7 +115,27 @@ export default function DashboardPage() {
     setTimeout(() => fetchCounts(), 0);
   }, []);
 
-  // Auto-refresh every 45s: update counts and trigger list refresh
+  // Persist and debounce global search
+  useEffect(() => {
+    try { localStorage.setItem('dashboard.globalSearch.v1', globalSearch); } catch {}
+    const t = setTimeout(() => setDebouncedSearch(globalSearch.trim()), 400);
+    return () => clearTimeout(t);
+  }, [globalSearch]);
+
+  // Initialize global search from storage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dashboard.globalSearch.v1');
+      if (saved) setGlobalSearch(saved);
+    } catch {}
+  }, []);
+
+  // Recompute counts immediately when search changes
+  useEffect(() => {
+    fetchCounts();
+  }, [debouncedSearch]);
+
+  // Auto-refresh every 45s: update counts and trigger list refresh (mute sound while searching)
   useEffect(() => {
     const interval = setInterval(() => {
       if (pauseRefresh) return;
@@ -109,7 +146,7 @@ export default function DashboardPage() {
       fetchCounts();
     }, 45000);
     return () => clearInterval(interval);
-  }, [pauseRefresh, globalSearch]);
+  }, [pauseRefresh, debouncedSearch]);
   
   const refreshPage = async () => {
     setIsRefreshing(true);
@@ -140,18 +177,23 @@ export default function DashboardPage() {
       {/* Header moved to global layout; keep page title hidden for a11y consistency */}
       <h1 className="sr-only">3D Print Job Dashboard</h1>
 
-      <StatusTabs 
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <StatusTabs 
         currentStatus={status} 
         onStatusChange={updateStatus} 
-        stats={Object.fromEntries(statusOptions.map(s => [s, (statusCounts[s] || 0) + (globalSearch ? 0 : 0)]))}
-      />
+        stats={Object.fromEntries(statusOptions.map(s => [s, (statusCounts[s] || 0)]))}
+        matchCounts={debouncedSearch ? crossTabMatches : undefined}
+        searchActive={!!debouncedSearch}
+        />
+      </div>
       
       <JobList
-        filters={{ status }} 
+        filters={{ status, search: debouncedSearch }} 
         onJobsMutated={fetchCounts} 
         refreshToken={refreshTick}
         onModalOpenChange={setPauseRefresh}
-        onSearchChange={setGlobalSearch}
+        searchValue={globalSearch}
+        onSearchInput={setGlobalSearch}
       />
     </div>
   );
