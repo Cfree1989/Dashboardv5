@@ -173,9 +173,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     const minutes = totalMinutes % 60;
 
     const parts: string[] = [];
-    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
-    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
-    if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
 
     if (parts.length === 0) return 'Submitted just now';
     return `Submitted ${parts.join(' ')} ago`;
