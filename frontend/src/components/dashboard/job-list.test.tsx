@@ -61,8 +61,8 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getAllByText('Note Job').length).toBeGreaterThan(0));
     // Expand card
     fireEvent.click(screen.getByText('Show More'));
-    // Begin edit
-    fireEvent.click(screen.getByText('Edit Notes'));
+    // Begin edit via new centered section button
+    fireEvent.click(screen.getByText('Add Note'));
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
     // Enter note
     const textarea = screen.getByLabelText(/Add a new note/i);

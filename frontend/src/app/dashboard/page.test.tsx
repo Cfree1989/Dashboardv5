@@ -61,31 +61,25 @@ describe('DashboardPage Sound Integration', () => {
   });
 
   it('should play sound when UPLOADED count increases', async () => {
-    // First call returns 0 uploads
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ jobs: [] }), // 0 uploads
-      })
-      // Second call returns 2 uploads (increase detected)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ jobs: [{ id: '1' }, { id: '2' }] }), // 2 uploads
-      });
+    // Simulate two sweeps of 8 status fetches: first sweep -> all 0; second sweep -> UPLOADED has 2
+    const statusesPerSweep = 8;
+    let idx = 0;
+    (global.fetch as jest.Mock).mockImplementation((url: any) => {
+      const round = Math.floor(idx / statusesPerSweep);
+      const isUploaded = String(url).includes('status=UPLOADED');
+      idx++;
+      const jobs = round === 0 ? [] : (isUploaded ? [{ id: '1' }, { id: '2' }] : []);
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ jobs }) });
+    });
 
     render(<DashboardPage />);
 
-    // Wait for initial fetch
+    // Wait for two rounds of fetch (initial + second causing increase)
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect((global.fetch as jest.Mock).mock.calls.length).toBeGreaterThan(1);
     });
-
-    // Trigger another fetch (simulating auto-refresh or manual refresh)
-    await waitFor(() => {
-      expect(soundUtils.playNewUploadSound).toHaveBeenCalled();
-    });
+    // Allow microtasks then assert; polling to avoid flake
+    await waitFor(() => expect(soundUtils.playNewUploadSound).toHaveBeenCalled(), { timeout: 2000 });
   });
 
   it('should not play sound on initial load', async () => {

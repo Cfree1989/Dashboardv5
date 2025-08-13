@@ -104,8 +104,9 @@ export function playStatusChangeSound(): void {
  * Check if audio is supported and enabled
  */
 export function isAudioSupported(): boolean {
-  return typeof window !== 'undefined' && 
-         (window.AudioContext || (window as any).webkitAudioContext) !== undefined;
+  if (typeof window === 'undefined') return false;
+  const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+  return typeof Ctx === 'function';
 }
 
 /**

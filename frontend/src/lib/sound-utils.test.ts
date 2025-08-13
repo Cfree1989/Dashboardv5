@@ -51,10 +51,9 @@ describe('sound-utils', () => {
     console.warn = mockConsoleWarn;
     
     // Mock global objects
-    global.window = {
-      AudioContext: jest.fn(() => mockAudioContext),
-      webkitAudioContext: jest.fn(() => mockAudioContext),
-    } as any;
+    (global as any).window = (global as any).window || ({} as any);
+    (global as any).window.AudioContext = jest.fn(() => mockAudioContext) as any;
+    (global as any).window.webkitAudioContext = jest.fn(() => mockAudioContext) as any;
     
     global.Audio = jest.fn(() => mockAudio) as any;
     global.document = {
@@ -77,7 +76,8 @@ describe('sound-utils', () => {
     });
 
     it('should return true when webkitAudioContext is available', () => {
-      delete (global.window as any).AudioContext;
+      (global.window as any).AudioContext = undefined;
+      (global.window as any).webkitAudioContext = jest.fn(() => mockAudioContext);
       expect(isAudioSupported()).toBe(true);
     });
 
@@ -94,8 +94,9 @@ describe('sound-utils', () => {
     });
 
     it('should return false when page is hidden', () => {
-      (global.document as any).visibilityState = 'hidden';
+      Object.defineProperty(global.document as any, 'visibilityState', { value: 'hidden', configurable: true });
       expect(canPlayAudio()).toBe(false);
+      Object.defineProperty(global.document as any, 'visibilityState', { value: 'visible', configurable: true });
     });
 
     it('should return false when audio is not supported', () => {

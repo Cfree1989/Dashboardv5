@@ -22,5 +22,40 @@ if (typeof (global as any).ResizeObserver === 'undefined') {
   } as any;
 }
 
+// Provide minimal Web Audio API polyfill for tests that expect support
+if (typeof (global as any).window === 'undefined') {
+  (global as any).window = {} as any;
+}
+
+(global as any).window.AudioContext = (global as any).window.AudioContext || (function() {
+  return function MockAudioContext(this: any) {
+    this.createOscillator = jest.fn(() => ({
+      frequency: { setValueAtTime: jest.fn(), exponentialRampToValueAtTime: jest.fn(), linearRampToValueAtTime: jest.fn() },
+      start: jest.fn(),
+      stop: jest.fn(),
+      connect: jest.fn(),
+    }));
+    this.createGain = jest.fn(() => ({
+      gain: { setValueAtTime: jest.fn(), linearRampToValueAtTime: jest.fn(), exponentialRampToValueAtTime: jest.fn() },
+      connect: jest.fn(),
+    }));
+    this.currentTime = 0;
+    this.state = 'running';
+    this.resume = jest.fn();
+    this.destination = {};
+  } as any;
+})();
+
+// Ensure document.visibilityState exists and is visible by default
+Object.defineProperty(document, 'visibilityState', {
+  value: 'visible',
+  configurable: true,
+});
+
+// In case any test imports canPlayAudio before it's mocked, ensure Audio is defined
+if (!(global as any).Audio) {
+  (global as any).Audio = function() { return { play: jest.fn(), volume: 0, src: '' }; } as any;
+}
+
 
 

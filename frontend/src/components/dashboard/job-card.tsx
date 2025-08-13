@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
@@ -23,6 +23,8 @@ interface Job {
   notes?: string;
   staff_viewed_at?: string;
   file_path?: string;
+  discipline?: string;
+  class_number?: string;
 }
 
 interface JobCardProps {
@@ -84,6 +86,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const { show } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const notesHeaderRef = useRef<HTMLHeadingElement | null>(null);
+  const notesSectionId = `notes-section-${job.id}`;
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -323,10 +327,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             {jobNotes ? (
               <button
                 type="button"
-                onClick={() => { setShowMore(true); beginEditNotes(); }}
+                onClick={() => {
+                  setShowMore(true);
+                  // Focus notes header after expand
+                  setTimeout(() => notesHeaderRef.current?.focus(), 0);
+                }}
                 className="flex items-center text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition"
-                title="Has notes — click to add or edit"
-                aria-label="Has notes — click to add or edit"
+                title="Has notes — click to view"
+                aria-label="Has notes — click to view"
+                aria-expanded={showMore}
+                aria-controls={notesSectionId}
               >
                 <FileText className="w-4 h-4 mr-1" />
                 <span className="hidden md:inline font-medium">Has notes</span>
@@ -347,7 +357,98 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
         {showMore && (
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Additional Details</h4>
+            {/* Staff Notes section */}
+            <div id={notesSectionId}>
+              <div className="flex items-center justify-between mb-2">
+                <h4
+                  ref={notesHeaderRef}
+                  tabIndex={-1}
+                  className="text-sm font-medium text-gray-900 focus:outline-none"
+                >
+                  Staff Notes
+                </h4>
+                <button
+                  type="button"
+                  onClick={beginEditNotes}
+                  className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 focus-ring btn-transition text-xs"
+                >
+                  Add Note
+                </button>
+              </div>
+              {!isEditingNotes && !jobNotes && (
+                <p className="text-sm text-gray-500 italic mb-3">No notes added yet</p>
+              )}
+              {jobNotes && !isEditingNotes && (
+                <div className="mb-4">
+                  <div className="bg-gray-50 p-2 rounded border">
+                    <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
+                      {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
+                        <li key={idx}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              {isEditingNotes && (
+                <div className="mt-1 space-y-3">
+                  {jobNotes && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Existing notes:</span>
+                      <div className="bg-gray-50 p-2 rounded border mt-1">
+                        <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
+                          {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
+                            <li key={idx}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Add a new note</label>
+                    <textarea
+                      id={`notes-${job.id}`}
+                      className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
+                      value={notesDraft}
+                      onChange={(e) => setNotesDraft(e.target.value)}
+                      aria-describedby={`notes-status-${job.id}`}
+                      placeholder="Type your note to append…"
+                    />
+                    <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div>
+                      <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
+                      <select
+                        id={`notesStaff-${job.id}`}
+                        className="w-full border rounded-lg px-3 py-2 focus-ring text-sm"
+                        value={notesStaffName}
+                        onChange={(e) => setNotesStaffName(e.target.value)}
+                        disabled={loadingStaff}
+                      >
+                        <option value="" disabled>{loadingStaff ? 'Loading staff...' : 'Select your name'}</option>
+                        {staff.map(s => (
+                          <option key={s.name} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-end justify-end space-x-2">
+                      <button onClick={cancelEditNotes} type="button" className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Cancel</button>
+                      <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName || notesDraft.length > MAX_NOTES_LEN} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
+                    </div>
+                  </div>
+                  <div id={`notes-status-${job.id}`} className="mt-1 text-sm" aria-live="polite">
+                    {saveMessage && <span className="text-green-600">{saveMessage}</span>}
+                    {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
+                    {notesDraft.length > MAX_NOTES_LEN && (
+                      <div className="text-red-600" role="alert">Notes must be at most {MAX_NOTES_LEN} characters.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Additional Details */}
+            <h4 className="text-sm font-medium text-gray-900 mt-4 mb-2">Additional Details</h4>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-gray-500">Job ID:</span>
@@ -375,6 +476,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 <span className="text-gray-500">Created:</span>
                 <p className="text-gray-900">{formatCreatedAtCentral(job.created_at)}</p>
               </div>
+              <div>
+                <span className="text-gray-500">Discipline:</span>
+                <p className="text-gray-900">{job.discipline || 'Not set'}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Class:</span>
+                <p className="text-gray-900">{job.class_number || 'Not set'}</p>
+              </div>
             </div>
             {(job.weight_g || job.time_hours || job.cost_usd) && (
               <div className="mt-3">
@@ -392,74 +501,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 </div>
               </div>
             )}
-            {jobNotes && !isEditingNotes && (
-              <div className="mt-3">
-                <span className="text-gray-500 text-sm">Notes:</span>
-                <div className="bg-gray-50 p-2 rounded border mt-1">
-                  <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
-                    {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-            {isEditingNotes && (
-              <div className="mt-3 space-y-3">
-                {jobNotes && (
-                  <div>
-                    <span className="text-gray-500 text-sm">Existing notes:</span>
-                    <div className="bg-gray-50 p-2 rounded border mt-1">
-                      <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
-                        {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
-                          <li key={idx}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Add a new note</label>
-                  <textarea
-                    id={`notes-${job.id}`}
-                    className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
-                    value={notesDraft}
-                    onChange={(e) => setNotesDraft(e.target.value)}
-                    aria-describedby={`notes-status-${job.id}`}
-                    placeholder="Type your note to append…"
-                  />
-                  <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div>
-                    <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
-                    <select
-                      id={`notesStaff-${job.id}`}
-                      className="w-full border rounded-lg px-3 py-2 focus-ring text-sm"
-                      value={notesStaffName}
-                      onChange={(e) => setNotesStaffName(e.target.value)}
-                      disabled={loadingStaff}
-                    >
-                      <option value="" disabled>{loadingStaff ? 'Loading staff...' : 'Select your name'}</option>
-                      {staff.map(s => (
-                        <option key={s.name} value={s.name}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-end justify-end space-x-2">
-                    <button onClick={cancelEditNotes} type="button" className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition">Cancel</button>
-                    <button onClick={saveNotes} type="button" disabled={savingNotes || !notesStaffName || notesDraft.length > MAX_NOTES_LEN} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 focus-ring btn-transition">{savingNotes ? 'Saving...' : 'Save Notes'}</button>
-                  </div>
-                </div>
-                <div id={`notes-status-${job.id}`} className="mt-1 text-sm" aria-live="polite">
-                  {saveMessage && <span className="text-green-600">{saveMessage}</span>}
-                  {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
-                  {notesDraft.length > MAX_NOTES_LEN && (
-                    <div className="text-red-600" role="alert">Notes must be at most {MAX_NOTES_LEN} characters.</div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -472,16 +513,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </button>
 
           <div className="flex flex-wrap gap-2 ml-auto">
-            {showMore && (
-              <button
-                onClick={beginEditNotes}
-                className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition whitespace-nowrap"
-                title="Edit Notes"
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Edit Notes</span>
-              </button>
-            )}
             {currentStatus === "UPLOADED" && (
               <>
                 {!!job.staff_viewed_at && (
