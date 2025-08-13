@@ -1,17 +1,56 @@
 from flask import Blueprint
-from flask import jsonify, request
+from flask import jsonify, request, current_app
 from app.models.event import Event
 from app.models.job import Job
 from app.models.payment import Payment
 from app.utils.decorators import token_required
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
+from time import time
+import os
 
 bp = Blueprint('analytics', __name__, url_prefix='/api/v1/analytics')
+
+# Lightweight in-memory cache for analytics responses (disabled during tests)
+_AN_CACHE: dict = {}
+_AN_CACHE_TTL = int(os.environ.get('ANALYTICS_CACHE_TTL', '60'))
+
+
+def _cache_get(key: tuple):
+    try:
+        if current_app.config.get('TESTING'):
+            return None
+    except Exception:
+        # If app context not ready, skip cache
+        return None
+    entry = _AN_CACHE.get(key)
+    if not entry:
+        return None
+    expires_at, data = entry
+    if time() >= expires_at:
+        try:
+            del _AN_CACHE[key]
+        except Exception:
+            pass
+        return None
+    return data
+
+
+def _cache_set(key: tuple, data):
+    try:
+        if current_app.config.get('TESTING'):
+            return
+    except Exception:
+        return
+    _AN_CACHE[key] = (time() + _AN_CACHE_TTL, data)
 
 @bp.route('/overview', methods=['GET'])
 @token_required
 def overview():
+    cache_key = ('overview', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
     # Params
     try:
         days = int(request.args.get('days', 7))
@@ -54,20 +93,45 @@ def overview():
                 diffs.append((ts - start).total_seconds() / 3600.0)
     avg_turnaround_hours = round(sum(diffs) / len(diffs), 2) if diffs else None
     # Storage usage unknown without config; return None placeholder
+    # Recent rejections in last 30 days respecting filters
+    since30 = datetime.now(timezone.utc) - timedelta(days=30)
+    rej_q = Event.query.filter(Event.event_type == 'JobRejected')
+    # Filter by time
+    recent_rejections = 0
+    for e in rej_q.all():
+        ts = getattr(e, 'timestamp', None)
+        if not ts:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts < since30:
+            continue
+        if printer_filter or discipline_filter:
+            j = Job.query.get(e.job_id)
+            if printer_filter and getattr(j, 'printer', None) != printer_filter:
+                continue
+            if discipline_filter and getattr(j, 'discipline', None) != discipline_filter:
+                continue
+        recent_rejections += 1
     payload = {
         'by_status': by_status,
         'in_queue': in_queue,
         'total_submissions': total_submissions,
         'avg_turnaround_hours': avg_turnaround_hours,
         'storage_usage_percent': None,
-        'recent_rejections_30d': Event.query.filter(Event.event_type == 'JobRejected').count(),
+        'recent_rejections_30d': recent_rejections,
     }
+    _cache_set(cache_key, payload)
     return jsonify(payload), 200
 
 
 @bp.route('/trends', methods=['GET'])
 @token_required
 def trends():
+    cache_key = ('trends', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
     # Very lightweight stub: daily counts of JobCreated over N days
     try:
         days = int(request.args.get('days', 30))
@@ -108,12 +172,18 @@ def trends():
                     continue
             approvals_bucket[ts.date().isoformat()] += 1
     approvals_series = [{'date': d, 'count': c} for d, c in sorted(approvals_bucket.items())]
-    return jsonify({'series': series, 'approvals': approvals_series, 'metric': 'submissions'}), 200
+    payload = {'series': series, 'approvals': approvals_series, 'metric': 'submissions'}
+    _cache_set(cache_key, payload)
+    return jsonify(payload), 200
 
 
 @bp.route('/resources', methods=['GET'])
 @token_required
 def resources():
+    cache_key = ('resources', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
     try:
         days = int(request.args.get('days', 7))
     except Exception:
@@ -174,17 +244,31 @@ def resources():
     average_lead_time = [
         {'date': d, 'hours': round(sum(vals)/len(vals), 2)} for d, vals in sorted(day_diffs.items()) if vals
     ]
-    # Material consumption from payments (grams by material over period)
+    # Material consumption from payments (grams by material over period) with filters
     filament_g = 0.0
     resin_g = 0.0
     payments = Payment.query.all()
+    filtered_payment_ids = set()
     for p in payments:
+        ts = getattr(p, 'paid_ts', None)
+        if not ts:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts < since:
+            continue
         job = Job.query.get(p.job_id)
+        if printer_filter and getattr(job, 'printer', None) != printer_filter:
+            continue
+        if discipline_filter and getattr(job, 'discipline', None) != discipline_filter:
+            continue
+        filtered_payment_ids.add(p.job_id)
         mat = (getattr(job, 'material', '') or '').strip().lower()
+        grams = float(getattr(p, 'grams', 0) or 0)
         if mat == 'resin':
-            resin_g += float(getattr(p, 'grams', 0) or 0)
+            resin_g += grams
         else:
-            filament_g += float(getattr(p, 'grams', 0) or 0)
+            filament_g += grams
     # Queue age distribution (active jobs)
     now = datetime.now(timezone.utc)
     active_statuses = {'UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING'}
@@ -215,12 +299,18 @@ def resources():
             continue
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
-        if ts >= since:
-            revenue_counter[ts.date().isoformat()] += int(getattr(p, 'price_cents', 0) or 0)
+        if ts < since:
+            continue
+        job = Job.query.get(p.job_id)
+        if printer_filter and getattr(job, 'printer', None) != printer_filter:
+            continue
+        if discipline_filter and getattr(job, 'discipline', None) != discipline_filter:
+            continue
+        revenue_counter[ts.date().isoformat()] += int(getattr(p, 'price_cents', 0) or 0)
     revenue_over_time = [{'date': d, 'cents': c} for d, c in sorted(revenue_counter.items())]
     # Payment metrics
     total_revenue_cents = sum(c for _, c in revenue_counter.items())
-    payment_count = len(payments)
+    payment_count = len(filtered_payment_ids)
     avg_ticket_usd = round((total_revenue_cents / 100.0) / payment_count, 2) if payment_count else 0.0
     # Build payload
     payload = {
@@ -234,6 +324,66 @@ def resources():
         'avg_ticket_usd': avg_ticket_usd,
         'payment_count': payment_count,
     }
+    _cache_set(cache_key, payload)
+    return jsonify(payload), 200
+
+
+@bp.route('/financial', methods=['GET'])
+@token_required
+def financial():
+    cache_key = ('financial', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
+    # Parameters
+    try:
+        days = int(request.args.get('days', 30))
+    except Exception:
+        days = 30
+    printer_filter = request.args.get('printer')
+    discipline_filter = request.args.get('discipline')
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Aggregate payments within time window, optionally filtered by job attributes
+    payments = Payment.query.all()
+
+    from collections import Counter
+    revenue_counter = Counter()
+    total_revenue_cents = 0
+    payment_count = 0
+
+    for p in payments:
+        ts = getattr(p, 'paid_ts', None)
+        if not ts:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts < since:
+            continue
+
+        # Apply filters by joining to Job lazily
+        job = Job.query.get(p.job_id)
+        if printer_filter and getattr(job, 'printer', None) != printer_filter:
+            continue
+        if discipline_filter and getattr(job, 'discipline', None) != discipline_filter:
+            continue
+
+        cents = int(getattr(p, 'price_cents', 0) or 0)
+        total_revenue_cents += cents
+        payment_count += 1
+        revenue_counter[ts.date().isoformat()] += cents
+
+    avg_ticket_usd = round((total_revenue_cents / 100.0) / payment_count, 2) if payment_count else 0
+    revenue_over_time = [{'date': d, 'cents': c} for d, c in sorted(revenue_counter.items())]
+
+    payload = {
+        'total_revenue_cents': total_revenue_cents,
+        'payment_count': payment_count,
+        'avg_ticket_usd': avg_ticket_usd,
+        'revenue_over_time': revenue_over_time,
+    }
+    _cache_set(cache_key, payload)
     return jsonify(payload), 200
 
 @bp.route('/events', methods=['GET'])

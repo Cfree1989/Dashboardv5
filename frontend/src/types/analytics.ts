@@ -40,6 +40,7 @@ export type AnalyticsData = {
     averageTicketUsd: number;
     paymentRatePercent: number; // paid picked up / (completed+paidpickedup) * 100
     revenueByPeriod: { period: string; revenueUsd: number }[];
+    paymentsCount: number;
   };
 };
 

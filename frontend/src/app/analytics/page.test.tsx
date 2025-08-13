@@ -25,6 +25,14 @@ describe('/analytics page', () => {
           printing_throughput: [], average_lead_time: [], printer_utilization: [], material_consumption_g: { filament: 0, resin: 0 }, queue_age_buckets: {}, revenue_over_time: [], total_revenue_cents: 0, avg_ticket_usd: 0, payment_count: 0,
         }) });
       }
+      if (url.includes('/api/v1/analytics/financial')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({
+          total_revenue_cents: 1200,
+          payment_count: 2,
+          avg_ticket_usd: 6.0,
+          revenue_over_time: [{ date: '2025-08-01', cents: 1200 }]
+        }) });
+      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
     localStorage.setItem('token', 'test');

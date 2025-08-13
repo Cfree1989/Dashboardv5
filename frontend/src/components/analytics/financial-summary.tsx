@@ -13,7 +13,7 @@ export function FinancialSummary({ data }: Props) {
         <Kpi label="Total Revenue" value={`$${formatMoney(f.totalRevenueUsd)}`} />
         <Kpi label="Avg Ticket" value={`$${formatMoney(f.averageTicketUsd)}`} />
         <Kpi label="Payment Rate" value={`${f.paymentRatePercent}%`} />
-        <Kpi label="Payments" value={String(data.resources.paymentCount)} />
+        <Kpi label="Payments" value={String(data.financial.paymentsCount ?? data.resources.paymentCount)} />
       </div>
       <div className="mt-4">
         <div className="font-medium text-gray-700 mb-2">Revenue Over Time</div>

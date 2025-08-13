@@ -13,15 +13,17 @@ export async function fetchAnalyticsData(params: { period: number; discipline?: 
   const qp30 = new URLSearchParams(qp);
   qp30.set('days', String(Math.max(days, 30)));
 
-  const [oRes, tRes, rRes] = await Promise.all([
+  const [oRes, tRes, rRes, fRes] = await Promise.all([
     fetch(`/api/v1/analytics/overview?${qp.toString()}`, { headers: h }),
     fetch(`/api/v1/analytics/trends?${qp30.toString()}`, { headers: h }),
     fetch(`/api/v1/analytics/resources?${qp.toString()}`, { headers: h }),
+    fetch(`/api/v1/analytics/financial?${qp.toString()}`, { headers: h }),
   ]);
 
   const overviewJson = await oRes.json();
   const trendsJson = await tRes.json();
   const resourcesJson = await rRes.json();
+  const financialJson = await fRes.json();
 
   const totalSubs = (overviewJson.total_submissions ?? overviewJson.totalSubmissions ?? overviewJson.total) ?? 0;
   const overview: OverviewData = {
@@ -51,16 +53,18 @@ export async function fetchAnalyticsData(params: { period: number; discipline?: 
   };
 
   const financial = {
-    totalRevenueUsd: (resources.totalRevenueCents || 0) / 100,
-    averageTicketUsd: resources.avgTicketUsd || 0,
+    totalRevenueUsd: (financialJson.total_revenue_cents ?? resources.totalRevenueCents ?? 0) / 100,
+    averageTicketUsd: (financialJson.avg_ticket_usd ?? resources.avgTicketUsd ?? 0),
     paymentRatePercent: (() => {
       // Approximation: proportion of payments among completed+paidpickedup
       const completed = overview.byStatus?.COMPLETED ?? 0;
       const paid = overview.byStatus?.PAIDPICKEDUP ?? 0;
       const denom = completed + paid;
-      return denom > 0 ? Math.round(((resources.paymentCount || 0) / denom) * 1000) / 10 : 0;
+      const paymentsCount = (resources.paymentCount ?? financialJson.payment_count ?? 0);
+      return denom > 0 ? Math.round((paymentsCount / denom) * 1000) / 10 : 0;
     })(),
-    revenueByPeriod: (resources.revenueOverTime || []).map((p: any) => ({ period: p.date, revenueUsd: (p.cents || 0) / 100 })),
+    revenueByPeriod: (financialJson.revenue_over_time ?? resources.revenueOverTime ?? []).map((p: any) => ({ period: p.date, revenueUsd: (p.cents || 0) / 100 })),
+    paymentsCount: (financialJson.payment_count ?? resources.paymentCount ?? 0)
   };
 
   return { overview, trends, resources, financial };
