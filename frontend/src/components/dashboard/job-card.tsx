@@ -280,13 +280,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   return (
     <TooltipProvider>
-    <div
-      className={`
-      bg-white rounded-xl shadow-sm border transition-all card-hover
-      ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
-    `}
-    >
-      <div className="p-4">
+         <div
+       className={`
+       bg-white rounded-xl shadow-sm border transition-all card-hover
+       ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
+     `}
+     >
+       <div className="p-4 overflow-visible">
 		{currentStatus === 'UPLOADED' && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
 				<span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
@@ -434,19 +434,19 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                       </div>
                     </div>
                   )}
-                  <div>
-                    <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Add a new note</label>
-                    <textarea
-                      id={`notes-${job.id}`}
-                      className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
-                      value={notesDraft}
-                      onChange={(e) => setNotesDraft(e.target.value)}
-                      aria-describedby={`notes-status-${job.id}`}
-                      placeholder="Type your note to append…"
-                      ref={notesTextareaRef}
-                    />
-                    <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
-                  </div>
+                                     <div className="px-1">
+                     <label htmlFor={`notes-${job.id}`} className="text-gray-500 text-sm block mb-1">Add a new note</label>
+                     <textarea
+                       id={`notes-${job.id}`}
+                       className="w-full min-h-[100px] border rounded-lg px-3 py-2 focus-ring text-sm"
+                       value={notesDraft}
+                       onChange={(e) => setNotesDraft(e.target.value)}
+                       aria-describedby={`notes-status-${job.id}`}
+                       placeholder="Type your note to append…"
+                       ref={notesTextareaRef}
+                     />
+                     <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
+                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
                       <label htmlFor={`notesStaff-${job.id}`} className="block text-sm text-gray-700 mb-1">Performing Action As</label>
@@ -536,130 +536,133 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center mt-4 gap-2">
-          <button 
-            onClick={() => setShowMore(!showMore)} 
-            className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition whitespace-nowrap"
-            aria-expanded={showMore}
-            aria-controls={detailsSectionId}
-            aria-label={showMore ? 'Collapse details' : 'Expand details'}
-            title={showMore ? 'Collapse' : 'Expand'}
-          >
-            {showMore ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+                 <div className="flex flex-wrap items-center mt-4 gap-2">
+           <div className="flex flex-wrap gap-2">
+             {currentStatus === "UPLOADED" && (
+               <>
+ 				{!!job.staff_viewed_at && (
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <button
+                       onClick={handleReapplyNew}
+                       title="Mark as unreviewed (shows NEW badge again)"
+                       aria-label="Mark as unreviewed (shows NEW badge again)"
+                       className="flex items-center px-3 py-1 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 hover:text-orange-950 focus-ring btn-transition whitespace-nowrap"
+                     >
+                       <Eye className="w-4 h-4 mr-1" />
+                       <span className="hidden sm:inline">Unreviewed</span>
+                     </button>
+                   </TooltipTrigger>
+                   <TooltipContent side="top">Marks this job as unreviewed (shows NEW badge again)</TooltipContent>
+                 </Tooltip>
+                 )}
+                 <button
+                   onClick={handleApprove}
+                   disabled={isApproving || isRejecting}
+                   className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
+                 >
+                   {isApproving ? (
+                     <>
+                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent mr-1"></div>
+                       <span className="hidden sm:inline">Approving...</span>
+                     </>
+                   ) : (
+                     <>
+                       <CheckCircle className="w-4 h-4 mr-1" />
+                       <span className="hidden sm:inline">Approve</span>
+                     </>
+                   )}
+                 </button>
+                 <button
+                   onClick={handleReject}
+                   disabled={isRejecting || isApproving}
+                   className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
+                 >
+                   {isRejecting ? (
+                     <>
+                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent mr-1"></div>
+                       <span className="hidden sm:inline">Rejecting...</span>
+                     </>
+                   ) : (
+                     <>
+                       <XCircle className="w-4 h-4 mr-1" />
+                       <span className="hidden sm:inline">Reject</span>
+                     </>
+                   )}
+                 </button>
+                 <button
+                   onClick={() => setShowDeleteConfirm(true)}
+                   disabled={isDeleting}
+                   className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
+                   title="Archive job"
+                 >
+                   {isDeleting ? (
+                     <>
+                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-600 border-t-transparent mr-1"></div>
+                       <span className="hidden sm:inline">Archiving...</span>
+                     </>
+                   ) : (
+                     <>
+                       <Archive className="w-4 h-4 mr-1" />
+                       <span className="hidden sm:inline">Archive</span>
+                     </>
+                   )}
+                 </button>
+               </>
+             )}
+             {currentStatus === "READYTOPRINT" && (
+               <button
+                 onClick={() => onStatusAction?.(job.id, "mark-printing")}
+                 className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
+               >
+                 <Printer className="w-4 h-4 mr-1" />
+                 <span className="hidden sm:inline">Mark Printing</span>
+               </button>
+             )}
+             <button
+               type="button"
+               onClick={openOpenFileModal}
+               className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
+               title="Open File"
+             >
+               <ExternalLink className="w-4 h-4 mr-1" />
+               <span className="hidden sm:inline">Open File</span>
+             </button>
 
-          <div className="flex flex-wrap gap-2 ml-auto">
-            {currentStatus === "UPLOADED" && (
-              <>
-				{!!job.staff_viewed_at && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={handleReapplyNew}
-                      title="Mark as unreviewed (shows NEW badge again)"
-                      aria-label="Mark as unreviewed (shows NEW badge again)"
-                      className="flex items-center px-3 py-1 bg-orange-100 text-orange-900 rounded-lg hover:bg-orange-200 hover:text-orange-950 focus-ring btn-transition whitespace-nowrap"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Unreviewed</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">Marks this job as unreviewed (shows NEW badge again)</TooltipContent>
-                </Tooltip>
-                )}
-                <button
-                  onClick={handleApprove}
-                  disabled={isApproving || isRejecting}
-                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
-                >
-                  {isApproving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent mr-1"></div>
-                      <span className="hidden sm:inline">Approving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Approve</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handleReject}
-                  disabled={isRejecting || isApproving}
-                  className="flex items-center px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
-                >
-                  {isRejecting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-600 border-t-transparent mr-1"></div>
-                      <span className="hidden sm:inline">Rejecting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Reject</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={isDeleting}
-                  className="flex items-center px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 focus-ring btn-transition whitespace-nowrap"
-                  title="Archive job"
-                >
-                  {isDeleting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-orange-600 border-t-transparent mr-1"></div>
-                      <span className="hidden sm:inline">Archiving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Archive className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Archive</span>
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-            {currentStatus === "READYTOPRINT" && (
-              <button
-                onClick={() => onStatusAction?.(job.id, "mark-printing")}
-                className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
-              >
-                <Printer className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Mark Printing</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={openOpenFileModal}
-              className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
-              title="Open File"
-            >
-              <ExternalLink className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Open File</span>
-            </button>
+             {currentStatus === "PRINTING" && (
+               <button
+                 onClick={() => onStatusAction?.(job.id, "mark-complete")}
+                 className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
+               >
+                 <CheckCircle className="w-4 h-4 mr-1" />
+                 <span className="hidden sm:inline">Mark Complete</span>
+               </button>
+             )}
+             {currentStatus === "COMPLETED" && (
+               <button
+                 onClick={() => onStatusAction?.(job.id, "mark-picked-up")}
+                 className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
+               >
+                 <CheckCircle className="w-4 h-4 mr-1" />
+                 <span className="hidden sm:inline">Mark Paid/Picked Up</span>
+               </button>
+             )}
+           </div>
+         </div>
 
-            {currentStatus === "PRINTING" && (
-              <button
-                onClick={() => onStatusAction?.(job.id, "mark-complete")}
-                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Mark Complete</span>
-              </button>
-            )}
-            {currentStatus === "COMPLETED" && (
-              <button
-                onClick={() => onStatusAction?.(job.id, "mark-picked-up")}
-                className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Mark Paid/Picked Up</span>
-              </button>
-            )}
-          </div>
-        </div>
+         {/* Collapse arrow at bottom center */}
+         <div className="flex justify-center mt-4 pt-2 border-t border-gray-100">
+           <button 
+             onClick={() => setShowMore(!showMore)} 
+             className="flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus-ring btn-transition"
+             aria-expanded={showMore}
+             aria-controls={detailsSectionId}
+             aria-label={showMore ? 'Collapse details' : 'Expand details'}
+             title={showMore ? 'Collapse' : 'Expand'}
+           >
+             {showMore ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+           </button>
+         </div>
       </div>
       {showReviewModal && (
         <ReviewModal
