@@ -241,6 +241,15 @@ Deleting jobs immediately is risky. Soft-delete preserves recoverability and aud
     - `dashboardv5-redis-1` (Redis - port 6379)
     - `dashboardv5-worker-1` (Background worker)
 
+### 🚨 NEW ISSUE: Docker Container Dependencies
+- **Issue**: Module resolution error persists in Docker container despite local fix
+- **Root Cause**: Docker container built before `@radix-ui/react-tooltip` was added to package.json
+- **Actions Taken**:
+  - ✅ Stopped Docker Compose services
+  - ✅ Rebuilt frontend container to include updated dependencies
+  - ✅ Restarted all services with rebuilt container
+- **Status**: Awaiting verification that module resolution error is resolved
+
 ### 🎯 CURRENT STATUS: Services Running
 - **Docker Compose Status**: All containers successfully started
 - **Expected Access**: Frontend should be available at `http://localhost:3000`
@@ -508,9 +517,10 @@ Students (and staff assisting them) benefit from a delightful, searchable histor
   - Success: One-click reports downloadable for selected date range.
 
 ### Project Status Board — CRITICAL ISSUE
-- [x] ✅ **Fix @radix-ui/react-tooltip module resolution error** — RESOLVED
+- [x] ✅ **Fix @radix-ui/react-tooltip module resolution error** — RESOLVED (local)
 - [x] ✅ **Architecture misalignment identified** — Root cause: standalone vs Docker Compose
 - [x] 🎯 **Deploy using Docker Compose** — ✅ **COMPLETED**
+- [ ] 🔄 **Rebuild Docker container with updated dependencies** — IN PROGRESS
 
 ### Project Status Board — Post-E2E Enhancements
 - [x] TT1. Tooltip system (frontend) — ✅ UNBLOCKED (module resolved)
