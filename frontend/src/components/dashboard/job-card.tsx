@@ -538,9 +538,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     onClick={handleReapplyNew}
                     title="Mark as Unreviewed"
                     aria-label="Mark as Unreviewed"
-                    className="p-2 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-700 focus-ring btn-transition"
+                    className="flex items-center px-3 py-1 bg-yellow-50 text-yellow-700 rounded-lg hover:bg-yellow-100 hover:text-yellow-800 focus-ring btn-transition whitespace-nowrap"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">Mark as Unreviewed</span>
                   </button>
                 )}
                 <button
