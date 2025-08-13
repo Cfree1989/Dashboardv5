@@ -61,8 +61,14 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getAllByText('Note Job').length).toBeGreaterThan(0));
     // Expand card
     fireEvent.click(screen.getByText('Show More'));
-    // Begin edit via new centered section button
-    fireEvent.click(screen.getByText('Add Note'));
+    // Begin edit by clicking the notes area
+    // If placeholder is present, click it; otherwise click the clickable notes container
+    const placeholder = screen.queryByText(/No notes added yet/i);
+    if (placeholder) {
+      fireEvent.click(placeholder);
+    } else {
+      fireEvent.click(screen.getByLabelText(/Click to add or edit note/i));
+    }
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
     // Enter note
     const textarea = screen.getByLabelText(/Add a new note/i);

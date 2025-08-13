@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, ExternalLink, Copy, Archive } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
@@ -88,6 +88,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isDeleting, setIsDeleting] = useState(false);
   const notesHeaderRef = useRef<HTMLHeadingElement | null>(null);
   const notesSectionId = `notes-section-${job.id}`;
+  const notesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Focus the textarea when entering edit mode for quick typing
+  useEffect(() => {
+    if (isEditingNotes) {
+      setTimeout(() => notesTextareaRef.current?.focus(), 0);
+    }
+  }, [isEditingNotes]);
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -329,12 +337,12 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 type="button"
                 onClick={() => {
                   setShowMore(true);
-                  // Focus notes header after expand
-                  setTimeout(() => notesHeaderRef.current?.focus(), 0);
+                  beginEditNotes();
+                  // Focus will move to textarea via effect
                 }}
                 className="flex items-center text-sm text-gray-500 hover:text-gray-700 focus-ring btn-transition"
-                title="Has notes — click to view"
-                aria-label="Has notes — click to view"
+                title="Has notes — click to add or edit"
+                aria-label="Has notes — click to add or edit"
                 aria-expanded={showMore}
                 aria-controls={notesSectionId}
               >
@@ -367,20 +375,29 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 >
                   Staff Notes
                 </h4>
-                <button
-                  type="button"
-                  onClick={beginEditNotes}
-                  className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 focus-ring btn-transition text-xs"
-                >
-                  Add Note
-                </button>
               </div>
               {!isEditingNotes && !jobNotes && (
-                <p className="text-sm text-gray-500 italic mb-3">No notes added yet</p>
+                <div
+                  className="text-sm text-gray-500 italic mb-3 cursor-pointer focus-ring"
+                  role="button"
+                  tabIndex={0}
+                  onClick={beginEditNotes}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
+                  aria-label="Click to add a note"
+                >
+                  No notes added yet — click to add
+                </div>
               )}
               {jobNotes && !isEditingNotes && (
                 <div className="mb-4">
-                  <div className="bg-gray-50 p-2 rounded border">
+                  <div
+                    className="bg-gray-50 p-2 rounded border cursor-pointer focus-ring"
+                    role="button"
+                    tabIndex={0}
+                    onClick={beginEditNotes}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
+                    aria-label="Click to add or edit note"
+                  >
                     <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
                       {(jobNotes.split('\n').filter(Boolean).reverse()).map((line, idx) => (
                         <li key={idx}>{line}</li>
@@ -412,6 +429,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                       onChange={(e) => setNotesDraft(e.target.value)}
                       aria-describedby={`notes-status-${job.id}`}
                       placeholder="Type your note to append…"
+                      ref={notesTextareaRef}
                     />
                     <div className="mt-1 text-xs text-gray-500">{notesDraft.length}/{MAX_NOTES_LEN}</div>
                   </div>
