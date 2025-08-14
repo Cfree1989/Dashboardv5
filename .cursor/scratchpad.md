@@ -193,6 +193,7 @@
   - **Frontend Build Issue Resolved**: Fixed 'swr' module resolution error by ensuring dependencies are properly installed in container environment
   - **Docker Deployment Note**: When adding new dependencies like 'swr', must rebuild frontend container with `docker compose build --no-cache frontend` to ensure proper installation
   - **Container Restart Required**: After installing new dependencies, restart the frontend container with `docker compose restart frontend` to clear Next.js module cache
+  - **Catalog Fixed**: Updated default catalog to match masterplan specifications with correct printers (Prusa MK4S, Prusa XL, Raise3D Pro 2 Plus, Formlabs Form 3) and materials (Filament with 23 colors, Resin with 4 colors)
 
 ### Recent Accomplishments
 - **D2. Admin System-Level Event Logging 500 Error**: ✅ **COMPLETED**

@@ -17,13 +17,25 @@ class CatalogService:
             "methods": ["Filament", "Resin"],
             "printers": [
                 {
-                    "id": "prusa-mk3s",
-                    "name": "Prusa MK3S",
+                    "id": "prusa-mk4s",
+                    "name": "Prusa MK4S",
                     "supported_methods": ["Filament"],
                     "is_active": True
                 },
                 {
-                    "id": "form3",
+                    "id": "prusa-xl",
+                    "name": "Prusa XL",
+                    "supported_methods": ["Filament"],
+                    "is_active": True
+                },
+                {
+                    "id": "raise3d-pro2-plus",
+                    "name": "Raise3D Pro 2 Plus",
+                    "supported_methods": ["Filament"],
+                    "is_active": True
+                },
+                {
+                    "id": "formlabs-form3",
                     "name": "Formlabs Form 3",
                     "supported_methods": ["Resin"],
                     "is_active": True
@@ -35,23 +47,21 @@ class CatalogService:
                     "method": "Filament",
                     "name": "PLA",
                     "unit_cost_per_g_cents": 10,
-                    "colors": ["Black", "White", "Orange", "Blue", "Red"],
+                    "colors": [
+                        "True Red", "True Orange", "Light Orange", "True Yellow", "Dark Yellow",
+                        "Lime Green", "Green", "Forest Green", "Blue", "Electric Blue",
+                        "Midnight Purple", "Light Purple", "Clear", "True White", "Gray",
+                        "True Black", "Brown", "Copper", "Bronze", "True Silver",
+                        "True Gold", "Glow in the Dark", "Color Changing"
+                    ],
                     "is_active": True
                 },
                 {
-                    "id": "abs",
-                    "method": "Filament",
-                    "name": "ABS",
-                    "unit_cost_per_g_cents": 10,
-                    "colors": ["Black", "White", "Grey"],
-                    "is_active": True
-                },
-                {
-                    "id": "resin-standard",
+                    "id": "resin",
                     "method": "Resin",
-                    "name": "Standard Resin",
+                    "name": "Resin",
                     "unit_cost_per_g_cents": 20,
-                    "colors": ["Grey", "Clear"],
+                    "colors": ["Black", "White", "Gray", "Clear"],
                     "is_active": True
                 }
             ]
