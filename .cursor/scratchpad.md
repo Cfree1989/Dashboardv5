@@ -262,6 +262,30 @@
   - [ ] Implement date range filtering
   - [ ] Add staff attribution to analytics
 
+#### **Phase 1.5: System Stability & Concurrency (High Priority)**
+- [ ] **S1. Job Locking for Concurrency Control**
+  - [ ] Backend: Implement `POST /jobs/<id>/lock`, `unlock`, and `extend` endpoints
+  - [ ] Backend: Add `locked_by` and `locked_until` fields to the Job model
+  - [ ] Frontend: Request lock when opening modals (approve, reject, etc.)
+  - [ ] Frontend: Display "Job is locked" message if lock is held by another user
+  - [ ] Frontend: Implement heartbeat to extend lock while modal is open
+  - [ ] Tests: Add tests for locking, unlocking, and conflict scenarios
+
+- [ ] **S2. Duplicate Submission Detection**
+  - [ ] Backend: Add `file_hash` field to the Job model
+  - [ ] Backend: On `POST /submit`, calculate file hash and check for active duplicates
+  - [ ] Backend: Return `409 Conflict` if an active duplicate is found
+  - [ ] Frontend: Display a user-friendly error message on duplicate submission
+  - [ ] Tests: Add tests for duplicate detection and reprint allowance
+
+- [ ] **S3. System Health Audit Tool**
+  - [ ] Backend: Create `POST /admin/audit/start` to trigger an async scan
+  - [ ] Backend: Create `GET /admin/audit/report` to fetch the last scan results
+  - [ ] Backend: Implement logic to find orphaned files and broken DB links
+  - [ ] Frontend: Create an "Admin > System Health" page to display the report
+  - [ ] Frontend: Add controls for admins to safely delete orphaned files
+  - [ ] Tests: Add tests for the audit scan logic
+
 #### **Phase 2: Admin Features (Medium Priority)**
 - [x] **M1. Submission Form Improvements**
   - [x] Improve UX parity with masterplan
@@ -290,7 +314,6 @@
 
 #### **Phase 3: Advanced Features (Lower Priority)**
 - [ ] **Phase 6: Real-time Features**
-  - [ ] Implement real-time locks
   - [ ] Add alert system
   - [ ] Enhance auto-refresh functionality
   - [ ] Add real-time notifications
