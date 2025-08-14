@@ -1011,3 +1011,20 @@ Success criteria:
 - Phase 1 (MVP): C1-S1..S3 only, feature-flagged admin editor. Keep UI fallback if catalog missing.
 - Phase 2: Replace JSON editor with structured nested CRUD when time allows; add diff/rollback UI.
 - Phase 3: Optional: expose `GET /api/v1/catalog/version` and add lightweight polling for high-traffic desks.
+
+### Future UI Improvements (Post-MVP)
+- **Structured Forms**: Replace JSON editor with user-friendly forms:
+  - Add/Edit/Delete printers with dropdown for supported methods
+  - Add/Edit/Delete materials with method selection and color picker
+  - Visual color selection instead of text input
+  - Inline validation with real-time feedback
+- **Better UX**: 
+  - Drag-and-drop reordering of items
+  - Bulk operations (activate/deactivate multiple items)
+  - Search and filter capabilities
+  - Preview of how changes affect submission forms
+- **Advanced Features**:
+  - Version history with diff view
+  - Rollback to previous versions
+  - Import/export catalog configurations
+  - Template catalogs for different use cases
