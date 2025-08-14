@@ -1,16 +1,22 @@
 from __future__ import annotations
-from flask import Blueprint, jsonify, request, g, abort
+from flask import Blueprint, jsonify, request, g, abort, current_app
 from app.utils.decorators import token_required
-from app import db
+from app import db, limiter
 from app.models.job import Job
 from app.models.event import Event
-from app.services.file_service import STATUS_TO_DIR
+from app.models.payment import Payment
+from app.models.staff import Staff
+from app.services.event_service import log_event
 from app.services.file_service import move_authoritative
+from app.services.email_service import send_approval_email, send_rejection_email, send_completion_email
+from app.services.token_service import generate_confirmation_token
+from app.services.mock_job_service import MockJobService
 from pathlib import Path
 import os
 import json
 from datetime import datetime, timezone
 from datetime import timedelta
+import shutil
 
 
 bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
@@ -462,4 +468,148 @@ def prune_jobs():
     db.session.add(batch_evt)
     db.session.commit()
     return jsonify({'message': 'Pruning process completed', 'jobs_deleted': deleted}), 200
+
+
+@bp.route('/mock-jobs', methods=['POST'])
+@token_required
+@limiter.limit("2 per minute")
+def generate_mock_jobs():
+    """Generate mock jobs for testing purposes."""
+    # Development-only safety check
+    if not current_app.config.get('DEBUG', False):
+        return jsonify({'message': 'Mock job generation is only allowed in development mode'}), 403
+    
+    # Validate admin access
+    staff_name = g.staff_name
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff member'}), 403
+    
+    data = request.get_json(silent=True) or {}
+    
+    # Validate required fields
+    counts = data.get('counts', {})
+    if not isinstance(counts, dict):
+        return jsonify({'message': 'counts must be a dictionary'}), 400
+    
+    # Validate status counts
+    valid_statuses = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP']
+    for status, count in counts.items():
+        if status not in valid_statuses:
+            return jsonify({'message': f'Invalid status: {status}'}), 400
+        if not isinstance(count, int) or count < 0:
+            return jsonify({'message': f'Invalid count for {status}: must be non-negative integer'}), 400
+        if count > 50:  # Limit to prevent abuse
+            return jsonify({'message': f'Count for {status} too high: maximum 50'}), 400
+    
+    # Get optional parameters
+    student_email = data.get('email', 'cfree3@lsu.edu')
+    add_notes = data.get('addNotes', True)
+    seed = data.get('seed')
+    
+    # Validate email
+    if not isinstance(student_email, str) or '@' not in student_email:
+        return jsonify({'message': 'Invalid email address'}), 400
+    
+    # Validate seed
+    if seed is not None and not isinstance(seed, int):
+        return jsonify({'message': 'seed must be an integer'}), 400
+    
+    try:
+        # Generate mock jobs
+        created_counts = MockJobService.generate_mock_jobs(
+            counts=counts,
+            student_email=student_email,
+            add_notes=add_notes,
+            seed=seed
+        )
+        
+        # Log the event
+        total_created = sum(created_counts.values())
+        log_event(
+            event_type='MockJobsGenerated',
+            details={
+                'counts': created_counts,
+                'total_created': total_created,
+                'student_email': student_email,
+                'add_notes': add_notes,
+                'seed': seed
+            },
+            triggered_by=staff_name,
+            workstation_id=g.workstation_id
+        )
+        
+        return jsonify({
+            'message': f'Successfully generated {total_created} mock jobs',
+            'created_counts': created_counts,
+            'student_email': student_email,
+            'add_notes': add_notes,
+            'seed': seed
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Error generating mock jobs: {str(e)}'}), 500
+
+
+@bp.route('/delete-all-jobs', methods=['POST'])
+@token_required
+@limiter.limit("1 per minute")
+def delete_all_jobs():
+    """Delete ALL jobs from the entire system (development only)."""
+    # Development-only safety check
+    if not current_app.config.get('DEBUG', False):
+        return jsonify({'message': 'Mass job deletion is only allowed in development mode'}), 403
+    
+    # Validate admin access
+    staff_name = g.staff_name
+    staff = Staff.query.get(staff_name)
+    if not staff or not staff.is_active:
+        return jsonify({'message': 'Invalid or inactive staff member'}), 403
+    
+    data = request.get_json(silent=True) or {}
+    confirm = data.get('confirm', False)
+    
+    if not confirm:
+        return jsonify({'message': 'Confirmation required. Set confirm: true in request body.'}), 400
+    
+    try:
+        # Get counts before deletion for logging
+        total_jobs = Job.query.count()
+        total_events = Event.query.count()
+        total_payments = Payment.query.count()
+        
+        # Delete all jobs
+        deleted_counts = MockJobService.delete_all_jobs()
+        
+        # Log the event
+        log_event(
+            event_type='AllJobsDeleted',
+            details={
+                'jobs_deleted': deleted_counts['jobs_deleted'],
+                'events_deleted': deleted_counts['events_deleted'],
+                'payments_deleted': deleted_counts['payments_deleted'],
+                'total_before': {
+                    'jobs': total_jobs,
+                    'events': total_events,
+                    'payments': total_payments
+                }
+            },
+            triggered_by=staff_name,
+            workstation_id=g.workstation_id
+        )
+        
+        return jsonify({
+            'message': f'Successfully deleted all {deleted_counts["jobs_deleted"]} jobs from the system',
+            'deleted_counts': deleted_counts,
+            'total_before': {
+                'jobs': total_jobs,
+                'events': total_events,
+                'payments': total_payments
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Error deleting all jobs: {str(e)}'}), 500
 

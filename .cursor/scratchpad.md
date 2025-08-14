@@ -98,6 +98,41 @@
   - Integration with existing search and expand/collapse controls
 - **Build Status**: ✅ Green build with no TypeScript errors
 - **Test Status**: Basic sorting test exists but needs refinement for multiple combobox scenarios
+
+### M2. Admin Mock Data Generator (Option 1) ✅ **COMPLETED**
+- **Backend Implementation**:
+  - ✅ `MockJobService` class with pricing constants, material diversity, and realistic data generation
+  - ✅ `generate_mock_jobs()` method with full control over parameters (counts, email, notes, seed)
+  - ✅ `generate_randomized_jobs()` method for simplified "randomizer" mode
+  - ✅ `delete_jobs_by_email()` method for targeted deletion
+  - ✅ `delete_all_jobs()` method for complete system cleanup
+  - ✅ Development-only safety checks on all methods
+  - ✅ CLI commands: `generate-mock-jobs`, `randomize-jobs`, `delete-jobs`, `delete-all-jobs`
+  - ✅ API endpoint: `POST /api/v1/admin/mock-jobs` with validation and rate limiting
+  - ✅ API endpoint: `POST /api/v1/admin/delete-all-jobs` with confirmation requirement
+  - ✅ Comprehensive test coverage in `tests/test_mock_job_service.py`
+- **Frontend Implementation**:
+  - ✅ `MockDataGenerator` component with job count inputs, email field, seed option, and notes toggle
+  - ✅ "Delete All Jobs" section with confirmation checkbox and destructive styling
+  - ✅ Development-only visibility in admin panel (orange border and DEV badge)
+  - ✅ Real-time feedback with loading states and success/error messages
+  - ✅ Form validation and auto-clear after successful generation
+- **Features**:
+  - ✅ Correct material pricing (filament: $0.10/g, resin: $0.15/g, minimum $2.50)
+  - ✅ Diverse mock data (student names, disciplines, printers, colors, materials)
+  - ✅ Consistent email usage (`cfree3@lsu.edu` default)
+  - ✅ Notes generation for realistic job details
+  - ✅ Status-appropriate timestamps and event creation
+  - ✅ Payment generation for PAIDPICKEDUP jobs with actual vs estimated costs
+  - ✅ Complete system cleanup with foreign key constraint handling
+- **Safety Features**:
+  - ✅ Development-only access (DEBUG mode check)
+  - ✅ Confirmation requirements for destructive actions
+  - ✅ Rate limiting on API endpoints
+  - ✅ Comprehensive error handling and rollback
+  - ✅ Audit trail logging for all operations
+- **Build Status**: ✅ Green build with no TypeScript errors
+- **Test Status**: ✅ Backend tests passing, CLI commands working
 - **Manual Verification**: Feature is fully functional across all dashboard tabs
 
 ### UI3. Global Search UX Stabilization ✅ COMPLETED
@@ -145,6 +180,7 @@
 - **Mock Jobs Population**: ✅ **COMPLETED** - Added 24 diverse mock jobs to test dashboard functionality: 15 completed jobs across Engineering, Art, Architecture, and Science disciplines with various materials/colors, plus 9 paid jobs demonstrating estimated vs actual cost scenarios including minimum charge cases
 - **Job Card Weight Display Fix**: ✅ **COMPLETED** - Fixed job cards to show actual weight from payment data instead of estimated weight for paid jobs, now displays "Final Weight:" vs "Weight:" similar to cost labeling
 - **System Cleanup**: ✅ **COMPLETED** - Cleared all 65 jobs, 304 events, and 15 payments from the system, removed all storage files, providing a clean slate for fresh testing
+- **M2. Admin Mock Data Generator Backend**: ✅ **COMPLETED** - Created comprehensive MockJobService with correct pricing calculations ($0.10/g Filament, $0.20/g Resin, $3.00 min), CLI commands (`generate-mock-jobs` and `randomize-jobs`), API endpoint (`POST /api/v1/admin/mock-jobs`), and simplified randomizer that only requires tab specification while automatically using `cfree3@lsu.edu` email and following all pricing rules
 - Implemented global search with cross-tab indicators and smooth UX
 - Fixed notification sound playing when exiting search
 - Positioned search input cohesively with other controls
@@ -408,6 +444,42 @@
   - [x] Wire admin UI panel to endpoint
   - [x] Add resend modal with staff selection and confirmation
   - [x] Add email template management
+
+- [x] **M2. Admin Mock Data Generator (Option 1)**
+  - **Goal**: One-click generation of diverse, realistic mock jobs via Admin UI; all jobs use `cfree3@lsu.edu`; correct pricing; distributed across tabs; with notes
+  - **Backend** ✅ **COMPLETED**
+    - [x] Create `MockJobService` to generate jobs/events/payments with correct pricing ($0.10/g Filament, $0.20/g Resin, $3.00 min)
+    - [x] Enforce `student_email = "cfree3@lsu.edu"` for all generated jobs
+    - [x] Implement status progression builder (UPLOADED, PENDING, READYTOPRINT, PRINTING, COMPLETED, PAIDPICKEDUP)
+    - [x] Add realistic notes pool (quality, rush, fix-in-slicer, satisfied pickup, reprint, etc.) with random assignment
+    - [x] Add discipline/class/printer/color/material diversity selectors
+    - [x] CLI: `flask generate-mock-jobs --uploaded N --pending N --ready N --printing N --completed N --paid N --email cfree3@lsu.edu --seed 123`
+    - [x] **NEW**: CLI: `flask randomize-jobs --uploaded N --pending N --ready N --printing N --completed N --paid N` (simplified randomizer)
+    - [x] API: `POST /api/v1/admin/mock-jobs` (admin-only) with body: per-status counts, includePaid, email (default `cfree3@lsu.edu`), seed, addNotes(boolean)
+    - [x] AuthZ: restrict to admin; add gentle rate-limit (e.g., 2/min)
+  - **Frontend (Admin UI)**
+    - [ ] Add "Mock Data" section in Admin → Data Management
+    - [ ] Controls: per-status count inputs/sliders; toggle include paid; email input (default `cfree3@lsu.edu`); add notes toggle; random seed optional
+    - [ ] Generate button with progress indicator; show summary (counts created by status)
+    - [ ] Persist last-used settings in `localStorage`
+  - **Pricing & Correctness**
+    - [ ] Unit-test pricing function: Filament $0.10/g, Resin $0.20/g, apply $3.00 minimum (round to cents)
+    - [ ] Ensure `Payment.price_cents = max(grams*rate, 300)`; store grams
+    - [ ] Ensure COMPLETED jobs have no payment; PAIDPICKEDUP jobs do
+  - **Diversity & Realism**
+    - [ ] Weighted distribution presets (Typical Day, Busy Period, End of Semester)
+    - [ ] Randomized but bounded weights by material (light/medium/heavy buckets)
+    - [ ] Spread created/updated timestamps over recent days
+  - **Tests**
+    - [ ] API test: creates exact requested counts; all emails = `cfree3@lsu.edu`; statuses correct; pricing correct
+    - [ ] CLI smoke test: runs without error and produces jobs
+    - [ ] UI test: happy path form submit → success summary
+  - **Success Criteria**
+    - [ ] Single admin action generates diversified jobs across tabs
+    - [ ] 100% jobs have `student_email = cfree3@lsu.edu`
+    - [ ] Pricing always correct; min-charge covered; resin vs filament respected
+    - [ ] Notes present on a configurable portion of jobs
+    - [ ] Operation completes < 3s for 50 jobs and does not break build/tests
 
 - [ ] **M4. Stats Endpoints**
   - [ ] Create `/api/v1/stats` endpoint

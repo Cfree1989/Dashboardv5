@@ -2,15 +2,16 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle } from "lucide-react";
+import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle, TestTube } from "lucide-react";
 import { StaffPanel } from "../../components/admin/staff-panel";
 import { SystemHealthPanel } from "../../components/admin/system-health";
 import { AdminSettingsPanel } from "../../components/admin/admin-settings";
 import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
 import { DataManagementPanel } from "../../components/admin/data-management";
 import { EmailToolsPanel } from "../../components/admin/email-tools";
+import { MockDataGenerator } from "../../components/admin/mock-data-generator";
 
-type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email";
+type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email" | "mock-data";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -24,14 +25,16 @@ export default function AdminPage() {
 
   const [activeSection, setActiveSection] = useState<AdminSection>("settings");
   const envLabel = typeof process !== "undefined" && process.env.NODE_ENV === "development" ? "DEV" : "PROD";
+  const isDevelopment = typeof process !== "undefined" && process.env.NODE_ENV === "development";
 
-  const sections: Array<{ id: AdminSection; label: string; icon: React.ComponentType<any> }> = [
+  const sections: Array<{ id: AdminSection; label: string; icon: React.ComponentType<any>; devOnly?: boolean }> = [
     { id: "settings", label: "Settings", icon: Settings },
     { id: "staff", label: "Staff Management", icon: Users },
     { id: "overrides", label: "Admin Overrides", icon: Shield },
     { id: "data", label: "Data Management", icon: Database },
     { id: "health", label: "System Health", icon: Activity },
     { id: "email", label: "Email Tools", icon: Mail },
+    { id: "mock-data", label: "Mock Data Generator", icon: TestTube, devOnly: true },
   ];
 
   const renderSection = () => {
@@ -48,10 +51,15 @@ export default function AdminPage() {
         return <SystemHealthPanel />;
       case "email":
         return <EmailToolsPanel />;
+      case "mock-data":
+        return <MockDataGenerator />;
       default:
         return null;
     }
   };
+
+  // Filter sections based on environment
+  const visibleSections = sections.filter(section => !section.devOnly || isDevelopment);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,7 +72,7 @@ export default function AdminPage() {
           <div className="lg:w-64 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <nav className="space-y-2">
-                {sections.map((section) => {
+                {visibleSections.map((section) => {
                   const Icon = section.icon as any;
                   const active = activeSection === section.id;
                   return (
@@ -73,10 +81,15 @@ export default function AdminPage() {
                       onClick={() => setActiveSection(section.id)}
                       className={`w-full flex items-center px-3 py-2 rounded-lg text-left transition-colors ${
                         active ? "bg-blue-100 text-blue-700 border border-blue-200" : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                      } ${section.devOnly ? "border-l-4 border-l-orange-400" : ""}`}
                     >
                       <Icon className="w-4 h-4 mr-3" />
                       {section.label}
+                      {section.devOnly && (
+                        <span className="ml-auto text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                          DEV
+                        </span>
+                      )}
                     </button>
                   );
                 })}
