@@ -813,12 +813,12 @@ def record_payment(job_id):
     if grams <= 0 or not txn_no or not picked_up_by:
         return jsonify({'message': 'grams > 0, txn_no and picked_up_by are required'}), 400
 
-    # Compute price from job.cost_usd if present; fallback to grams at $0.10/g (min $3)
-    if job.cost_usd is not None:
-        price_cents = int(Decimal(str(float(job.cost_usd))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
-    else:
-        raw_cost = max(3.0, grams * (0.20 if (job.material or '').lower() == 'resin' else 0.10))
-        price_cents = int(Decimal(str(raw_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
+    # Compute final price from actual pickup weight (grams) with material-specific rate and $3 minimum
+    # Note: job.cost_usd is the estimate from approval; actual price is calculated from pickup weight
+    material_rate = 0.20 if (job.material or '').lower() == 'resin' else 0.10
+    raw_cost = grams * material_rate
+    final_cost = max(3.0, raw_cost)  # $3.00 minimum charge
+    price_cents = int(Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
 
     payment = Payment(
         job_id=job.id,

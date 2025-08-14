@@ -7,14 +7,17 @@ type Props = { data: AnalyticsData };
 export function FinancialSummary({ data }: Props) {
   const f = data.financial;
   const totalRevenueUsd = f.totalRevenueCents / 100;
+  const estimatedRevenueUsd = f.estimatedRevenueCents / 100;
+  const actualRevenueUsd = f.actualRevenueCents / 100;
+  const varianceUsd = f.varianceCents / 100;
   
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
       <h3 className="text-base font-semibold mb-3">Financial Summary</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Kpi label="Total Revenue" value={`$${formatMoney(totalRevenueUsd)}`} />
-        <Kpi label="Avg Ticket" value={`$${formatMoney(f.avgTicketUsd)}`} />
-        <Kpi label="Payment Rate" value={`${f.paymentCount > 0 ? Math.round((f.paymentCount / (data.overview.byStatus.COMPLETED || 0 + data.overview.byStatus.PAIDPICKEDUP || 0)) * 100) : 0}%`} />
+        <Kpi label="Estimated Revenue" value={`$${formatMoney(estimatedRevenueUsd)}`} />
+        <Kpi label="Actual Revenue" value={`$${formatMoney(actualRevenueUsd)}`} />
+        <Kpi label="Variance" value={`$${formatMoney(varianceUsd)}`} className={varianceUsd >= 0 ? 'text-green-600' : 'text-red-600'} />
         <Kpi label="Payments" value={String(f.paymentCount)} />
       </div>
       <div className="mt-4">
@@ -40,10 +43,10 @@ export function FinancialSummary({ data }: Props) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className="text-center rounded-lg border border-gray-200 p-3">
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      <div className={`text-2xl font-bold ${className || 'text-gray-900'}`}>{value}</div>
       <div className="text-xs text-gray-600 mt-1">{label}</div>
     </div>
   );

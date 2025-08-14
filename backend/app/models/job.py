@@ -79,5 +79,6 @@ class Job(db.Model):
             'last_updated_by': self.last_updated_by,
             'notes': self.notes,
             'created_at': self.created_at.replace(tzinfo=timezone.utc).isoformat(),
-            'updated_at': self.updated_at.replace(tzinfo=timezone.utc).isoformat()
+            'updated_at': self.updated_at.replace(tzinfo=timezone.utc).isoformat(),
+            'payment': self.payment.to_dict() if self.payment else None
         } 

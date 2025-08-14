@@ -54,6 +54,9 @@ export type FinancialData = {
   avgTicketUsd: number;
   revenueOverTime: RevenuePoint[];
   staffRevenue: Record<string, number>;
+  estimatedRevenueCents: number;
+  actualRevenueCents: number;
+  varianceCents: number;
   dateRange: DateRange;
 };
 

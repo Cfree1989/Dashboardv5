@@ -3,6 +3,7 @@ import pytest
 import os
 from app import db
 from app.models.job import Job
+from app.models.payment import Payment
 
 
 def create_job(app):
@@ -356,6 +357,123 @@ def test_record_payment_moves_file_and_sets_status(client, token, app, tmp_path)
     # File moved to PaidPickedUp
     assert not (tmp_path / 'Completed' / 'file.stl').exists()
     assert (tmp_path / 'PaidPickedUp' / 'file.stl').exists()
+
+
+def test_record_payment_uses_actual_grams_not_estimate(client, token, app):
+    """Test that payment calculation uses actual pickup weight, not the job estimate"""
+    job = create_job(app)
+    with app.app_context():
+        j = Job.query.get(job.id)
+        # Set up job with a high estimate ($50.00) but resin material
+        j.status = 'COMPLETED'
+        j.material = 'resin'
+        j.cost_usd = 50.00  # High estimate
+        db.session.commit()
+
+    client.post('/api/v1/staff', json={'name': 'Cashier'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Record payment with low actual weight (10g resin = $2.00, but min $3.00)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 10, 'txn_no': 'TC1', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    
+    # Verify the payment record has the correct price (min charge $3.00)
+    with app.app_context():
+        payment = Payment.query.get(job.id)
+        assert payment is not None
+        assert payment.price_cents == 300  # $3.00 minimum charge
+        assert payment.grams == 10.0
+        # Verify the job estimate was NOT used (would have been $50.00 = 5000 cents)
+
+
+def test_record_payment_filament_calculation(client, token, app):
+    """Test filament payment calculation with various weights"""
+    job = create_job(app)
+    with app.app_context():
+        j = Job.query.get(job.id)
+        j.status = 'COMPLETED'
+        j.material = 'filament'
+        j.cost_usd = 25.00  # Estimate
+        db.session.commit()
+
+    client.post('/api/v1/staff', json={'name': 'Cashier'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Test 1: Below minimum charge (20g filament = $2.00, should be $3.00 min)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 20, 'txn_no': 'TC1', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    
+    with app.app_context():
+        payment = Payment.query.get(job.id)
+        assert payment.price_cents == 300  # $3.00 minimum charge
+
+    # Test 2: Above minimum charge (50g filament = $5.00)
+    job2 = create_job(app)
+    with app.app_context():
+        j2 = Job.query.get(job2.id)
+        j2.status = 'COMPLETED'
+        j2.material = 'filament'
+        db.session.commit()
+
+    resp = client.post(
+        f'/api/v1/jobs/{job2.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 50, 'txn_no': 'TC2', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    
+    with app.app_context():
+        payment2 = Payment.query.get(job2.id)
+        assert payment2.price_cents == 500  # $5.00 (50g * $0.10/g)
+
+
+def test_record_payment_resin_calculation(client, token, app):
+    """Test resin payment calculation with various weights"""
+    job = create_job(app)
+    with app.app_context():
+        j = Job.query.get(job.id)
+        j.status = 'COMPLETED'
+        j.material = 'resin'
+        db.session.commit()
+
+    client.post('/api/v1/staff', json={'name': 'Cashier'}, headers={'Authorization': f'Bearer {token}'})
+
+    # Test 1: Below minimum charge (10g resin = $2.00, should be $3.00 min)
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 10, 'txn_no': 'TC1', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    
+    with app.app_context():
+        payment = Payment.query.get(job.id)
+        assert payment.price_cents == 300  # $3.00 minimum charge
+
+    # Test 2: Above minimum charge (25g resin = $5.00)
+    job2 = create_job(app)
+    with app.app_context():
+        j2 = Job.query.get(job2.id)
+        j2.status = 'COMPLETED'
+        j2.material = 'resin'
+        db.session.commit()
+
+    resp = client.post(
+        f'/api/v1/jobs/{job2.id}/payment',
+        json={'staff_name': 'Cashier', 'grams': 25, 'txn_no': 'TC2', 'picked_up_by': 'Student'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    
+    with app.app_context():
+        payment2 = Payment.query.get(job2.id)
+        assert payment2.price_cents == 500  # $5.00 (25g * $0.20/g)
 
 
 def test_append_note_with_name_prefix_and_limits(client, token, app):

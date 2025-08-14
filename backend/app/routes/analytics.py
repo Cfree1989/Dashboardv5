@@ -481,6 +481,29 @@ def financial():
         payment_count += 1
         revenue_counter[ts.date().isoformat()] += cents
     
+    # Calculate estimated vs actual revenue
+    estimated_revenue_cents = 0
+    actual_revenue_cents = total_revenue_cents  # This is the actual revenue from payments
+    
+    # Get all jobs in the date range that have cost estimates
+    jobs_with_estimates = Job.query.filter(
+        Job.created_at >= start,
+        Job.created_at <= end
+    ).all()
+    
+    for job in jobs_with_estimates:
+        # Apply filters
+        if printer_filter and getattr(job, 'printer', None) != printer_filter:
+            continue
+        if discipline_filter and getattr(job, 'discipline', None) != discipline_filter:
+            continue
+        
+        # Add estimated cost if available
+        if job.cost_usd:
+            estimated_revenue_cents += int(float(job.cost_usd) * 100)
+    
+    variance_cents = actual_revenue_cents - estimated_revenue_cents
+    
     revenue_over_time = [{'date': d, 'cents': c} for d, c in sorted(revenue_counter.items())]
     avg_ticket_usd = round((total_revenue_cents / 100.0) / payment_count, 2) if payment_count else 0.0
     
@@ -502,6 +525,9 @@ def financial():
         'avg_ticket_usd': avg_ticket_usd,
         'revenue_over_time': revenue_over_time,
         'staff_revenue': dict(staff_revenue),
+        'estimated_revenue_cents': estimated_revenue_cents,
+        'actual_revenue_cents': actual_revenue_cents,
+        'variance_cents': variance_cents,
         'date_range': {
             'start': start.isoformat(),
             'end': end.isoformat()

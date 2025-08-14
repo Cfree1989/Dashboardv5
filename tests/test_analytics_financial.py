@@ -103,5 +103,118 @@ def test_financial_no_payments_returns_zeros(client, token):
     assert data['payment_count'] == 0
     assert data['avg_ticket_usd'] == 0
     assert data['revenue_over_time'] == []
+    assert data['estimated_revenue_cents'] == 0
+    assert data['actual_revenue_cents'] == 0
+    assert data['variance_cents'] == 0
+
+
+def test_financial_estimated_vs_actual_revenue(client, token, app):
+    """Test estimated vs actual revenue calculation with mixed materials and min-charge cases"""
+    now = datetime.utcnow()
+    
+    # Create jobs with cost estimates (but no payments yet)
+    with app.app_context():
+        # Job 1: Filament job with $5.00 estimate
+        job1 = Job(
+            student_name='Alice',
+            student_email='alice@example.com',
+            discipline='Art',
+            class_number='101',
+            original_filename='file1.stl',
+            display_name='file1.stl',
+            file_path='path1',
+            metadata_path='meta1',
+            printer='Prusa',
+            color='Red',
+            material='Filament',
+            status='UPLOADED',
+            cost_usd=5.00,
+            created_at=now - timedelta(days=5)
+        )
+        db.session.add(job1)
+        
+        # Job 2: Resin job with $8.00 estimate  
+        job2 = Job(
+            student_name='Bob',
+            student_email='bob@example.com',
+            discipline='Engineering',
+            class_number='201',
+            original_filename='file2.stl',
+            display_name='file2.stl',
+            file_path='path2',
+            metadata_path='meta2',
+            printer='Formlabs',
+            color='Black',
+            material='Resin',
+            status='UPLOADED',
+            cost_usd=8.00,
+            created_at=now - timedelta(days=3)
+        )
+        db.session.add(job2)
+        
+        # Job 3: Small resin job that will hit minimum charge
+        job3 = Job(
+            student_name='Carol',
+            student_email='carol@example.com',
+            discipline='Art',
+            class_number='101',
+            original_filename='file3.stl',
+            display_name='file3.stl',
+            file_path='path3',
+            metadata_path='meta3',
+            printer='Formlabs',
+            color='White',
+            material='Resin',
+            status='UPLOADED',
+            cost_usd=1.00,  # Small estimate
+            created_at=now - timedelta(days=1)
+        )
+        db.session.add(job3)
+        db.session.commit()
+        
+        # Create payments for jobs 1 and 3 (job 2 not paid yet)
+        pay1 = Payment(
+            job_id=job1.id,
+            grams=50.0,  # 50g filament = $5.00
+            price_cents=500,
+            txn_no='TXN1',
+            picked_up_by='Alice',
+            paid_ts=now - timedelta(days=2),
+            paid_by_staff='Cashier',
+        )
+        db.session.add(pay1)
+        
+        pay3 = Payment(
+            job_id=job3.id,
+            grams=10.0,  # 10g resin = $2.00, but minimum charge applies = $3.00
+            price_cents=300,
+            txn_no='TXN3',
+            picked_up_by='Carol',
+            paid_ts=now - timedelta(days=1),
+            paid_by_staff='Cashier',
+        )
+        db.session.add(pay3)
+        db.session.commit()
+
+    # Test the financial endpoint
+    resp = client.get(
+        '/api/v1/analytics/financial?days=30',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    
+    # Estimated revenue: $5.00 + $8.00 + $1.00 = $14.00 = 1400 cents
+    assert data['estimated_revenue_cents'] == 1400
+    
+    # Actual revenue: $5.00 + $3.00 = $8.00 = 800 cents (only paid jobs)
+    assert data['actual_revenue_cents'] == 800
+    
+    # Variance: $8.00 - $14.00 = -$6.00 = -600 cents (negative because actual < estimated)
+    assert data['variance_cents'] == -600
+    
+    # Verify other fields still work
+    assert data['total_revenue_cents'] == 800
+    assert data['payment_count'] == 2
 
 

@@ -26,6 +26,16 @@ interface Job {
   file_path?: string;
   discipline?: string;
   class_number?: string;
+  payment?: {
+    job_id: string;
+    grams: number;
+    price_cents: number;
+    price_usd: number;
+    txn_no: string;
+    picked_up_by: string;
+    paid_ts: string;
+    paid_by_staff: string;
+  };
 }
 
 interface JobCardProps {
@@ -593,7 +603,12 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     <div className="text-gray-700"><span className="text-gray-500">Time:</span> {job.time_hours} h</div>
                   )}
                   {typeof job.cost_usd === 'number' && (
-                    <div className="text-gray-700"><span className="text-gray-500">Cost:</span> ${job.cost_usd.toFixed(2)}</div>
+                    <div className="text-gray-700">
+                      <span className="text-gray-500">
+                        {currentStatus === 'PAIDPICKEDUP' && job.payment ? 'Final Cost:' : 'Estimated Cost:'}
+                      </span> 
+                      ${currentStatus === 'PAIDPICKEDUP' && job.payment ? job.payment.price_usd.toFixed(2) : job.cost_usd.toFixed(2)}
+                    </div>
                   )}
                 </div>
               </div>
