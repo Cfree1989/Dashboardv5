@@ -164,7 +164,35 @@
 - Global Search UX Stabilization completed ✅
 - **FI1. Payment Accuracy & Finance Variance workstream completed** ✅
 - **D2. Admin System-Level Event Logging 500 Error completed** ✅
+- **C1. Admin Catalog for Printers/Materials/Colors - Phase 1 MVP completed** ✅
 - Site fully functional with all core features working and polished UI
+
+### C1. Catalog System Implementation Progress
+- **C1-S1. Backend Read Model** ✅ **COMPLETED**
+  - Database model, schema validation, API endpoints, and default seeding working
+  - Migration applied successfully
+  - API tested and returning correct data with Filament/Resin methods
+- **C1-S2. Frontend Consumption** ✅ **COMPLETED**
+  - SWR hook with caching and revalidation implemented
+  - Utility functions for filtering catalog data created
+  - Frontend build verified
+- **C1-S3. Admin Update (Guarded MVP)** ✅ **COMPLETED**
+  - Admin editor component with JSON interface created
+  - Feature flag support for controlled rollout
+  - Error handling and validation implemented
+- **C1-S4. Server-side Validation on Writes That Use Catalog** ✅ **COMPLETED**
+  - Added comprehensive validation method to CatalogService
+  - Integrated validation into job submission and approval endpoints
+  - Created comprehensive test suite with 13 test cases
+  - Updated existing tests to use correct method/material distinction
+- **C1-S5. Tests (TDD)** ✅ **COMPLETED**
+  - Created comprehensive test suite covering schema validation, service methods, API endpoints, and integration
+  - Test coverage includes: catalog schema validation, service methods, job configuration validation, API endpoints, and integration with job submission/approval
+  - Added catalog editor to admin panel for frontend testing and management
+  - Success: All tests passing, frontend builds successfully, catalog editor visible in admin panel
+  - **Frontend Build Issue Resolved**: Fixed 'swr' module resolution error by ensuring dependencies are properly installed in container environment
+  - **Docker Deployment Note**: When adding new dependencies like 'swr', must rebuild frontend container with `docker compose build --no-cache frontend` to ensure proper installation
+  - **Container Restart Required**: After installing new dependencies, restart the frontend container with `docker compose restart frontend` to clear Next.js module cache
 
 ### Recent Accomplishments
 - **D2. Admin System-Level Event Logging 500 Error**: ✅ **COMPLETED**
@@ -890,3 +918,96 @@ Success criteria:
 - All tests pass; backend and frontend build successfully
 - Core system functions unaffected
 - Optional: standalone scripts exist for dev use only
+
+## New Workstream — C1. Admin Catalog for Printers/Materials/Colors (Planner)
+
+### Background & Motivation
+- Goal: A single source of truth that defines printers, materials, and allowed colors to drive the submission form, the Change Info modal, and how jobs render on cards.
+- Current state: Options are scattered and partly hard-coded; changes require code edits and risk drift (e.g., typos in material/color names).
+
+### Tough, Honest Opinion (Verdict)
+- This is strategically valuable, but a risky scope expansion right before stabilization/E2E. The biggest trap is persisting to a `catalog.json` file and wiring admin CRUD to mutate it. In Dockerized deployments, file writes inside containers are fragile (volume permissions, race conditions, rebuild drift) and give you no audit trail or rollback.
+- If we must do this now, avoid file-based persistence and instead store the catalog in the database with versioning and audit. Keep the initial surface area tiny: one GET endpoint, a simple admin editor behind a feature flag, and non-breaking integration on the form/modals.
+- If schedule is tight, ship a read-only catalog first (loaded from DB/seed) and wire the UI to consume it; add CRUD later. Do not block E2E on full CRUD.
+
+### Key Challenges & Analysis
+- Data model coupling: `method → materials → colors`, and `method → printers (via printer.supported_methods)`. Invalid combos must be prevented at the UI and validated server-side.
+- Back-compat: Existing jobs reference free-form strings; catalog activation must not break viewing/filters. Legacy values should display and remain selectable via a guarded "Other" path if needed.
+- Instant propagation: Clients need a refresh strategy (SWR/window focus refetch or short TTL). "Instant" via websockets is overkill; a version bump and refetch is sufficient.
+- Auditability: Admin edits must be attributed, diffable, and reversible. JSON files do not provide this; DB with events does.
+
+### Recommendation
+- Phase the work. Start with a minimal, safe foundation that does not introduce file write paths from the app.
+  1) Store the catalog as a single JSON document in the DB (e.g., table `catalog_store(id PK, version, data JSONB, updated_by, updated_at)`, single row with `id='active'`).
+  2) Expose `GET /api/v1/catalog` returning `{ version, printers, materials }`.
+  3) Add a guarded `PUT /api/v1/admin/catalog` (admin-only) that validates schema, bumps `version`, writes, and logs an event. No partial nested CRUD yet.
+  4) Frontend reads the catalog via a `useCatalog()` hook using SWR with `revalidateOnFocus` and caches by `version`.
+  5) Wire submission form and Change Info modal to filter options based on the catalog. If catalog missing, gracefully fall back to current behavior.
+
+### Proposed Minimal Schema (JSON)
+```
+{
+  "version": 1,
+  "methods": ["FDM", "SLA"],
+  "printers": [
+    { "id": "prusa-mk3s", "name": "Prusa MK3S", "supported_methods": ["FDM"], "is_active": true },
+    { "id": "form3", "name": "Formlabs Form 3", "supported_methods": ["SLA"], "is_active": true }
+  ],
+  "materials": [
+    { "id": "pla", "method": "FDM", "name": "PLA", "unit_cost_per_g_cents": 10, "colors": ["Black","White","Orange"], "is_active": true },
+    { "id": "resin-standard", "method": "SLA", "name": "Standard Resin", "unit_cost_per_g_cents": 20, "colors": ["Grey","Clear"], "is_active": true }
+  ]
+}
+```
+
+### High-level Task Breakdown (Small, Verifiable Steps)
+- C1-S1. Backend Read Model ✅ **COMPLETED**
+  - ✅ Added `catalog_store` table with SQLAlchemy model and custom schema validation (no Pydantic).
+  - ✅ Seed a sensible default row on startup if missing (dev-only).
+  - ✅ Endpoint: `GET /api/v1/catalog` returns validated data and `version`.
+  - ✅ Success: 200 with schema; returns cache headers and ETag.
+  - ✅ Database migration created and applied successfully.
+  - ✅ API tested and working: returns default catalog with Filament/Resin methods, printers, and materials.
+
+- C1-S2. Frontend Consumption ✅ **COMPLETED**
+  - ✅ Created `lib/use-catalog.ts` hook using SWR; revalidate on window focus.
+  - ✅ Added pure utils: `filterMaterialsByMethod`, `filterPrintersByMethod`, `colorsForMaterial`.
+  - ✅ Installed SWR dependency and verified frontend build success.
+  - ✅ Success: Hook ready for integration with submission form and Change Info modal.
+
+- C1-S3. Admin Update (Guarded MVP) ✅ **COMPLETED**
+  - ✅ Admin page section `Catalog` with a single JSON editor (textarea + schema validation) behind a feature flag.
+  - ✅ Endpoint: `PUT /api/v1/catalog` (admin-only) validates against schema, bumps `version`, logs event.
+  - ✅ Success: Invalid payloads rejected with helpful messages; valid payload increments `version` and clients see updates on next focus.
+  - ✅ Frontend component created with proper error handling and loading states.
+  - ✅ Feature flag support for controlled rollout.
+
+- C1-S4. Server-side Validation on Writes That Use Catalog ✅ **COMPLETED**
+  - ✅ Added `validate_job_configuration` method to `CatalogService` that validates method/material/color/printer combinations
+  - ✅ Integrated validation into job submission endpoint (`POST /api/v1/submit`) with proper error responses
+  - ✅ Integrated validation into job approval endpoint (`POST /api/v1/jobs/<id>/approve`) for printer overrides
+  - ✅ Created comprehensive test suite covering valid/invalid combinations, case sensitivity, whitespace handling, and custom catalogs
+  - ✅ Updated existing tests to use correct method/material distinction
+  - ✅ Success: Invalid combinations return 400 with detailed error messages; existing legacy jobs remain readable
+
+- C1-S5. Tests (TDD)
+  - Backend: schema validation, GET returns seeded data, PUT rejects bad shapes and accepts good ones, event logged.
+  - Frontend: unit tests for filter utils; form filtering reacts to catalog; change to catalog re-renders options.
+  - E2E (later): admin update -> user focuses form -> sees updated options.
+
+### Success Criteria
+- A single `GET /api/v1/catalog` drives options across submission form and Change Info modal; job cards display values without regressions.
+- Admin can update the catalog (behind a feature flag); changes propagate to clients on next focus without app restarts.
+- Server rejects invalid method/material/color/printer combinations.
+- All changes are auditable and reversible (versioned writes, event log).
+
+### Risks & Mitigations
+- File persistence fragility → Use DB JSONB with versioning; no container file writes.
+- Breaking existing jobs → Allow legacy values; validate only on new writes.
+- "Instant" updates expectation → Use SWR revalidate on focus + short TTL, expose `version` for manual refetch when admin saves.
+- Scope creep (full nested CRUD UI) → MVP is one JSON doc editor with schema validation; expand later if needed.
+
+### Rollout Strategy
+- Phase 1 (MVP): C1-S1..S3 only, feature-flagged admin editor. Keep UI fallback if catalog missing.
+- Phase 2: Replace JSON editor with structured nested CRUD when time allows; add diff/rollback UI.
+- Phase 3: Optional: expose `GET /api/v1/catalog/version` and add lightweight polling for high-traffic desks.

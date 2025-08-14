@@ -9,12 +9,15 @@ def test_submit_job_success(client):
         'student_email': 'charlie@example.com',
         'discipline': 'Eng',
         'class_number': '303',
-        'printer': 'Prusa',
-        'color': 'Green',
-        'material': 'Filament',
+        'print_method': 'Filament',
+        'printer': 'Prusa MK3S',
+        'color': 'Black',
+        'material': 'PLA',
         'file': (io.BytesIO(b'solid data'), 'model.stl')
     }
     resp = client.post('/api/v1/submit', data=data, content_type='multipart/form-data')
+    if resp.status_code != 201:
+        print(f"Response: {resp.get_json()}")
     assert resp.status_code == 201
     json = resp.get_json()
     assert json['student_name'] == 'Charlie'
@@ -46,9 +49,10 @@ def test_submit_duplicate(client):
         'student_email': 'frank@example.com',
         'discipline': 'Art',
         'class_number': '404',
-        'printer': 'Prusa',
+        'print_method': 'Filament',
+        'printer': 'Prusa MK3S',
         'color': 'Red',
-        'material': 'Filament',
+        'material': 'PLA',
         'file': (io.BytesIO(b'dupe data'), 'dup.stl')
     }
     resp1 = client.post('/api/v1/submit', data=data, content_type='multipart/form-data')

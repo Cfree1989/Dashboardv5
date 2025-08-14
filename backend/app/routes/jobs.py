@@ -18,6 +18,7 @@ import shutil
 from decimal import Decimal, ROUND_HALF_UP
 from app.services.file_service import move_authoritative
 from app.services.file_service import STATUS_TO_DIR
+from app.services.catalog_service import CatalogService
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -366,14 +367,24 @@ def approve_job(job_id):
     job.staff_viewed_at = datetime.utcnow()
     # Optional: validate and apply printer override if provided
     if printer_override:
-        # Allowed printer sets by material
-        allowed_by_material = {
-            'filament': { 'Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus' },
-            'resin': { 'Formlabs Form 3' },
-        }
-        allowed = allowed_by_material.get(material, set())
-        if allowed and printer_override not in allowed:
-            return jsonify({'message': 'Invalid printer for selected material'}), 400
+        # Determine method from material for validation
+        # This is a fallback since jobs might not have method stored separately
+        method_for_validation = "Filament" if (job.material or '').lower() in ["pla", "abs"] else "Resin" if (job.material or '').lower() in ["resin", "standard resin"] else "Filament"
+        
+        # Validate printer override against catalog
+        is_valid, validation_errors = CatalogService.validate_job_configuration(
+            method=method_for_validation,
+            material=job.material,
+            color=job.color,
+            printer=printer_override
+        )
+        
+        if not is_valid:
+            return jsonify({
+                'message': 'Invalid printer override',
+                'details': validation_errors
+            }), 400
+            
         previous_printer = job.printer
         if printer_override and printer_override != previous_printer:
             job.printer = printer_override

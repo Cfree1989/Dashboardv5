@@ -10,6 +10,7 @@ from app.services.email_service import send_submission_confirmation_email, send_
 from app.services.token_service import generate_confirmation_token, verify_confirmation_token, _serializer
 from app.services.file_service import move_authoritative
 from app.routes.jobs import _sync_authoritative_metadata
+from app.services.catalog_service import CatalogService
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
@@ -91,10 +92,26 @@ def submit_job():
         normalized_student = _normalize_name_for_filename(student_name or 'Student')
 
         # Derive print method/material and color
-        raw_method = request.form.get('material') or request.form.get('print_method') or ''
+        raw_method = request.form.get('print_method') or ''
+        raw_material = request.form.get('material') or ''
         raw_color = request.form.get('color') or ''
+        raw_printer = request.form.get('printer') or ''
         normalized_method = _normalize_simple_label(raw_method or 'Method')
         normalized_color = _normalize_simple_label(raw_color or 'Color')
+        
+        # Validate job configuration against catalog
+        is_valid, validation_errors = CatalogService.validate_job_configuration(
+            method=raw_method,
+            material=raw_material,
+            color=raw_color,
+            printer=raw_printer
+        )
+        
+        if not is_valid:
+            return jsonify({
+                'error': 'Invalid job configuration',
+                'details': validation_errors
+            }), 400
 
         # Short/simple Job ID
         simple_id = short_id

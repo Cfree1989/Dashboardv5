@@ -1,5 +1,5 @@
 from app import create_app, db
-from app.models import Job, Event, Staff, Payment
+from app.models import Job, Event, Staff, Payment, CatalogStore
 
 app = create_app()
 
@@ -14,7 +14,8 @@ def make_shell_context():
         'Job': Job,
         'Event': Event,
         'Staff': Staff,
-        'Payment': Payment
+        'Payment': Payment,
+        'CatalogStore': CatalogStore
     }
 
 if __name__ == '__main__':
