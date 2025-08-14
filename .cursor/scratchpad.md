@@ -753,3 +753,140 @@
 
 ### Rollback Plan
 - Revert any admin route edits and restore logging after schema solution is in place.
+
+### Executor Status Update — D2 Validation
+- Mock generation: Working (200 OK), jobs created successfully
+- Delete all jobs: Working (200 OK)
+- Hotfix in place: system-level `log_event` calls in admin routes are disabled to avoid `Event.job_id` NOT NULL violations; response computation fixed
+- Dev auth: `g.staff_name` defaulted from JWT/workstation for admin routes; auto-create active `Staff` in DEBUG if missing; rate limits relaxed for testing
+- Next (long-term): choose one
+  - Make `Event.job_id` nullable via migration and treat `None` as system events
+  - Or add separate `SystemEvent` table
+  - Or use a special `SYSTEM` job id to associate admin actions
+
+### D2 — Current Situation & Decision Point (Planner)
+
+**The Problem**: What started as simple "Generate Mock Jobs" and "Delete All Jobs" buttons has revealed a fundamental architectural issue with system-level event logging that affects the entire audit trail system.
+
+**Root Cause**: The database schema requires every `Event` to be linked to a specific `Job` (`job_id` cannot be null), but admin system-level actions (like deleting all jobs) don't have a single job to associate with.
+
+**Current State**: 
+- Hotfix in place: system-level event logging disabled
+- Admin buttons work but create no audit trail
+- Core system functionality unaffected
+- This is a temporary solution, not a proper fix
+
+**Options Moving Forward**:
+
+**Option A: Remove Admin Features Entirely** ⭐ **RECOMMENDED**
+- **Pros**: 
+  - Eliminates the architectural problem completely
+  - No database schema changes needed
+  - No risk of breaking the audit trail system
+  - Keeps the system simple and focused
+  - Mock data can be generated via CLI commands if needed
+- **Cons**: 
+  - Loses convenient admin UI features
+  - Staff would need to use CLI for mock data generation
+- **Implementation**: Remove the mock generator and delete-all buttons from admin panel
+- **Effort**: 30 minutes to clean up the UI
+
+**Option B: Fix the Architecture (High Risk)**
+- **Pros**: 
+  - Maintains full audit trail
+  - Keeps admin features
+- **Cons**: 
+  - Requires database migration (risk of data loss)
+  - Complex schema changes that could break existing functionality
+  - High testing burden to ensure nothing breaks
+  - Could introduce new bugs in the event system
+- **Implementation**: Choose one of the three schema approaches (nullable job_id, separate SystemEvent table, or SYSTEM job)
+- **Effort**: 2-3 days with significant risk
+
+**Option C: Keep Current Hotfix (Medium Risk)**
+- **Pros**: 
+  - Admin features work
+  - No immediate changes needed
+- **Cons**: 
+  - Incomplete audit trail (missing admin actions)
+  - Technical debt that will need addressing later
+  - Could cause confusion about what's being logged
+- **Implementation**: Leave as-is, document the limitation
+- **Effort**: 0 days, but creates future technical debt
+
+**Planner Recommendation**: **Option A - Remove Admin Features**
+- This is a 3D print management system, not a data management platform
+- The core value is in job lifecycle management, not bulk data operations
+- Mock data generation can be done via CLI when needed for testing
+- Keeps the system architecture clean and focused
+- Eliminates the risk of breaking the audit trail system
+
+**Success Criteria for Option A**:
+- Remove mock data generator from admin panel
+- Remove "Delete All Jobs" button from admin panel  
+- Clean up any related backend endpoints if not used elsewhere
+- Ensure CLI commands still work for development/testing
+- No regressions in core system functionality
+
+### D2 — Rollback & Clean Removal Plan (Planner)
+
+Goal: Cleanly remove all Mock Job Generation and Delete-All features from the app UI and API, keeping only optional CLI tooling for developers.
+
+Scope to remove from the application:
+- Backend API endpoints: `POST /api/v1/admin/mock-jobs`, `POST /api/v1/admin/delete-all-jobs`
+- Backend service: `MockJobService` usage in routes
+- Frontend admin UI: `MockDataGenerator` component and related buttons/sections
+- Tests specifically for mock generator endpoints
+- Any rate-limit/auth/temp hacks added only for these endpoints
+- Documentation references in admin UI
+
+Keep (dev-only):
+- CLI commands optionally, or move them to `scripts/` and remove from Flask CLI
+
+Step-by-step tasks:
+1) Backend routes cleanup (`backend/app/routes/admin.py`)
+   - Remove imports: `MockJobService`
+   - Remove route handlers: `@bp.route('/mock-jobs'...) def generate_mock_jobs`, `@bp.route('/delete-all-jobs'...) def delete_all_jobs`
+   - Remove temporary DEBUG/limiter/staff_name fallbacks added for these endpoints
+   - Ensure remaining admin routes still import and run cleanly
+
+2) Backend services cleanup
+   - Option A (preferred): Keep `MockJobService` file for dev CLI use only; remove imports/usages from app routes
+   - Option B: Move `backend/app/services/mock_job_service.py` to `scripts/mock_job_service.py` and update CLI scripts
+
+3) Backend CLI cleanup (`backend/app/seed.py`)
+   - Remove Flask CLI commands: `generate-mock-jobs`, `randomize-jobs`, `delete-all-jobs` from app CLI registry
+   - If we still want dev-only scripts, add standalone scripts under `/scripts` using app context
+
+4) Frontend cleanup
+   - Remove `frontend/src/components/admin/mock-data-generator.tsx`
+   - Remove references from admin page(s) (`admin/data-management.tsx`, `admin/staff-panel.tsx`, or similar)
+   - Verify admin UI builds without these controls and no imports remain
+
+5) Tests cleanup
+   - Remove `tests/test_mock_job_service.py`
+   - Remove any test cases referencing the removed endpoints
+   - Run test suite to confirm green
+
+6) Config & rate-limit cleanup
+   - Revert any rate-limit increases introduced for these endpoints in `admin.py`
+   - Revert `g.staff_name` fallback if it was only introduced for these admin endpoints (validate other routes still set it correctly)
+
+7) Docs cleanup
+   - Update README/admin docs to remove references to admin mock generator and delete-all buttons
+   - Document alternative: use CLI or scripts if needed in development
+
+8) Verification
+   - Backend: `docker-compose up -d --build`, confirm no route errors
+   - Frontend: build and run, admin page loads without mock/delete sections
+   - Manual: Submit, approve, complete, pay flow unaffected
+
+9) Optional dev scripts
+   - Add `scripts/generate_mock_data.py` and `scripts/clear_all_data.py` (not wired to UI)
+   - Document usage in README (dev-only)
+
+Success criteria:
+- No references to `/api/v1/admin/mock-jobs` or `/api/v1/admin/delete-all-jobs` remain in code or UI
+- All tests pass; backend and frontend build successfully
+- Core system functions unaffected
+- Optional: standalone scripts exist for dev use only

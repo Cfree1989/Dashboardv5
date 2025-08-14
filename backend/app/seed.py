@@ -3,7 +3,6 @@ from flask.cli import with_appcontext
 from .models.staff import Staff
 from .models.job import Job
 from .models.event import Event
-from .services.mock_job_service import MockJobService
 from datetime import datetime
 import random
 import uuid
@@ -87,10 +86,7 @@ def init_app(app):
     app.cli.add_command(seed_data_command)
     app.cli.add_command(seed_demo_jobs_command)
     app.cli.add_command(seed_uploaded_jobs_command)
-    app.cli.add_command(generate_mock_jobs_command)
-    app.cli.add_command(randomize_jobs_command)
-    app.cli.add_command(delete_jobs_command)
-    app.cli.add_command(delete_all_jobs_command)
+    # Removed mock/bulk CLI commands from app registry
 
 
 @click.command('seed-uploaded')
@@ -134,209 +130,10 @@ def seed_uploaded_jobs_command(count: int):
     db.session.commit()
     click.echo(f'Seeded {created} UPLOADED jobs.')
 
-@click.command('generate-mock-jobs')
-@click.option('--uploaded', default=0, help='Number of UPLOADED jobs to create')
-@click.option('--pending', default=0, help='Number of PENDING jobs to create')
-@click.option('--ready', default=0, help='Number of READYTOPRINT jobs to create')
-@click.option('--printing', default=0, help='Number of PRINTING jobs to create')
-@click.option('--completed', default=0, help='Number of COMPLETED jobs to create')
-@click.option('--paid', default=0, help='Number of PAIDPICKEDUP jobs to create')
-@click.option('--email', default='cfree3@lsu.edu', help='Email address for all jobs')
-@click.option('--seed', type=int, help='Random seed for reproducible generation')
-@click.option('--add-notes/--no-notes', default=True, help='Whether to add notes to jobs')
-@with_appcontext
-def generate_mock_jobs_command(uploaded, pending, ready, printing, completed, paid, email, seed, add_notes):
-    """Generate mock jobs with correct pricing and realistic data."""
-    from flask import current_app
-    
-    # Safety check: only allow in development
-    if not current_app.config.get('DEBUG', False):
-        click.echo('❌ Mock job generation is only allowed in development mode')
-        return 1
-    
-    counts = {
-        'UPLOADED': uploaded,
-        'PENDING': pending,
-        'READYTOPRINT': ready,
-        'PRINTING': printing,
-        'COMPLETED': completed,
-        'PAIDPICKEDUP': paid
-    }
-    
-    total_requested = sum(counts.values())
-    if total_requested == 0:
-        click.echo('No jobs requested. Use --help to see options.')
-        return
-    
-    click.echo(f'Generating {total_requested} mock jobs with email: {email}')
-    if seed is not None:
-        click.echo(f'Using seed: {seed}')
-    
-    try:
-        created_counts = MockJobService.generate_mock_jobs(
-            counts=counts,
-            student_email=email,
-            add_notes=add_notes,
-            seed=seed
-        )
-        
-        click.echo('✅ Mock jobs generated successfully!')
-        click.echo('Created:')
-        for status, count in created_counts.items():
-            if count > 0:
-                click.echo(f'  {status}: {count} jobs')
-        
-        total_created = sum(created_counts.values())
-        click.echo(f'\nTotal: {total_created} jobs created')
-        
-    except Exception as e:
-        click.echo(f'❌ Error generating mock jobs: {e}')
-        return 1
+## Removed: generate-mock-jobs CLI command
 
-@click.command('randomize-jobs')
-@click.option('--uploaded', default=0, help='Number of UPLOADED jobs to create')
-@click.option('--pending', default=0, help='Number of PENDING jobs to create')
-@click.option('--ready', default=0, help='Number of READYTOPRINT jobs to create')
-@click.option('--printing', default=0, help='Number of PRINTING jobs to create')
-@click.option('--completed', default=0, help='Number of COMPLETED jobs to create')
-@click.option('--paid', default=0, help='Number of PAIDPICKEDUP jobs to create')
-@click.option('--email', default='cfree3@lsu.edu', help='Email address for all jobs')
-@click.option('--seed', type=int, help='Random seed for reproducible generation')
-@with_appcontext
-def randomize_jobs_command(uploaded, pending, ready, printing, completed, paid, email, seed):
-    """Simplified randomizer: just specify which tab and how many jobs. Everything else is randomized."""
-    from flask import current_app
-    
-    # Safety check: only allow in development
-    if not current_app.config.get('DEBUG', False):
-        click.echo('❌ Mock job generation is only allowed in development mode')
-        return 1
-    
-    counts = {
-        'UPLOADED': uploaded,
-        'PENDING': pending,
-        'READYTOPRINT': ready,
-        'PRINTING': printing,
-        'COMPLETED': completed,
-        'PAIDPICKEDUP': paid
-    }
-    
-    total_requested = sum(counts.values())
-    if total_requested == 0:
-        click.echo('No jobs requested. Use --help to see options.')
-        return
-    
-    click.echo(f'🎲 Randomizing {total_requested} jobs across tabs with email: {email}')
-    if seed is not None:
-        click.echo(f'Using seed: {seed}')
-    
-    try:
-        created_counts = MockJobService.generate_randomized_jobs(
-            status_counts=counts,
-            student_email=email,
-            seed=seed
-        )
-        
-        click.echo('✅ Randomized jobs generated successfully!')
-        click.echo('Created:')
-        for status, count in created_counts.items():
-            if count > 0:
-                click.echo(f'  {status}: {count} jobs')
-        
-        total_created = sum(created_counts.values())
-        click.echo(f'\nTotal: {total_created} jobs created')
-        click.echo('✨ All details randomized while following pricing rules!')
-        
-    except Exception as e:
-        click.echo(f'❌ Error generating randomized jobs: {e}')
-        return 1
+## Removed: randomize-jobs CLI command
 
-@click.command('delete-jobs')
-@click.option('--email', default='cfree3@lsu.edu', help='Email address to match for deletion')
-@click.option('--confirm', is_flag=True, help='Skip confirmation prompt')
-@with_appcontext
-def delete_jobs_command(email, confirm):
-    """Delete all jobs with a specific email address (development only)."""
-    from flask import current_app
-    
-    # Safety check: only allow in development
-    if not current_app.config.get('DEBUG', False):
-        click.echo('❌ Job deletion is only allowed in development mode')
-        return 1
-    
-    # Count jobs before deletion
-    jobs_to_delete = Job.query.filter_by(student_email=email).all()
-    job_count = len(jobs_to_delete)
-    
-    if job_count == 0:
-        click.echo(f'No jobs found with email: {email}')
-        return
-    
-    if not confirm:
-        click.echo(f'⚠️  This will delete {job_count} jobs with email: {email}')
-        click.echo('This action cannot be undone!')
-        if not click.confirm('Are you sure you want to continue?'):
-            click.echo('Deletion cancelled.')
-            return
-    
-    try:
-        deleted_counts = MockJobService.delete_jobs_by_email(email)
-        
-        click.echo('🗑️  Jobs deleted successfully!')
-        click.echo(f'Deleted:')
-        click.echo(f'  Jobs: {deleted_counts["jobs_deleted"]}')
-        click.echo(f'  Events: {deleted_counts["events_deleted"]}')
-        click.echo(f'  Payments: {deleted_counts["payments_deleted"]}')
-        
-    except Exception as e:
-        click.echo(f'❌ Error deleting jobs: {e}')
-        return 1
+## Removed: delete-jobs CLI command
 
-@click.command('delete-all-jobs')
-@click.option('--confirm', is_flag=True, help='Skip confirmation prompt')
-@with_appcontext
-def delete_all_jobs_command(confirm):
-    """Delete ALL jobs from the entire system (development only)."""
-    from flask import current_app
-    
-    # Safety check: only allow in development
-    if not current_app.config.get('DEBUG', False):
-        click.echo('❌ Mass job deletion is only allowed in development mode')
-        return 1
-    
-    # Count all jobs before deletion
-    total_jobs = Job.query.count()
-    total_events = Event.query.count()
-    total_payments = Payment.query.count()
-    
-    if total_jobs == 0:
-        click.echo('No jobs found in the system.')
-        return
-    
-    if not confirm:
-        click.echo(f'⚠️  ⚠️  ⚠️  DANGER ZONE ⚠️  ⚠️  ⚠️')
-        click.echo(f'This will delete ALL jobs from the entire system:')
-        click.echo(f'  Jobs: {total_jobs}')
-        click.echo(f'  Events: {total_events}')
-        click.echo(f'  Payments: {total_payments}')
-        click.echo('This action cannot be undone!')
-        click.echo('Type "DELETE ALL" to confirm:')
-        
-        confirmation = input().strip()
-        if confirmation != "DELETE ALL":
-            click.echo('Deletion cancelled.')
-            return
-    
-    try:
-        deleted_counts = MockJobService.delete_all_jobs()
-        
-        click.echo('🗑️  All jobs deleted successfully!')
-        click.echo(f'Deleted:')
-        click.echo(f'  Jobs: {deleted_counts["jobs_deleted"]}')
-        click.echo(f'  Events: {deleted_counts["events_deleted"]}')
-        click.echo(f'  Payments: {deleted_counts["payments_deleted"]}')
-        click.echo('✨ System is now clean and ready for fresh testing!')
-        
-    except Exception as e:
-        click.echo(f'❌ Error deleting all jobs: {e}')
-        return 1
+## Removed: delete-all-jobs CLI command

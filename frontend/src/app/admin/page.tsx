@@ -2,16 +2,15 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle, TestTube } from "lucide-react";
+import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle } from "lucide-react";
 import { StaffPanel } from "../../components/admin/staff-panel";
 import { SystemHealthPanel } from "../../components/admin/system-health";
 import { AdminSettingsPanel } from "../../components/admin/admin-settings";
 import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
 import { DataManagementPanel } from "../../components/admin/data-management";
 import { EmailToolsPanel } from "../../components/admin/email-tools";
-import { MockDataGenerator } from "../../components/admin/mock-data-generator";
 
-type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email" | "mock-data";
+type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -34,7 +33,6 @@ export default function AdminPage() {
     { id: "data", label: "Data Management", icon: Database },
     { id: "health", label: "System Health", icon: Activity },
     { id: "email", label: "Email Tools", icon: Mail },
-    { id: "mock-data", label: "Mock Data Generator", icon: TestTube, devOnly: true },
   ];
 
   const renderSection = () => {
@@ -51,8 +49,6 @@ export default function AdminPage() {
         return <SystemHealthPanel />;
       case "email":
         return <EmailToolsPanel />;
-      case "mock-data":
-        return <MockDataGenerator />;
       default:
         return null;
     }
