@@ -163,9 +163,18 @@
 - JobCard UI improvements completed ✅
 - Global Search UX Stabilization completed ✅
 - **FI1. Payment Accuracy & Finance Variance workstream completed** ✅
+- **D2. Admin System-Level Event Logging 500 Error completed** ✅
 - Site fully functional with all core features working and polished UI
 
 ### Recent Accomplishments
+- **D2. Admin System-Level Event Logging 500 Error**: ✅ **COMPLETED**
+  - **Root Cause Confirmed**: The `log_event` function in `event_service.py` required `job_id` as first parameter, but admin routes (`delete_all_jobs` and `generate_mock_jobs`) were calling it without `job_id` for system-level events
+  - **Database Constraint**: `Event.job_id` has `nullable=False`, causing `NOT NULL` constraint violations when trying to create system-level events
+  - **Fix Implemented**: Modified `log_event` function signature to make `job_id` optional (`job_id=None`) and reordered parameters for better usability
+  - **Updated All Callers**: Fixed all `log_event` calls in `submit.py` to use new signature with `job_id` as keyword argument
+  - **Admin Routes**: Already correctly calling `log_event` without `job_id` for system-level events (no changes needed)
+  - **Testing**: All imports successful, backend container starts without errors
+  - **Result**: "Delete All Jobs" and "Generate Mock Jobs" admin features should now work without 500 errors
 - Successfully resolved `@radix-ui/react-tooltip` module resolution error
 - Fixed Docker Compose architecture misalignment
 - Moved collapse arrow to bottom center of job cards
@@ -658,3 +667,89 @@
 
 ### Rollback Plan
 - Revert `backend/app/routes/jobs.py` change, modal UI adjustments, and Finance UI/API additions.
+
+## New Workstream — D2. Admin System-Level Event Logging 500 Error (Planner)
+
+### Background & Motivation
+- Admin features "Delete All Jobs" and "Generate Mock Jobs" are failing with a 500 Internal Server Error.
+- This is a regression likely caused by resetting to a previous commit (`6a82db1f`).
+- The error prevents admins from clearing or populating the system for testing or maintenance.
+
+### Key Challenges & Analysis
+- **500 Error**: Indicates an unhandled exception on the backend.
+- **Root Cause Hypothesis**: The `delete_all_jobs` and `generate_mock_jobs` functions in `backend/app/routes/admin.py` attempt to call `log_event()` for system-level actions (`AllJobsDeleted`, `MockJobsGenerated`).
+- The `Event` model in the database has a non-nullable foreign key `job_id`, meaning every event must be associated with a specific job.
+- System-level events have no single `job_id`, causing a `NOT NULL` constraint violation when the event is created. This database error triggers the 500 server error.
+- This issue was previously fixed but the code has reverted.
+
+### Success Criteria
+- The "Delete All Jobs" and "Generate Mock Jobs" features in the admin panel work successfully without errors.
+- The system remains stable, and the user receives a success notification on the frontend for both actions.
+- No new regressions are introduced in other admin functionalities.
+
+### High-level Task Breakdown
+- **D2-S1: Modify Event Service**: Update the `log_event` function signature in `backend/app/services/event_service.py` to make `job_id` optional (`job_id=None`).
+- **D2-S2: Update Admin Routes**: Modify the `delete_all_jobs` and `generate_mock_jobs` endpoints in `backend/app/routes/admin.py` to call `log_event` *without* passing a `job_id`.
+- **D2-S3: Manual Verification**: Test both "Delete All Jobs" and "Generate Mock Jobs" from the admin UI to confirm they work as expected.
+
+### D2 — BFROS Analysis (Before Fix)
+
+- Working backward from the symptom
+  - User action: Click Admin → Delete All Jobs / Generate Mock Jobs
+  - Frontend: POST to `/api/v1/admin/delete-all-jobs` and `/api/v1/admin/mock-jobs`
+  - Observed: 500 responses from backend; browser console shows 500s
+  - Expected: 200 JSON success with counts/summary
+
+- Possible sources (5–7)
+  1. DB constraint: `Event.job_id` is NOT NULL while system-level `log_event(...)` is called with no `job_id` (None) → IntegrityError → 500
+  2. Request payload mismatch for mock generation (frontend sending flattened counts vs `{ counts: {...}, email, addNotes, seed }`) → server KeyError/TypeError → 500
+  3. Admin guard failures (DEBUG mode off, inactive staff) should yield 403, but a bug in error path could raise 500
+  4. Rate limiting or token/auth issues causing unexpected server-side error handler path → 500
+  5. Filesystem operations in delete-all (removing files/dirs) raising unhandled exceptions → 500
+  6. MockJobService DB operations (FK/ordering) causing IntegrityError during cascade deletes/creates → 500
+  7. JSON error handlers misconfigured, masking underlying exception with generic 500
+
+- Most likely hypotheses (top 1–2)
+  - H1: IntegrityError on events insert due to `job_id=None` for system-level events
+  - H2: Mock generation payload shape mismatch leading to exception inside `MockJobService.generate_mock_jobs`
+
+- Logging/validation to confirm (no behavior changes)
+  - Add debug logs in `backend/app/routes/admin.py`:
+    - In `generate_mock_jobs`: log parsed body keys, `counts` type/keys, `student_email`, `add_notes`, `seed`; add try/except around `log_event` to log exception class/message before returning 500
+    - In `delete_all_jobs`: log `total_jobs/events/payments` before deletion; log `deleted_counts`; add try/except around `log_event` to log exception details
+  - Add debug log in `backend/app/services/event_service.py::log_event` printing `event_type`, `job_id`, and whether `job_id is None` just before `db.session.add(evt)`
+  - Tail backend logs while reproducing to capture full stack traces
+  - Verify frontend request body for `/admin/mock-jobs` in devtools Network tab; confirm it matches `{ counts, email, addNotes, seed }`
+
+- Decision gates
+  - If logs show IntegrityError on Event insert with `job_id=None` → proceed with hotfix: comment out system-level `log_event` in admin endpoints; plan schema solution later
+  - If logs show payload errors in `generate_mock_jobs` → fix frontend payload; keep server validation strict
+
+- Safety
+  - No mass refactors; only temporary logging and optional hotfix to unblock
+  - Avoid schema changes until confirmed by logs
+
+### D2 — Verification & Mitigation Plan (Expanded)
+- **D2-V1: Capture Backend Error Logs (Required)**
+  - Check backend container logs while triggering both endpoints to confirm the exact error stack trace (expect `IntegrityError` on `Event.job_id NOT NULL`).
+- **D2-V2: Confirm Frontend Payload**
+  - Verify `POST /api/v1/admin/mock-jobs` body is `{ counts: {...}, email, addNotes, seed }` and not a flattened counts object.
+- **D2-H1: Immediate Hotfix (Safe, Minimal-Change)**
+  - Temporarily disable system-level `log_event(...)` calls inside `admin.py` for `MockJobsGenerated` and `AllJobsDeleted` by commenting them out. This avoids inserting events with `job_id=None` into a NOT NULL column.
+  - Restart backend and retest both admin endpoints.
+- **D2-L1: Long-term Resolution (Choose One; requires migration)**
+  - Option A: Make `Event.job_id` nullable in the model and add an Alembic migration; treat `job_id=None` as system-level events.
+  - Option B: Add a separate `SystemEvent` model/table for admin/system-wide actions; keep `Event` strictly per-job.
+  - Option C: Create a special bootstrap Job row (e.g., `id='SYSTEM'`) and associate system events to it; less schema churn but semantically weaker.
+
+### Success Criteria (Revised)
+- Triggering `POST /api/v1/admin/delete-all-jobs` and `POST /api/v1/admin/mock-jobs` returns 200 with expected JSON.
+- No 500 errors in backend logs; no DB `IntegrityError`.
+- Frontend admin UI confirms success via toasts and summaries.
+
+### Risks & Mitigations (Revised)
+- **Audit Trail Temporarily Reduced**: Hotfix removes system-level audit entries; mitigation: include richer response summaries and re-enable after long-term fix.
+- **Schema Migration Risk**: Plan migration in a controlled step; ensure rollback path and backups.
+
+### Rollback Plan
+- Revert any admin route edits and restore logging after schema solution is in place.

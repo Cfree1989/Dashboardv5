@@ -156,7 +156,7 @@ def submit_job():
         db.session.commit()
 
         # Event logging
-        log_event(job.id, 'JobCreated', {'original_filename': job.original_filename})
+        log_event('JobCreated', {'original_filename': job.original_filename}, job_id=job.id)
 
         # Fire-and-forget best-effort submission confirmation email
         try:
@@ -197,7 +197,7 @@ def confirm_job(token: str):
     except Exception:
         # Non-fatal: do not block confirmation on metadata issues
         pass
-    log_event(job.id, 'StudentConfirmed', {'status': job.status})
+    log_event('StudentConfirmed', {'status': job.status}, job_id=job.id)
     return jsonify(job.to_dict()), 200
 
 
@@ -240,8 +240,8 @@ def resend_confirmation():
         sent = False
 
     # Log events
-    log_event(job.id, 'ResendConfirmationRequested', {'via': 'token' if token else 'job_id'})
-    log_event(job.id, 'ApprovalEmailResent', {'confirmation_url': confirmation_url, 'sent': bool(sent)})
+    log_event('ResendConfirmationRequested', {'via': 'token' if token else 'job_id'}, job_id=job.id)
+    log_event('ApprovalEmailResent', {'confirmation_url': confirmation_url, 'sent': bool(sent)}, job_id=job.id)
 
     # Update last sent timestamp
     try:

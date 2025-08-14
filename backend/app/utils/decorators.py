@@ -13,6 +13,8 @@ def token_required(f):
         try:
             payload = decode_token(token)
             g.workstation_id = payload.get('workstation_id')
+            # Provide a safe default for admin routes that expect g.staff_name
+            g.staff_name = payload.get('staff_name') or payload.get('workstation_id') or 'Admin'
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
