@@ -1,28 +1,43 @@
 import React from 'react';
 import type { OverviewData } from '../../types/analytics';
-import { BarChart3, Clock, Inbox } from 'lucide-react';
+import { BarChart3, Clock, Inbox, AlertTriangle } from 'lucide-react';
 
 type Props = { data: OverviewData };
 
+// Define the workflow order for status display
+const STATUS_ORDER = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
+
 export function OverviewCards({ data }: Props) {
+  // Sort status entries by workflow order
+  const sortedStatusEntries = Object.entries(data.byStatus || {})
+    .sort(([a], [b]) => {
+      const aIndex = STATUS_ORDER.indexOf(a);
+      const bIndex = STATUS_ORDER.indexOf(b);
+      return aIndex - bIndex;
+    });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold">Overview</h2>
+        {data.dateRange && (
+          <div className="text-xs text-gray-500">
+            {new Date(data.dateRange.start).toLocaleDateString()} - {new Date(data.dateRange.end).toLocaleDateString()}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Kpi label="Total Submissions" value={formatNumber(data.totalSubmissions)} icon={<BarChart3 size={16} />} />
         <Kpi label="In Queue" value={formatNumber(data.inQueue)} icon={<Inbox size={16} />} />
         <Kpi label="Avg Turnaround (h)" value={data.avgTurnaroundHours != null ? String(data.avgTurnaroundHours) : '--'} icon={<Clock size={16} />} />
-        {data.storageUsagePercent != null && (
-          <Kpi label="Storage Usage" value={`${data.storageUsagePercent}%`} />
-        )}
+        <Kpi label="Recent Rejections" value={formatNumber(data.recentRejections)} icon={<AlertTriangle size={16} />} />
       </div>
-      {Object.keys(data.byStatus || {}).length > 0 && (
+      
+      {sortedStatusEntries.length > 0 && (
         <div className="mt-5">
           <div className="text-sm font-medium text-gray-700 mb-2">Queue by Status</div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            {Object.entries(data.byStatus).map(([status, count]) => (
+            {sortedStatusEntries.map(([status, count]) => (
               <div key={status} className="rounded-lg border border-gray-200 p-3 text-center">
                 <div className="text-xl font-semibold text-gray-900">{count as number}</div>
                 <div className="text-xs text-gray-600 break-words">{status}</div>

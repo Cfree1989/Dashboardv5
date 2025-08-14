@@ -1,19 +1,48 @@
-import React, { useState } from 'react';
-import type { AnalyticsFilters } from '../../types/analytics';
+import React, { useState, useEffect } from 'react';
+import type { StaffAnalyticsFilters } from '../../types/analytics';
 
-type Props = {
-  filters: AnalyticsFilters;
-  onFiltersChange: (next: AnalyticsFilters) => void;
+type StaffMember = {
+  name: string;
+  is_active: boolean;
 };
 
-export function AnalyticsFilters({ filters, onFiltersChange }: Props) {
+type Props = {
+  filters: StaffAnalyticsFilters;
+  onFiltersChange: (next: StaffAnalyticsFilters) => void;
+};
+
+export function StaffAnalyticsFilters({ filters, onFiltersChange }: Props) {
   const [useCustomRange, setUseCustomRange] = useState(false);
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   
   const periodOptions: { value: 7 | 30 | 90; label: string }[] = [
     { value: 7, label: '7 days' },
     { value: 30, label: '30 days' },
     { value: 90, label: '90 days' },
   ];
+
+  // Fetch staff list on component mount
+  useEffect(() => {
+    async function fetchStaff() {
+      try {
+        setLoadingStaff(true);
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/v1/staff?include_inactive=true', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setStaffList(data.staff || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch staff list:', error);
+      } finally {
+        setLoadingStaff(false);
+      }
+    }
+    fetchStaff();
+  }, []);
 
   const handlePeriodChange = (period: 7 | 30 | 90) => {
     setUseCustomRange(false);
@@ -97,41 +126,22 @@ export function AnalyticsFilters({ filters, onFiltersChange }: Props) {
       )}
 
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-700">Discipline:</label>
+        <label className="text-sm text-gray-700">Staff Member:</label>
         <select
-          aria-label="Discipline"
+          aria-label="Staff Member"
           className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-          value={filters.discipline}
-          onChange={(e) => onFiltersChange({ ...filters, discipline: e.target.value })}
+          value={filters.staff || 'all'}
+          onChange={(e) => onFiltersChange({ ...filters, staff: e.target.value === 'all' ? undefined : e.target.value })}
+          disabled={loadingStaff}
         >
-          <option value="all">All</option>
-          <option value="Art">Art</option>
-          <option value="Architecture">Architecture</option>
-          <option value="Landscape Architecture">Landscape Architecture</option>
-          <option value="Interior Design">Interior Design</option>
-          <option value="Engineering">Engineering</option>
-          <option value="Hobby/Personal">Hobby/Personal</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-700">Printer:</label>
-        <select
-          aria-label="Printer"
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-          value={filters.printer}
-          onChange={(e) => onFiltersChange({ ...filters, printer: e.target.value })}
-        >
-          <option value="all">All</option>
-          <option value="Prusa MK4S">Prusa MK4S</option>
-          <option value="Prusa XL">Prusa XL</option>
-          <option value="Raise3D Pro 2 Plus">Raise3D Pro 2 Plus</option>
-          <option value="Formlabs Form 3">Formlabs Form 3</option>
+          <option value="all">All Staff</option>
+          {staffList.map((staff) => (
+            <option key={staff.name} value={staff.name}>
+              {staff.name} {!staff.is_active && '(Inactive)'}
+            </option>
+          ))}
         </select>
       </div>
     </div>
   );
 }
-
-

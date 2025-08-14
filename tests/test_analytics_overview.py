@@ -51,7 +51,7 @@ def test_overview_recent_rejections_30d_window(client, token, app):
     resp = client.get('/api/v1/analytics/overview?days=7', headers={'Authorization': f'Bearer {token}'})
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data['recent_rejections_30d'] == 1
+    assert data['recent_rejections'] == 1
 
 
 def test_overview_recent_rejections_filters(client, token, app):
@@ -63,11 +63,11 @@ def test_overview_recent_rejections_filters(client, token, app):
     # Filter by printer
     r1 = client.get('/api/v1/analytics/overview?printer=Prusa', headers={'Authorization': f'Bearer {token}'})
     assert r1.status_code == 200
-    assert r1.get_json()['recent_rejections_30d'] == 1
+    assert r1.get_json()['recent_rejections'] == 1
 
     # Filter by discipline
     r2 = client.get('/api/v1/analytics/overview?discipline=Engineering', headers={'Authorization': f'Bearer {token}'})
     assert r2.status_code == 200
-    assert r2.get_json()['recent_rejections_30d'] == 1
+    assert r2.get_json()['recent_rejections'] == 1
 
 

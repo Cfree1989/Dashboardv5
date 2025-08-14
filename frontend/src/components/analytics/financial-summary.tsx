@@ -6,21 +6,23 @@ type Props = { data: AnalyticsData };
 
 export function FinancialSummary({ data }: Props) {
   const f = data.financial;
+  const totalRevenueUsd = f.totalRevenueCents / 100;
+  
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
       <h3 className="text-base font-semibold mb-3">Financial Summary</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Kpi label="Total Revenue" value={`$${formatMoney(f.totalRevenueUsd)}`} />
-        <Kpi label="Avg Ticket" value={`$${formatMoney(f.averageTicketUsd)}`} />
-        <Kpi label="Payment Rate" value={`${f.paymentRatePercent}%`} />
-        <Kpi label="Payments" value={String(data.financial.paymentsCount ?? data.resources.paymentCount)} />
+        <Kpi label="Total Revenue" value={`$${formatMoney(totalRevenueUsd)}`} />
+        <Kpi label="Avg Ticket" value={`$${formatMoney(f.avgTicketUsd)}`} />
+        <Kpi label="Payment Rate" value={`${f.paymentCount > 0 ? Math.round((f.paymentCount / (data.overview.byStatus.COMPLETED || 0 + data.overview.byStatus.PAIDPICKEDUP || 0)) * 100) : 0}%`} />
+        <Kpi label="Payments" value={String(f.paymentCount)} />
       </div>
       <div className="mt-4">
         <div className="font-medium text-gray-700 mb-2">Revenue Over Time</div>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={data.financial.revenueByPeriod.map((p) => ({ date: p.period, revenue: p.revenueUsd }))}
+              data={f.revenueOverTime.map((p) => ({ date: p.date, revenue: p.cents / 100 }))}
               margin={{ left: 8, right: 8, top: 8, bottom: 8 }}
               key="revenue"
             >
@@ -32,7 +34,7 @@ export function FinancialSummary({ data }: Props) {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        {data.financial.revenueByPeriod.length === 0 && <div className="text-gray-500 text-sm mt-2">No data</div>}
+        {f.revenueOverTime.length === 0 && <div className="text-gray-500 text-sm mt-2">No data</div>}
       </div>
     </div>
   );

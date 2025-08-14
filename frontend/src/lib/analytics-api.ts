@@ -1,21 +1,34 @@
-import type { AnalyticsData, OverviewData, TrendData, ResourcesData } from '../types/analytics';
+import type { AnalyticsData, OverviewData, TrendData, ResourcesData, FinancialData, AnalyticsFilters } from '../types/analytics';
 
-export async function fetchAnalyticsData(params: { period: number; discipline?: string; printer?: string }): Promise<AnalyticsData> {
+export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<AnalyticsData> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  const days = params.period || 7;
-
+  
+  // Build query parameters
   const qp = new URLSearchParams();
-  qp.set('days', String(days));
+  
+  // Use date range if provided, otherwise fall back to days
+  if (params.startDate && params.endDate) {
+    qp.set('start_date', params.startDate);
+    qp.set('end_date', params.endDate);
+  } else {
+    const days = params.period || 7;
+    qp.set('days', String(days));
+  }
+  
   if (params.printer && params.printer !== 'all') qp.set('printer', params.printer);
   if (params.discipline && params.discipline !== 'all') qp.set('discipline', params.discipline);
 
-  const qp30 = new URLSearchParams(qp);
-  qp30.set('days', String(Math.max(days, 30)));
+  // For trends, use a longer period if no specific date range is provided
+  const qpTrends = new URLSearchParams(qp);
+  if (!params.startDate || !params.endDate) {
+    const days = Math.max(params.period || 7, 30);
+    qpTrends.set('days', String(days));
+  }
 
   const [oRes, tRes, rRes, fRes] = await Promise.all([
     fetch(`/api/v1/analytics/overview?${qp.toString()}`, { headers: h }),
-    fetch(`/api/v1/analytics/trends?${qp30.toString()}`, { headers: h }),
+    fetch(`/api/v1/analytics/trends?${qpTrends.toString()}`, { headers: h }),
     fetch(`/api/v1/analytics/resources?${qp.toString()}`, { headers: h }),
     fetch(`/api/v1/analytics/financial?${qp.toString()}`, { headers: h }),
   ]);
@@ -25,19 +38,22 @@ export async function fetchAnalyticsData(params: { period: number; discipline?: 
   const resourcesJson = await rRes.json();
   const financialJson = await fRes.json();
 
-  const totalSubs = (overviewJson.total_submissions ?? overviewJson.totalSubmissions ?? overviewJson.total) ?? 0;
   const overview: OverviewData = {
-    totalSubmissions: totalSubs,
+    totalSubmissions: overviewJson.total_submissions ?? 0,
     inQueue: overviewJson.in_queue ?? 0,
     avgTurnaroundHours: overviewJson.avg_turnaround_hours ?? null,
     storageUsagePercent: overviewJson.storage_usage_percent ?? null,
     byStatus: overviewJson.by_status ?? {},
-    recentRejections30d: overviewJson.recent_rejections_30d ?? 0,
+    recentRejections: overviewJson.recent_rejections ?? 0,
+    dateRange: overviewJson.date_range ?? { start: '', end: '' },
   };
 
   const trends: TrendData = {
     submissions: trendsJson.series ?? [],
     approvals: trendsJson.approvals ?? [],
+    staffSubmissions: trendsJson.staff_submissions ?? {},
+    staffApprovals: trendsJson.staff_approvals ?? {},
+    dateRange: trendsJson.date_range ?? { start: '', end: '' },
   };
 
   const resources: ResourcesData = {
@@ -50,21 +66,18 @@ export async function fetchAnalyticsData(params: { period: number; discipline?: 
     totalRevenueCents: resourcesJson.total_revenue_cents ?? 0,
     avgTicketUsd: resourcesJson.avg_ticket_usd ?? 0,
     paymentCount: resourcesJson.payment_count ?? 0,
+    staffPrinting: resourcesJson.staff_printing ?? {},
+    staffPayments: resourcesJson.staff_payments ?? {},
+    dateRange: resourcesJson.date_range ?? { start: '', end: '' },
   };
 
-  const financial = {
-    totalRevenueUsd: (financialJson.total_revenue_cents ?? resources.totalRevenueCents ?? 0) / 100,
-    averageTicketUsd: (financialJson.avg_ticket_usd ?? resources.avgTicketUsd ?? 0),
-    paymentRatePercent: (() => {
-      // Approximation: proportion of payments among completed+paidpickedup
-      const completed = overview.byStatus?.COMPLETED ?? 0;
-      const paid = overview.byStatus?.PAIDPICKEDUP ?? 0;
-      const denom = completed + paid;
-      const paymentsCount = (resources.paymentCount ?? financialJson.payment_count ?? 0);
-      return denom > 0 ? Math.round((paymentsCount / denom) * 1000) / 10 : 0;
-    })(),
-    revenueByPeriod: (financialJson.revenue_over_time ?? resources.revenueOverTime ?? []).map((p: any) => ({ period: p.date, revenueUsd: (p.cents || 0) / 100 })),
-    paymentsCount: (financialJson.payment_count ?? resources.paymentCount ?? 0)
+  const financial: FinancialData = {
+    totalRevenueCents: financialJson.total_revenue_cents ?? 0,
+    paymentCount: financialJson.payment_count ?? 0,
+    avgTicketUsd: financialJson.avg_ticket_usd ?? 0,
+    revenueOverTime: financialJson.revenue_over_time ?? [],
+    staffRevenue: financialJson.staff_revenue ?? {},
+    dateRange: financialJson.date_range ?? { start: '', end: '' },
   };
 
   return { overview, trends, resources, financial };

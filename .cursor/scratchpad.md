@@ -243,7 +243,7 @@
 ### 🔄 REMAINING TASKS
 
 #### **Phase 1: Analytics Enhancements (High Priority)**
-- [ ] **A1. Analytics Dashboard Parity**
+- [x] **A1. Analytics Dashboard Parity**
   - [x] Unify filters across all analytics components
   - [x] Standardize overview cards design
   - [x] Implement consistent trend charts
@@ -253,14 +253,59 @@
   - [x] Implement fade-in transitions
   - [x] Add reduced motion support
 
-- [ ] **A2. Analytics Backend Endpoints**
+- [x] **A2. Analytics Backend Endpoints**
   - [x] Create `/api/v1/analytics/overview` endpoint
   - [x] Create `/api/v1/analytics/trends` endpoint
   - [x] Create `/api/v1/analytics/resources` endpoint
   - [x] Create `/api/v1/analytics/financial` endpoint
   - [x] Add basic in-memory caching (60s, disabled in tests)
-  - [ ] Implement date range filtering
-  - [ ] Add staff attribution to analytics
+  - [x] Implement date range filtering
+  - [x] Add staff attribution to analytics
+
+- [x] **A3. Analytics UX Improvements** ✅ **COMPLETED**
+  - [x] Fix queue status ordering to match dashboard workflow (UPLOADED → PENDING → READYTOPRINT → PRINTING → COMPLETED → PAIDPICKEDUP → REJECTED → ARCHIVED)
+  - [x] Remove confusing staff activity summary from overview cards
+  - [x] Remove staff filter from main analytics (moving to separate staff analytics section) ✅ **COMPLETED**
+  - [x] Remove storage usage percentage (not useful without configuration)
+  - [x] Clean up analytics types and API responses
+  - [x] Ensure all analytics endpoints respect printer and discipline filters
+
+- [ ] **A4. Staff Analytics Section** (New)
+  - [x] **A4.1. Staff Analytics Backend** ✅ **COMPLETED**
+    - [x] Create `/api/v1/staff-analytics/overview` endpoint for staff performance summary
+    - [x] Create `/api/v1/staff-analytics/performance` endpoint for individual staff metrics
+    - [x] Create `/api/v1/staff-analytics/activity` endpoint for staff activity timeline
+    - [x] Create `/api/v1/staff-analytics/comparison` endpoint for staff comparison data
+    - [x] Implement staff performance calculation logic (completion rates, response times)
+    - [x] Add staff workload distribution analysis
+    - [x] Create staff activity tracking and aggregation
+
+  - [x] **A4.2. Staff Analytics Frontend** ✅ **COMPLETED**
+    - [x] Create new `/staff-analytics` page with dedicated staff-focused interface
+    - [x] Build staff performance cards showing individual metrics
+    - [x] Implement staff comparison views and side-by-side analysis
+    - [x] Create staff activity timeline with daily activity logs
+    - [x] Add staff workload distribution visualization
+    - [x] Implement staff-specific filtering and date range controls
+    - [x] Add navigation between system analytics and staff analytics
+
+  - [x] **A4.3. Staff Analytics Features** ✅ **COMPLETED**
+    - [x] Individual staff performance metrics (tasks completed, response times, quality metrics)
+    - [x] Staff comparison views for fair workload distribution analysis
+    - [x] Staff activity timeline showing daily actions and performance trends
+    - [x] Team performance overview vs individual performance breakdown
+    - [x] Staff training opportunity identification based on performance gaps
+    - [x] Staff accountability tracking with complete audit trail access
+
+- [x] **A5. Analytics Interface Consolidation** ✅ **COMPLETED**
+  - [x] Convert `/analytics` page to tabbed interface (similar to admin page pattern)
+  - [x] Add "System Analytics" tab with existing system analytics content
+  - [x] Add "Staff Analytics" tab with staff analytics components
+  - [x] Implement shared state management for filters and date ranges
+  - [x] Add sidebar navigation with icons (BarChart3 for system, Users for staff)
+  - [x] Remove separate `/staff-analytics` page and route
+  - [x] Update navigation links throughout application
+  - [x] Test tabbed interface functionality and responsiveness
 
 #### **Phase 1.5: System Stability & Concurrency (High Priority)**
 - [ ] **S1. Job Locking for Concurrency Control**
@@ -436,10 +481,10 @@
 - **Core Features**: 100% Complete ✅
 - **Pre-E2E Items**: 100% Complete ✅
 - **UI Improvements**: 100% Complete ✅
-- **Analytics**: 25% Complete (overview/trends/resources/financial endpoints, caching) ✅
+- **Analytics**: 100% Complete ✅ (system analytics complete, staff analytics section implemented; JSON mapping errors fixed)
 - **Admin Features**: 0% Complete ❌
 - **Documentation**: 0% Complete ❌
 - **Testing**: 0% Complete ❌
 - **Production**: 0% Complete ❌
 
-**Overall Project Completion**: ~95% (Core functionality complete, UI polished, ready for enhancements)
+**Overall Project Completion**: ~98% (Core functionality complete, UI polished, analytics fully implemented with consolidated tabbed interface)
