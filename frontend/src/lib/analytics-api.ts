@@ -77,6 +77,11 @@ export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<Anal
     avgTicketUsd: financialJson.avg_ticket_usd ?? 0,
     revenueOverTime: financialJson.revenue_over_time ?? [],
     staffRevenue: financialJson.staff_revenue ?? {},
+
+
+    estimatedRevenueCents: financialJson.estimated_revenue_cents ?? 0,
+    actualRevenueCents: financialJson.actual_revenue_cents ?? 0,
+    varianceCents: financialJson.variance_cents ?? 0,
     dateRange: financialJson.date_range ?? { start: '', end: '' },
   };
 

@@ -597,7 +597,12 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                 <h5 className="text-sm font-medium text-gray-900 mb-1">Print Details</h5>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   {typeof job.weight_g === 'number' && (
-                    <div className="text-gray-700"><span className="text-gray-500">Weight:</span> {job.weight_g} g</div>
+                    <div className="text-gray-700">
+                      <span className="text-gray-500">
+                        {currentStatus === 'PAIDPICKEDUP' && job.payment ? 'Final Weight:' : 'Weight:'}
+                      </span> 
+                      {currentStatus === 'PAIDPICKEDUP' && job.payment ? job.payment.grams : job.weight_g} g
+                    </div>
                   )}
                   {typeof job.time_hours === 'number' && (
                     <div className="text-gray-700"><span className="text-gray-500">Time:</span> {job.time_hours} h</div>

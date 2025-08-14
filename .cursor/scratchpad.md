@@ -141,6 +141,10 @@
 - **UI2. Dashboard Sorting**: ✅ **COMPLETED** - Full sorting functionality implemented with Time, Name, Printer, Color, and Class options, direction toggles, localStorage persistence, and motion-safe transitions
 - **FI1-S4. Finance Estimated vs Actual**: ✅ **COMPLETED** - Added estimated vs actual revenue comparison to financial analytics with variance calculation, updated frontend KPIs with color-coded variance display, and comprehensive test coverage
 - **FI1-S5. Manual QA**: ✅ **COMPLETED** - Verified payment workflow functionality, job card labeling changes, and financial analytics display
+- **Payment Modal Weight Input Fix**: ✅ **COMPLETED** - Fixed issue where weight field was defaulting to browser auto-fill values (5g/25g) by adding autocomplete="off" attributes and explicit field clearing on modal open
+- **Mock Jobs Population**: ✅ **COMPLETED** - Added 24 diverse mock jobs to test dashboard functionality: 15 completed jobs across Engineering, Art, Architecture, and Science disciplines with various materials/colors, plus 9 paid jobs demonstrating estimated vs actual cost scenarios including minimum charge cases
+- **Job Card Weight Display Fix**: ✅ **COMPLETED** - Fixed job cards to show actual weight from payment data instead of estimated weight for paid jobs, now displays "Final Weight:" vs "Weight:" similar to cost labeling
+- **System Cleanup**: ✅ **COMPLETED** - Cleared all 65 jobs, 304 events, and 15 payments from the system, removed all storage files, providing a clean slate for fresh testing
 - Implemented global search with cross-tab indicators and smooth UX
 - Fixed notification sound playing when exiting search
 - Positioned search input cohesively with other controls

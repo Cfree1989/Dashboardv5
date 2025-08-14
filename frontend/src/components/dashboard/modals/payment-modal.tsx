@@ -66,6 +66,14 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
       }
     }
 
+    // Explicitly clear form fields when modal opens
+    setGrams("");
+    setTxnNo("");
+    setPickedUpBy("");
+    setStaffName("");
+    setConfirmOpen(false);
+    setError("");
+
     fetchStaff();
     fetchJobDetails();
   }, [jobId]);
@@ -164,11 +172,33 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="grams" className="block text-sm font-medium text-gray-700 mb-1">Weight (grams)</label>
-              <input id="grams" type="number" min="0" step="0.1" className="w-full border rounded-lg px-3 py-2 focus-ring" value={grams} onChange={(e) => setGrams(e.target.value)} required />
+              <input 
+                id="grams" 
+                type="number" 
+                min="0" 
+                step="0.1" 
+                className="w-full border rounded-lg px-3 py-2 focus-ring" 
+                value={grams} 
+                onChange={(e) => setGrams(e.target.value)} 
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+                placeholder="Enter weight"
+                required 
+              />
             </div>
             <div>
               <label htmlFor="txnNo" className="block text-sm font-medium text-gray-700 mb-1">Txn Number</label>
-              <input id="txnNo" className="w-full border rounded-lg px-3 py-2 focus-ring" value={txnNo} onChange={(e) => setTxnNo(e.target.value)} required />
+              <input 
+                id="txnNo" 
+                className="w-full border rounded-lg px-3 py-2 focus-ring" 
+                value={txnNo} 
+                onChange={(e) => setTxnNo(e.target.value)} 
+                autoComplete="off"
+                placeholder="Enter transaction number"
+                required 
+              />
             </div>
           </div>
 
