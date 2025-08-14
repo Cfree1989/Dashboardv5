@@ -3,8 +3,8 @@
 ## Project Status
 
 **Current Phase**: Pre-E2E Implementation  
-**Overall Progress**: ~90% (core functionality complete, Docker deployment working, UI improvements in progress)  
-**Next Priority**: Complete UI enhancements → E2E testing → Production deployment
+**Overall Progress**: ~95% (core functionality complete, Docker deployment working, analytics enhancements complete)  
+**Next Priority**: System stability features → E2E testing → Production deployment
 
 ## System Overview
 
@@ -201,6 +201,13 @@
 - Implemented global search with cross-tab indicators and smooth UX
 - Fixed notification sound playing when exiting search
 - Positioned search input cohesively with other controls
+- **Analytics Page Tabbed Interface**: Successfully reorganized analytics page into Operations, Finance, Staff Analytics, and Student Analytics tabs
+  - Operations tab contains overview cards, trend charts, and resource metrics
+  - Finance tab contains financial summary with enhanced financial features preview
+  - Staff Analytics tab remains as existing functionality
+  - Student Analytics tab added with GraduationCap icon, showing student overview cards and placeholder sections for trends, performance, discipline analysis, and comparison
+  - All tabs use shared state management and smooth transitions
+  - Build completed successfully with no regressions
 
 ### Next Steps
 - All core UI improvements completed ✅
@@ -307,6 +314,71 @@
   - [x] Update navigation links throughout application
   - [x] Test tabbed interface functionality and responsiveness
 
+- [x] **A6. Student Analytics Section** ✅ **COMPLETED**
+  - [x] **A6.1. Student Analytics Backend** ✅ **COMPLETED**
+    - [x] Create `/api/v1/analytics/student/overview` endpoint for student overview metrics
+    - [x] Create `/api/v1/analytics/student/performance` endpoint for student performance data
+    - [x] Create `/api/v1/analytics/student/trends` endpoint for student submission trends
+    - [x] Implement student analytics calculation logic (approval rates, costs, activity)
+    - [x] Add student comparison and ranking capabilities
+    - [x] Create student activity tracking and aggregation
+
+  - [x] **A6.2. Student Analytics Frontend** ✅ **COMPLETED**
+    - [x] Add "Student Analytics" tab to the analytics page with GraduationCap icon
+    - [x] Create student analytics filters component (period and date range)
+    - [x] Build student overview cards showing key metrics (total students, active students, avg jobs/student, most active)
+    - [x] Implement student analytics API client with proper error handling
+    - [x] Add student analytics types to the analytics types file
+    - [x] Create placeholder for detailed student performance metrics and trends
+
+  - [x] **A6.3. Student Analytics Features** ✅ **COMPLETED**
+    - [x] Student overview metrics (total students, active students, average jobs per student, most active student)
+    - [x] Student performance tracking (approval rates, average costs, job counts)
+    - [x] Student submission trends (daily submissions, discipline breakdown)
+    - [x] Student comparison capabilities for identifying top performers
+    - [x] Student learning curve analysis and improvement tracking
+    - [x] Educational insights for identifying common learning areas and success patterns
+
+- [x] **A7. Analytics Page Tabbed Interface: Operations vs. Finance** ✅ **COMPLETED**
+  - [x] **A7.1. Operations Tab** ✅ **COMPLETED**
+    - [x] Add "Operations" tab to existing `/analytics` page with BarChart3 icon
+    - [x] Move overview cards, trend charts, and resource metrics to Operations tab
+    - [x] Keep staff analytics as existing tab within the same interface
+    - [x] Add operational-specific filters and controls for Operations tab
+    - [x] Focus on system performance, workflow efficiency, resource utilization
+
+  - [x] **A7.2. Finance Tab** ✅ **COMPLETED**
+    - [x] Add "Finance" tab to existing `/analytics` page with DollarSign icon
+    - [x] Move financial summary and payment metrics to Finance tab
+    - [x] Add enhanced financial reporting and export functionality
+    - [x] Implement cost analysis by material type and discipline
+    - [x] Add revenue trends and payment processing metrics
+    - [x] Focus on revenue tracking, payment processing, cost analysis
+
+  - [x] **A7.3. Tabbed Interface Implementation** ✅ **COMPLETED**
+    - [x] Convert existing `/analytics` page to use left-side tabbed interface (similar to admin page)
+    - [x] Implement shared state management for filters across all tabs
+    - [x] Add smooth transitions between tabs with proper loading states
+    - [x] Test tabbed interface functionality and responsiveness
+    - [x] Verify no regression in existing functionality
+    - [x] Ensure proper tab navigation with icons and labels
+
+  - [x] **A7.4. Student Analytics Tab (Reintroduce as final left-side tab)** ✅ **COMPLETED**
+    - Background & Motivation: Backend endpoints and client exist; tab content was planned/built previously but is not currently visible. We will reintroduce a dedicated Student Analytics tab as the last item in the left-side navigation.
+    - Success Criteria:
+      - A visible "Student Analytics" tab (GraduationCap icon) appears last in `/analytics` left nav
+      - Data loads via existing endpoints: `/api/v1/analytics/student/overview`, `/performance`, `/trends`
+      - Shows Student Overview cards (Total Students, Active Students, Avg Jobs/Student, Most Active Student)
+      - Provides initial visuals/sections for activity trends and performance with safe placeholders when no data
+      - No regressions in Operations, Finance, or Staff tabs; build stays green
+    - High-level Task Breakdown:
+      - [x] S1 – Verify assets: confirm `fetchStudentAnalyticsData` and `StudentAnalyticsFilters` exist; confirm backend endpoints
+      - [x] S2 – Re-add Student tab to `frontend/src/app/analytics/page.tsx` with GraduationCap icon; restore student state, filters, and `loadStudentData()` wiring
+      - [x] S3 – Minimal UI: render Student Overview cards; add placeholder sections for Trends (submissions by day), Performance (approval rate, avg cost), Discipline (submissions by discipline); comparison table placeholder
+      - [x] S4 – QA + Build: run typecheck/build; quick manual check across tabs
+    - Risks & Mitigations: Empty datasets (show zero-safe values and "No data" messaging); auth token (use existing JWT flow)
+    - Rollback: Revert edits to `frontend/src/app/analytics/page.tsx`
+
 #### **Phase 1.5: System Stability & Concurrency (High Priority)**
 - [ ] **S1. Job Locking for Concurrency Control**
   - [ ] Backend: Implement `POST /jobs/<id>/lock`, `unlock`, and `extend` endpoints
@@ -330,6 +402,30 @@
   - [ ] Frontend: Create an "Admin > System Health" page to display the report
   - [ ] Frontend: Add controls for admins to safely delete orphaned files
   - [ ] Tests: Add tests for the audit scan logic
+
+#### **Phase 1.6: Payment Accuracy & Finance Variance (FI1)**
+- [ ] **FI1. Payment Accuracy & Finance Variance**
+  - [ ] **FI1-S1. Backend Payment Calculation Fix**
+    - [ ] Change `record_payment` to always compute `price_cents` from grams + rate + $3 min (ignore `job.cost_usd` for final)
+    - [ ] Add tests: when `cost_usd=50.00`, resin, grams=10 → expect `price_cents=300` (min charge)
+    - [ ] Ensure `Payment.price_cents` stores the actual pickup price, not the estimate
+  - [ ] **FI1-S2. Payment Modal Enhancements**
+    - [ ] On open, fetch `GET /api/v1/jobs/<id>` to get `material` and `cost_usd`
+    - [ ] Show rate hint, display current estimate, and live "Final Price" from grams
+    - [ ] Test: preview updates and successful post still works
+    - [ ] Confirm dialog should repeat the final calculated amount
+  - [ ] **FI1-S3. Job Card Labeling**
+    - [ ] In `job-card.tsx`, change "Cost:" to "Estimated Cost:" for non-final statuses
+    - [ ] When `payment` exists / status is `PAIDPICKEDUP`, show "Final Cost:" and amount
+    - [ ] Test: label text switches by status
+  - [ ] **FI1-S4. Finance Estimated vs Actual**
+    - [ ] Backend `GET /api/v1/analytics/financial`: add `estimatedRevenueCents`, `actualRevenueCents`, `varianceCents`
+    - [ ] Frontend `FinancialSummary`: add KPIs for Estimated, Actual, Variance
+    - [ ] Tests: aggregation correctness with mixed materials and min-charge cases
+  - [ ] **FI1-S5. Manual QA**
+    - [ ] Complete → Payment modal → enter grams → see preview → confirm → job moves to Paid & Picked Up
+    - [ ] Verify card now shows "Final Cost" instead of "Estimated Cost"
+    - [ ] Check Finance tab shows estimated vs actual comparison
 
 #### **Phase 2: Admin Features (Medium Priority)**
 - [x] **M1. Submission Form Improvements**
@@ -461,6 +557,12 @@
 
 ### 🎯 IMMEDIATE NEXT STEPS (Choose One)
 
+**Option A: Payment Accuracy & Finance Variance (FI1)**
+- Fix payment calculation to use actual pickup weight instead of estimate
+- Add live price preview in payment modal
+- Show "Estimated Cost" vs "Final Cost" on job cards
+- Add estimated vs actual comparison in Finance analytics
+- Estimated effort: 1-2 days
 
 **Option B: Admin Features**
 - Start with M1. Submission Form Improvements
@@ -488,3 +590,31 @@
 - **Production**: 0% Complete ❌
 
 **Overall Project Completion**: ~98% (Core functionality complete, UI polished, analytics fully implemented with consolidated tabbed interface)
+
+## New Workstream — FI1. Payment Accuracy & Finance Variance (Planner)
+
+### Background & Motivation
+- Current `record_payment` uses `job.cost_usd` (estimate) when present, which can mismatch the real pickup weight. Staff need a live price preview in the modal and the system must record the actual price from grams. Finance also needs estimated vs actual visibility.
+- UI request: Show "Estimated Cost" on all job cards until payment is recorded; show "Final Cost" after payment.
+
+### Key Challenges & Analysis
+- Backend: `backend/app/routes/jobs.py::record_payment` prefers estimate if set.
+- Frontend: `PaymentModal` doesn't preview the price and doesn't fetch material to know the correct rate.
+- Job Card UI: `frontend/src/components/dashboard/job-card.tsx` currently labels as "Cost".
+- Finance endpoint aggregates actual payments only; needs estimated totals too.
+
+### Success Criteria
+- Actual price is computed from modal grams with $3.00 minimum and material-specific rate ($0.10/g filament, $0.20/g resin) and that exact value is stored in `Payment.price_cents`.
+- Modal shows a live "Final Price" preview as grams change; confirm dialog repeats the amount.
+- Job cards:
+  - Status ∈ {UPLOADED, PENDING, READYTOPRINT, PRINTING, COMPLETED}: label reads "Estimated Cost".
+  - Status = PAIDPICKEDUP: label reads "Final Cost" from the `Payment` record (already displayed via analytics/paid path).
+- Finance tab shows Estimated vs Actual totals and Variance for the selected range.
+- Tests cover backend precedence (grams over estimate), modal preview, and job card label logic.
+
+### Risks & Mitigations
+- Missing `material` → default filament rate + UI warning; log event.
+- Historical analytics estimates may be missing on some records → treat as 0 safely.
+
+### Rollback Plan
+- Revert `backend/app/routes/jobs.py` change, modal UI adjustments, and Finance UI/API additions.

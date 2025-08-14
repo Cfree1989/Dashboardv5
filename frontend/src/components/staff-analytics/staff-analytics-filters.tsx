@@ -1,10 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { StaffAnalyticsFilters } from '../../types/analytics';
-
-type StaffMember = {
-  name: string;
-  is_active: boolean;
-};
 
 type Props = {
   filters: StaffAnalyticsFilters;
@@ -13,8 +8,6 @@ type Props = {
 
 export function StaffAnalyticsFilters({ filters, onFiltersChange }: Props) {
   const [useCustomRange, setUseCustomRange] = useState(false);
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [loadingStaff, setLoadingStaff] = useState(false);
   
   const periodOptions: { value: 7 | 30 | 90; label: string }[] = [
     { value: 7, label: '7 days' },
@@ -22,27 +15,7 @@ export function StaffAnalyticsFilters({ filters, onFiltersChange }: Props) {
     { value: 90, label: '90 days' },
   ];
 
-  // Fetch staff list on component mount
-  useEffect(() => {
-    async function fetchStaff() {
-      try {
-        setLoadingStaff(true);
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/v1/staff?include_inactive=true', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setStaffList(data.staff || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch staff list:', error);
-      } finally {
-        setLoadingStaff(false);
-      }
-    }
-    fetchStaff();
-  }, []);
+
 
   const handlePeriodChange = (period: 7 | 30 | 90) => {
     setUseCustomRange(false);
@@ -69,7 +42,7 @@ export function StaffAnalyticsFilters({ filters, onFiltersChange }: Props) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-4">
+    <div className="flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-2">
         <label className="text-sm text-gray-700">Period:</label>
         <div className="inline-flex overflow-hidden rounded-md border border-gray-200">
@@ -123,25 +96,7 @@ export function StaffAnalyticsFilters({ filters, onFiltersChange }: Props) {
             onChange={(e) => handleDateChange('endDate', e.target.value)}
           />
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-700">Staff Member:</label>
-        <select
-          aria-label="Staff Member"
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-          value={filters.staff || 'all'}
-          onChange={(e) => onFiltersChange({ ...filters, staff: e.target.value === 'all' ? undefined : e.target.value })}
-          disabled={loadingStaff}
-        >
-          <option value="all">All Staff</option>
-          {staffList.map((staff) => (
-            <option key={staff.name} value={staff.name}>
-              {staff.name} {!staff.is_active && '(Inactive)'}
-            </option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
-}
+             )}
+     </div>
+   );
+ }

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import type { AnalyticsFilters } from '../../types/analytics';
+import type { StudentAnalyticsFilters } from '../../types/analytics';
 
 type Props = {
-  filters: AnalyticsFilters;
-  onFiltersChange: (next: AnalyticsFilters) => void;
+  filters: StudentAnalyticsFilters;
+  onFiltersChange: (next: StudentAnalyticsFilters) => void;
 };
 
-export function AnalyticsFilters({ filters, onFiltersChange }: Props) {
+export function StudentAnalyticsFilters({ filters, onFiltersChange }: Props) {
   const [useCustomRange, setUseCustomRange] = useState(false);
   
   const periodOptions: { value: 7 | 30 | 90; label: string }[] = [
@@ -95,43 +95,6 @@ export function AnalyticsFilters({ filters, onFiltersChange }: Props) {
           />
         </div>
       )}
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-700">Discipline:</label>
-        <select
-          aria-label="Discipline"
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-          value={filters.discipline}
-          onChange={(e) => onFiltersChange({ ...filters, discipline: e.target.value })}
-        >
-          <option value="all">All</option>
-          <option value="Art">Art</option>
-          <option value="Architecture">Architecture</option>
-          <option value="Landscape Architecture">Landscape Architecture</option>
-          <option value="Interior Design">Interior Design</option>
-          <option value="Engineering">Engineering</option>
-          <option value="Hobby/Personal">Hobby/Personal</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-700">Printer:</label>
-        <select
-          aria-label="Printer"
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-          value={filters.printer}
-          onChange={(e) => onFiltersChange({ ...filters, printer: e.target.value })}
-        >
-          <option value="all">All</option>
-          <option value="Prusa MK4S">Prusa MK4S</option>
-          <option value="Prusa XL">Prusa XL</option>
-          <option value="Raise3D Pro 2 Plus">Raise3D Pro 2 Plus</option>
-          <option value="Formlabs Form 3">Formlabs Form 3</option>
-        </select>
-      </div>
     </div>
   );
 }
-
-

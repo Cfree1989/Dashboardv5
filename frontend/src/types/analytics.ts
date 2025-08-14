@@ -160,4 +160,37 @@ export type StaffAnalyticsFilters = {
   endDate?: string;
 };
 
+// Student Analytics Types
+export type StudentOverviewData = {
+  totalStudents: number;
+  activeStudents: number;
+  avgJobsPerStudent: number;
+  mostActiveStudent: string;
+};
+
+export type StudentPerformanceData = {
+  approvalRates: Record<string, number>;
+  avgCosts: Record<string, number>;
+  jobCounts: Record<string, number>;
+  totalCosts: Record<string, number>;
+};
+
+export type StudentTrendsData = {
+  submissionsByDay: DateCount[];
+  submissionsByDiscipline: Record<string, number>;
+};
+
+export type StudentAnalyticsData = {
+  overview: StudentOverviewData;
+  performance: StudentPerformanceData;
+  trends: StudentTrendsData;
+  dateRange: DateRange;
+};
+
+export type StudentAnalyticsFilters = {
+  period: 7 | 30 | 90 | number;
+  startDate?: string;
+  endDate?: string;
+};
+
 

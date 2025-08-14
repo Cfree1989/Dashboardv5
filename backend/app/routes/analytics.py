@@ -792,3 +792,171 @@ def staff_comparison():
     
     _cache_set(cache_key, payload)
     return jsonify(payload), 200 
+
+@bp.route('/student/overview', methods=['GET'])
+@token_required
+def student_overview():
+    """Get student analytics overview for the given date range"""
+    cache_key = ('student_overview', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
+    
+    start, end = _parse_date_range()
+    
+    # Get unique students
+    unique_students = Job.query.with_entities(Job.student_email).distinct().all()
+    total_students = len(unique_students)
+    
+    # Get active students (submissions in date range)
+    active_students_query = Job.query.filter(
+        Job.created_at >= start,
+        Job.created_at <= end
+    ).with_entities(Job.student_email).distinct()
+    active_students = len(active_students_query.all())
+    
+    # Calculate average jobs per student
+    total_jobs = Job.query.count()
+    avg_jobs_per_student = round(total_jobs / max(total_students, 1), 1)
+    
+    # Find most active student
+    most_active_query = Job.query.with_entities(
+        Job.student_name, 
+        func.count().label('job_count')
+    ).group_by(Job.student_name).order_by(func.count().desc()).first()
+    
+    most_active_student = most_active_query.student_name if most_active_query else "No data"
+    
+    payload = {
+        'total_students': total_students,
+        'active_students': active_students,
+        'avg_jobs_per_student': avg_jobs_per_student,
+        'most_active_student': most_active_student,
+        'date_range': {
+            'start': start.isoformat(),
+            'end': end.isoformat()
+        }
+    }
+    _cache_set(cache_key, payload)
+    return jsonify(payload), 200
+
+
+@bp.route('/student/performance', methods=['GET'])
+@token_required
+def student_performance():
+    """Get student performance metrics for the given date range"""
+    cache_key = ('student_performance', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
+    
+    start, end = _parse_date_range()
+    
+    # Get approval rates by student
+    student_approval_rates = {}
+    student_job_counts = {}
+    student_total_costs = {}
+    
+    jobs = Job.query.filter(
+        Job.created_at >= start,
+        Job.created_at <= end
+    ).all()
+    
+    for job in jobs:
+        student_email = job.student_email
+        if student_email not in student_job_counts:
+            student_job_counts[student_email] = 0
+            student_total_costs[student_email] = 0
+        
+        student_job_counts[student_email] += 1
+        if job.cost_usd:
+            student_total_costs[student_email] += float(job.cost_usd)
+        
+        # Calculate approval rate
+        if job.status in ['READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP']:
+            if student_email not in student_approval_rates:
+                student_approval_rates[student_email] = {'approved': 0, 'total': 0}
+            student_approval_rates[student_email]['approved'] += 1
+            student_approval_rates[student_email]['total'] += 1
+        elif job.status == 'REJECTED':
+            if student_email not in student_approval_rates:
+                student_approval_rates[student_email] = {'approved': 0, 'total': 0}
+            student_approval_rates[student_email]['total'] += 1
+    
+    # Calculate final approval rates
+    final_approval_rates = {}
+    for student_email, data in student_approval_rates.items():
+        if data['total'] > 0:
+            final_approval_rates[student_email] = round((data['approved'] / data['total']) * 100, 1)
+        else:
+            final_approval_rates[student_email] = 0
+    
+    # Calculate average costs
+    avg_costs = {}
+    for student_email, total_cost in student_total_costs.items():
+        job_count = student_job_counts.get(student_email, 1)
+        avg_costs[student_email] = round(total_cost / job_count, 2)
+    
+    payload = {
+        'approval_rates': final_approval_rates,
+        'avg_costs': avg_costs,
+        'job_counts': student_job_counts,
+        'total_costs': student_total_costs,
+        'date_range': {
+            'start': start.isoformat(),
+            'end': end.isoformat()
+        }
+    }
+    _cache_set(cache_key, payload)
+    return jsonify(payload), 200
+
+
+@bp.route('/student/trends', methods=['GET'])
+@token_required
+def student_trends():
+    """Get student submission trends for the given date range"""
+    cache_key = ('student_trends', tuple(sorted(request.args.items())))
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
+    
+    start, end = _parse_date_range()
+    
+    # Get submissions by day
+    daily_submissions = Job.query.with_entities(
+        func.date(Job.created_at).label('date'),
+        func.count().label('count')
+    ).filter(
+        Job.created_at >= start,
+        Job.created_at <= end
+    ).group_by(func.date(Job.created_at)).order_by(func.date(Job.created_at)).all()
+    
+    submissions_by_day = [
+        {'date': str(row.date), 'count': row.count}
+        for row in daily_submissions
+    ]
+    
+    # Get submissions by discipline
+    discipline_submissions = Job.query.with_entities(
+        Job.discipline,
+        func.count().label('count')
+    ).filter(
+        Job.created_at >= start,
+        Job.created_at <= end
+    ).group_by(Job.discipline).all()
+    
+    submissions_by_discipline = {
+        row.discipline: row.count
+        for row in discipline_submissions
+    }
+    
+    payload = {
+        'submissions_by_day': submissions_by_day,
+        'submissions_by_discipline': submissions_by_discipline,
+        'date_range': {
+            'start': start.isoformat(),
+            'end': end.isoformat()
+        }
+    }
+    _cache_set(cache_key, payload)
+    return jsonify(payload), 200 
