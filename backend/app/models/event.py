@@ -3,7 +3,7 @@ from datetime import datetime
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    job_id = db.Column(db.String, db.ForeignKey('job.id'), nullable=False)
+    job_id = db.Column(db.String, nullable=True)  # Removed foreign key constraint for system events
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     event_type = db.Column(db.String(50), nullable=False)
     details = db.Column(db.JSON, nullable=True)

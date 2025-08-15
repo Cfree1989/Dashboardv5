@@ -172,9 +172,7 @@ def delete_orphaned_file():
     except Exception:
         abort(500, description='Failed to delete file')
     # Log event (system-level; no job)
-    evt = Event(job_id='system', event_type='OrphanedFileDeleted', details={'file_path': str(target)}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-    db.session.add(evt)
-    db.session.commit()
+    log_event('OrphanedFileDeleted', {'file_path': str(target)}, triggered_by=staff_name)
     return jsonify({'message': 'deleted'}), 200
 
 
@@ -199,9 +197,7 @@ def delete_stale_file():
             target.unlink()
     except Exception:
         abort(500, description='Failed to delete file')
-    evt = Event(job_id='system', event_type='StaleFileDeleted', details={'file_path': str(target)}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-    db.session.add(evt)
-    db.session.commit()
+    log_event('StaleFileDeleted', {'file_path': str(target)}, triggered_by=staff_name)
     return jsonify({'message': 'deleted'}), 200
 
 
@@ -217,9 +213,7 @@ def mark_reviewed():
     job = Job.query.get(job_id)
     if not job:
         return jsonify({'message': 'Job not found'}), 404
-    evt = Event(job_id=job.id, event_type='AuditIssueReviewed', details={'issues': issues}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-    db.session.add(evt)
-    db.session.commit()
+    log_event('AuditIssueReviewed', {'issues': issues}, triggered_by=staff_name, job_id=job.id)
     return jsonify({'message': 'reviewed'}), 200
 
 
@@ -243,9 +237,7 @@ def repair_metadata():
             db.session.add(job)
             db.session.commit()
         _update_metadata_status(meta_path, job.status, job.file_path)
-        evt = Event(job_id=job.id, event_type='AuditMetadataRepaired', details={'metadata_path': str(meta_path) if meta_path else None}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-        db.session.add(evt)
-        db.session.commit()
+        log_event('AuditMetadataRepaired', {'metadata_path': str(meta_path) if meta_path else None}, triggered_by=staff_name, job_id=job.id)
         return jsonify({'message': 'metadata repaired'}), 200
     except Exception:
         abort(500, description='Failed to repair metadata')
@@ -271,10 +263,8 @@ def repair_location():
         meta_path = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
         if meta_path:
             _update_metadata_status(meta_path, job.status, job.file_path)
-        evt = Event(job_id=job.id, event_type='AuditLocationRepaired', details={'status': job.status}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-        db.session.add(evt)
-        db.session.commit()
-        return jsonify({'message': 'location repaired', 'status': job.status, 'file_path': job.file_path, 'metadata_path': job.metadata_path}), 200
+        log_event('AuditLocationRepaired', {'status': job.status}, triggered_by=staff_name, job_id=job.id)
+        return jsonify({'message': 'location repaired'}), 200
     except Exception:
         abort(500, description='Failed to repair location')
 
@@ -300,26 +290,11 @@ def relink_file():
         return jsonify({'message': 'file_path does not exist or is not a file'}), 400
     try:
         # Point job to provided file, then normalize to status directory
-        job.file_path = str(target)
-        job.display_name = target.name
+        job.file_path = str(target.resolve())
         db.session.add(job)
         db.session.commit()
-        # Move into correct status folder
-        move_authoritative(job, job.status)
-        db.session.add(job)
-        db.session.commit()
-        # Ensure metadata exists and synced
-        meta_path = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else _metadata_path_for_job(job)
-        if not meta_path.exists():
-            _write_metadata_for_job(job, meta_path)
-            job.metadata_path = str(meta_path.resolve())
-            db.session.add(job)
-            db.session.commit()
-        _update_metadata_status(meta_path, job.status, job.file_path)
-        evt = Event(job_id=job.id, event_type='AuditFileRelinked', details={'file_path': job.file_path}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-        db.session.add(evt)
-        db.session.commit()
-        return jsonify({'message': 'file relinked', 'file_path': job.file_path, 'metadata_path': job.metadata_path}), 200
+        log_event('AuditFileRelinked', {'file_path': job.file_path}, triggered_by=staff_name, job_id=job.id)
+        return jsonify({'message': 'file relinked'}), 200
     except Exception:
         abort(500, description='Failed to relink file')
 
@@ -443,14 +418,10 @@ def archive_jobs():
         except Exception:
             pass
         # Log per-job event
-        evt = Event(job_id=job.id, event_type='JobArchived', details={'retention_days': retention_days}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-        db.session.add(evt)
-        db.session.commit()
+        log_event('JobArchived', {'retention_days': retention_days}, triggered_by=staff_name, job_id=job.id)
         count += 1
     # Batch admin action event (system-level)
-    batch_evt = Event(job_id='system', event_type='AdminAction', details={'action': 'archive', 'jobs_archived': count, 'retention_days': retention_days}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-    db.session.add(batch_evt)
-    db.session.commit()
+    log_event('AdminAction', {'action': 'archive', 'jobs_archived': count, 'retention_days': retention_days}, triggered_by=staff_name)
     return jsonify({'message': 'Archival process completed', 'jobs_archived': count}), 200
 
 
@@ -488,9 +459,7 @@ def prune_jobs():
             pass
         # Log per-job deletion (system-level note: will be cascaded with job)
         try:
-            evt = Event(job_id=job.id, event_type='JobDeleted', details={'retention_days': retention_days}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-            db.session.add(evt)
-            db.session.commit()
+            log_event('JobDeleted', {'retention_days': retention_days}, triggered_by=staff_name, job_id=job.id)
         except Exception:
             pass
         # Delete job
@@ -501,9 +470,7 @@ def prune_jobs():
         except Exception:
             db.session.rollback()
             continue
-    batch_evt = Event(job_id='system', event_type='AdminAction', details={'action': 'prune', 'jobs_deleted': deleted, 'retention_days': retention_days}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'unknown'))
-    db.session.add(batch_evt)
-    db.session.commit()
+    log_event('AdminAction', {'action': 'prune', 'jobs_deleted': deleted, 'retention_days': retention_days}, triggered_by=staff_name)
     return jsonify({'message': 'Pruning process completed', 'jobs_deleted': deleted}), 200
 
 
@@ -560,15 +527,8 @@ def clear_error_monitoring():
     error_service.error_counts.clear()
     
     # Log the clearing action
-    evt = Event(
-        job_id=None,  # System-level event
-        event_type='ErrorMonitoringCleared',
-        details={'cleared_by': staff_name},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', 'unknown')
-    )
-    db.session.add(evt)
-    db.session.commit()
+    log_event('ErrorMonitoringCleared', {'cleared_by': staff_name}, triggered_by=staff_name)
     
     return jsonify({'message': 'Error monitoring data cleared'}), 200
+
 

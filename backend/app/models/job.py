@@ -46,7 +46,6 @@ class Job(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    events = db.relationship('Event', backref='job', lazy=True, cascade='all, delete-orphan')
     payment = db.relationship('Payment', backref='job', uselist=False, cascade='all, delete-orphan')
     
     def to_dict(self):
