@@ -25,6 +25,15 @@ def create_app():
     if not app.config.get('TESTING') and 'DATABASE_URL' not in os.environ:
         raise RuntimeError('DATABASE_URL is not set. Refusing to start to avoid SQLite fallback.')
     
+    # JWT Cookie Configuration
+    app.config['JWT_COOKIE_NAME'] = os.environ.get('JWT_COOKIE_NAME', 'auth_token')
+    app.config['JWT_COOKIE_SECURE'] = os.environ.get('JWT_COOKIE_SECURE', 'false').lower() == 'true'
+    app.config['JWT_COOKIE_HTTPONLY'] = os.environ.get('JWT_COOKIE_HTTPONLY', 'true').lower() == 'true'
+    app.config['JWT_COOKIE_SAMESITE'] = os.environ.get('JWT_COOKIE_SAMESITE', 'Lax')
+    app.config['JWT_COOKIE_DOMAIN'] = os.environ.get('JWT_COOKIE_DOMAIN', None)
+    app.config['JWT_COOKIE_PATH'] = os.environ.get('JWT_COOKIE_PATH', '/')
+    app.config['JWT_COOKIE_MAX_AGE'] = int(os.environ.get('JWT_COOKIE_MAX_AGE', 43200))  # 12 hours in seconds
+    
     # Email configuration
     app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.office365.com')
     app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))

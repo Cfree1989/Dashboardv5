@@ -1,15 +1,17 @@
 import functools
 from flask import request, jsonify, g
-from app.services.auth_service import decode_token
+from app.services.auth_service import decode_token, get_token_from_request
 import jwt
 
 def token_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', None)
-        if not auth_header or not auth_header.startswith('Bearer '):
+        # Get token from cookies (preferred) or Authorization header (fallback)
+        token = get_token_from_request(request)
+        
+        if not token:
             return jsonify({'message': 'Token is missing'}), 401
-        token = auth_header.split('Bearer ')[1]
+            
         try:
             payload = decode_token(token)
             g.workstation_id = payload.get('workstation_id')
