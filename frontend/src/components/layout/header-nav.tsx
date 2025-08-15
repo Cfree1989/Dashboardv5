@@ -3,6 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { LayoutDashboard, Shield, RefreshCcw, LogOut, BarChart3 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { logout } from '../../lib/auth';
 
 export function HeaderNav() {
   // Always use Next.js router-aware pathname so it updates on client navigations
@@ -24,64 +25,90 @@ export function HeaderNav() {
     } catch {}
   };
 
-  const onLogout = () => {
-    try { localStorage.removeItem('token'); } catch {}
-    if (typeof window !== 'undefined' && window.location) {
-      try { window.location.assign('/login'); } catch { window.location.href = '/login'; }
+  const onLogout = async () => {
+    try {
+      await logout();
+      if (typeof window !== 'undefined' && window.location) {
+        try { window.location.assign('/login'); } catch { window.location.href = '/login'; }
+      }
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Fallback to direct navigation
+      if (typeof window !== 'undefined' && window.location) {
+        try { window.location.assign('/login'); } catch { window.location.href = '/login'; }
+      }
     }
   };
 
   return (
     <div className="w-full border-b border-gray-200 bg-white">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="text-2xl font-bold text-gray-900">3D Print Job Dashboard</div>
-        <div className="flex items-center gap-3">
-          {lastUpdated && (
-            <span className="text-xs text-gray-500">Last updated: {lastUpdated}</span>
-          )}
-          <Link
-            href="/dashboard"
-            aria-current={pathname.startsWith('/dashboard') ? 'page' : undefined}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-orange-600 bg-orange-500 ${
-              pathname.startsWith('/dashboard') ? 'border-l-8 border-orange-200 pl-2' : ''
-            }`}
-          >
-            <LayoutDashboard size={16} /> Dashboard
-          </Link>
-          <Link
-            href="/admin"
-            aria-current={pathname.startsWith('/admin') ? 'page' : undefined}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-purple-600 bg-purple-500 ${
-              pathname.startsWith('/admin') ? 'border-l-8 border-purple-200 pl-2' : ''
-            }`}
-          >
-            <Shield size={16} /> Admin
-          </Link>
-          <Link
-            href="/analytics"
-            aria-current={pathname.startsWith('/analytics') ? 'page' : undefined}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-white transition-colors hover:bg-green-700 bg-green-600 ${
-              pathname.startsWith('/analytics') ? 'border-l-8 border-green-300 pl-2' : ''
-            }`}
-          >
-            <BarChart3 size={16} /> Analytics
-          </Link>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
-            onClick={onRefresh}
-            title="Refresh"
-          >
-            <RefreshCcw size={16} /> Refresh
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-white hover:bg-red-600"
-            onClick={onLogout}
-            title="Logout"
-          >
-            <LogOut size={16} /> Logout
-          </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Left side - Navigation */}
+          <div className="flex items-center space-x-8">
+            <Link
+              href="/dashboard"
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                pathname === '/dashboard'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+            >
+              <LayoutDashboard className="h-5 w-5" />
+              <span>Dashboard</span>
+            </Link>
+
+            <Link
+              href="/admin"
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                pathname.startsWith('/admin')
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+            >
+              <Shield className="h-5 w-5" />
+              <span>Admin</span>
+            </Link>
+
+            <Link
+              href="/analytics"
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                pathname.startsWith('/analytics')
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 className="h-5 w-5" />
+              <span>Analytics</span>
+            </Link>
+          </div>
+
+          {/* Right side - Actions */}
+          <div className="flex items-center space-x-4">
+            {lastUpdated && (
+              <div className="text-sm text-gray-500">
+                Last updated: {lastUpdated}
+              </div>
+            )}
+            
+            <button
+              onClick={onRefresh}
+              className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+              title="Refresh page"
+            >
+              <RefreshCcw className="h-5 w-5" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+
+            <button
+              onClick={onLogout}
+              className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-red-700 hover:text-red-800 hover:bg-red-50 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-5 w-5" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

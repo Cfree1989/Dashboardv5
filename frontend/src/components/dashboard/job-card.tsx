@@ -6,6 +6,7 @@ import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 import ConfirmDialog from './modals/confirm-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
+import { apiRequest, getLegacyToken } from '../../lib/auth';
 
 interface Job {
   id: string;
@@ -45,6 +46,8 @@ interface JobCardProps {
   onReject?: (jobId: string) => void;
   onMarkReviewed?: (jobId: string) => void;
   onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
+  onUpdate?: (jobId: string, updates: any) => Promise<void>;
+  onDelete?: (jobId: string) => Promise<void>;
   onModalOpenChange?: (open: boolean) => void; // pause auto-refresh while editing notes
   expandSignal?: number;
   collapseSignal?: number;
@@ -78,7 +81,7 @@ function convertToWindowsPath(filePath: string): string {
   return `C:\\Dashboardv5\\storage\\${filePath}`.replace(/\//g, '\\');
 }
 
-export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
+export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
   const [showMore, setShowMore] = useState(false);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
@@ -134,10 +137,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   useEffect(() => {
     const loadStaff = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error('Failed to load staff');
-        const data = await res.json();
+        const data = await apiRequest<any>('/api/v1/staff');
         const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
         if (activeStaff.length > 0) {
           setAdminStaffName(activeStaff[0].name);
@@ -155,10 +155,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     const ensureStaffForResend = async () => {
       try {
         setLoadingStaff(true);
-        const token = localStorage.getItem('token');
-        const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiRequest<any>('/api/v1/staff');
         const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
         setStaff(activeStaff);
       } catch {
@@ -256,10 +253,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     // lazy-load staff
     try {
       setLoadingStaff(true);
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/v1/staff', { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('Failed to load staff');
-      const data = await res.json();
+      const data = await apiRequest<any>('/api/v1/staff');
       setStaff((data?.staff || []).filter((s: any) => s.is_active));
     } catch (e) {
       setSaveError('Failed to load staff list');
@@ -290,12 +284,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const copyFilePath = async () => {
     // Log the action regardless
     try {
-      const token = localStorage.getItem('token');
-      fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+      await apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({})
-      }).catch(() => {});
+      });
     } catch {}
 
     if (job.file_path) {
@@ -328,17 +320,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSavingNotes(true);
       setSaveError("");
       setSaveMessage("Saving...");
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/v1/jobs/${job.id}/notes`, {
+      const data = await apiRequest<{ notes?: string }>(`/api/v1/jobs/${job.id}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ text: notesDraft, staff_name: notesStaffName })
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || 'Failed to add note');
-      }
-      const data = await res.json();
       setJobNotes(data?.notes || (jobNotes ? `${jobNotes}\n${notesDraft}` : notesDraft));
       setSaveMessage('Saved');
       setIsEditingNotes(false);
@@ -801,26 +786,21 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <a 
                 href={`print3d://open/?path=${encodeURIComponent(convertToWindowsPath(job.file_path || ''))}`}
                 className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition"
-                onClick={(e) => {
+                onClick={async (e) => {
                   const windowsPath = convertToWindowsPath(job.file_path || '');
                   
-                  // Log the action but preserve the anchor behavior
-                  console.log('✅ MODAL ANCHOR CLICKED (preserves user gesture):', {
-                    href: e.currentTarget.href,
-                    originalPath: job.file_path,
-                    windowsPath: windowsPath,
-                    jobId: job.id,
-                    currentTab: window.location.pathname,
-                    timestamp: new Date().toISOString(),
-                    trusted: e.isTrusted
-                  });
+                  // Log the action regardless
+                  try {
+                    await apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
+                      method: 'POST',
+                      body: JSON.stringify({})
+                    });
+                  } catch {}
                   
                   // Fire-and-forget logging (don't block the protocol launch)
                   try {
-                    const token = localStorage.getItem('token');
-                    fetch(`/api/v1/jobs/${job.id}/log-file-open`, {
+                    apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                       body: JSON.stringify({})
                     }).catch(() => {});
                   } catch {
@@ -853,12 +833,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           onConfirm={async () => {
             try {
               setIsDeleting(true);
-              const token = localStorage.getItem('token');
-              const res = await fetch(`/api/v1/jobs/${job.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-              if (!res.ok) {
-                const t = await res.text();
-                throw new Error(t || `Archive failed (${res.status})`);
-              }
+              await apiRequest(`/api/v1/jobs/${job.id}`, {
+                method: 'DELETE'
+              });
               show('Job archived');
               onReject?.(job.id);
             } catch (e) {
@@ -921,16 +898,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                      
                      try {
                        setIsResendingConfirm(true);
-                       const token = localStorage.getItem('token');
-                       const res = await fetch(`/api/v1/jobs/${job.id}/admin/resend-email`, {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                         body: JSON.stringify({ staff_name: resendStaffName })
-                       });
-                       if (!res.ok) {
-                         const data = await res.json().catch(() => ({} as any));
-                         throw new Error(data.message || 'Failed to resend');
-                       }
+                                               await apiRequest(`/api/v1/jobs/${job.id}/admin/resend-email`, {
+                          method: 'POST',
+                          body: JSON.stringify({ staff_name: resendStaffName })
+                        });
                        show('Confirmation email resent successfully');
                        setShowResendModal(false);
                        onModalOpenChange?.(false);

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { XCircle, Loader2 } from 'lucide-react';
 import LoginCard from '../../components/LoginCard';
+import { login } from '../../lib/auth';
 
 export default function LoginPage() {
   const [workstationId, setWorkstationId] = useState('workstation-1');
@@ -15,21 +16,13 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
+    
     try {
-      const res = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workstation_id: workstationId, password }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        localStorage.setItem('token', data.token);
-        router.push('/dashboard');
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error');
+      const data = await login(workstationId, password);
+      // Login successful - cookies are automatically set by the backend
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,142 +1,69 @@
-"use client";
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+'use client';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import JobCard from './job-card.tsx';
-import ApprovalModal from './modals/approval-modal';
-import StatusChangeModal from './modals/status-change-modal';
-import PaymentModal from './modals/payment-modal';
-import { JobListSkeleton } from './job-card-skeleton';
-import { useReducedMotion } from '../../lib/use-reduced-motion';
-import { ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, X as XIcon } from "lucide-react";
+import JobCard from './job-card';
+import { apiRequest, getLegacyToken } from '../../lib/auth';
 
-interface Job {
-  id: string;
-  display_name: string;
-  student_name?: string;
-  student_email?: string;
-  original_filename?: string;
-  printer?: string;
-  color?: string;
-  material?: string;
-  created_at?: string;
-  notes?: string;
-  staff_viewed_at?: string;
-  class_number?: string;
-}
-
-interface JobListFilters {
+export interface JobListFilters {
   status?: string;
   search?: string;
   printer?: string;
   discipline?: string;
 }
-export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, searchValue?: string, onSearchInput?: (value: string) => void }) {
-  const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [approveJobId, setApproveJobId] = useState<string | null>(null);
-  const [approveJobMaterial, setApproveJobMaterial] = useState<string | null>(null);
-  const [approveJobPrinter, setApproveJobPrinter] = useState<string | null>(null);
-  const [statusJobId, setStatusJobId] = useState<string | null>(null);
-  const [statusAction, setStatusAction] = useState<"mark-printing" | "mark-complete" | "mark-picked-up" | null>(null);
-  const prefersReducedMotion = useReducedMotion();
 
-  type SortBy = 'time' | 'name' | 'printer' | 'color' | 'class';
-  type SortDir = 'asc' | 'desc';
-  const [sortBy, setSortBy] = useState<SortBy>('time');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const [isFading, setIsFading] = useState(false);
-  const [expandAllSignal, setExpandAllSignal] = useState(0);
-  const [collapseAllSignal, setCollapseAllSignal] = useState(0);
-  const [allOpen, setAllOpen] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, searchValue?: string, onSearchInput?: (value: string) => void }) {
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [error, setError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const router = useRouter();
   const controllerRef = useRef<AbortController | null>(null);
 
-  // Load persisted sort on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('dashboard.sort.v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.sortBy === 'time' || parsed.sortBy === 'name' || parsed.sortBy === 'printer')) {
-          setSortBy(parsed.sortBy);
-        }
-        if (parsed && (parsed.sortDir === 'asc' || parsed.sortDir === 'desc')) {
-          setSortDir(parsed.sortDir);
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Persist selection and trigger a gentle fade
-  useEffect(() => {
-    try { localStorage.setItem('dashboard.sort.v1', JSON.stringify({ sortBy, sortDir })); } catch {}
-    if (!prefersReducedMotion) {
-      setIsFading(true);
-      const t = setTimeout(() => setIsFading(false), 180);
-      return () => clearTimeout(t);
-    }
-  }, [sortBy, sortDir, prefersReducedMotion]);
-
-  // Gentle fade on sort changes only
-
-  // Reset bulk state on status change to avoid confusion
-  useEffect(() => {
-    setAllOpen(false);
-  }, [filters?.status]);
-
-  function compareStrings(a?: string, b?: string): number {
-    const aa = (a || '').toLowerCase();
-    const bb = (b || '').toLowerCase();
-    if (aa < bb) return -1;
-    if (aa > bb) return 1;
-    return 0;
-  }
-
-  const sortedJobs = useMemo(() => {
+  const sortedJobs = () => {
     const copy = [...jobs];
     copy.sort((a, b) => {
-      // base comparisons
-      let cmp = 0;
-      if (sortBy === 'time') {
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
-        cmp = at === bt ? 0 : (at < bt ? -1 : 1);
-      } else if (sortBy === 'name') {
-        const an = a.student_name || a.display_name || '';
-        const bn = b.student_name || b.display_name || '';
-        cmp = compareStrings(an, bn);
-      } else if (sortBy === 'printer') {
-        cmp = compareStrings(a.printer, b.printer);
-      } else if (sortBy === 'color') {
-        cmp = compareStrings(a.color, b.color);
-      } else if (sortBy === 'class') {
-        cmp = compareStrings(a.class_number, b.class_number);
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+      
+      // Handle null/undefined values
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+      
+      // Handle dates
+      if (sortBy === 'created_at') {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
       }
-      if (cmp === 0) {
-        // Tie-breakers for stability: time desc, then name asc, then printer asc, then id asc
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
-        cmp = bt - at; // newer first
-        if (cmp === 0) {
-          cmp = compareStrings(a.student_name || a.display_name, b.student_name || b.display_name);
-          if (cmp === 0) {
-            cmp = compareStrings(a.printer, b.printer);
-            if (cmp === 0) {
-              cmp = compareStrings(a.id, b.id);
-            }
-          }
-        }
+      
+      // Handle strings (case-insensitive)
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      
+      // Tie-breakers for stable sorting
+      if (a.created_at !== b.created_at) {
+        const aTime = new Date(a.created_at).getTime();
+        const bTime = new Date(b.created_at).getTime();
+        return aTime - bTime;
       }
-      return sortDir === 'asc' ? cmp : -cmp;
+      if (a.student_name !== b.student_name) {
+        return (a.student_name || '').localeCompare(b.student_name || '');
+      }
+      if (a.printer !== b.printer) {
+        return (a.printer || '').localeCompare(b.printer || '');
+      }
+      return (a.id || 0) - (b.id || 0);
     });
     return copy;
-  }, [jobs, sortBy, sortDir]);
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getLegacyToken();
     if (!token) {
       router.push('/login');
       return;
@@ -163,19 +90,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         if (qSearch) params.append('search', qSearch);
         if (filters?.printer) params.append('printer', filters.printer);
         if (filters?.discipline) params.append('discipline', filters.discipline);
-        const res = await fetch('/api/v1/jobs' + (params.toString() ? `?${params}` : ''), {
-          headers: { 'Authorization': `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        if (res.status === 401) {
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
-        }
-        if (!res.ok) {
-          throw new Error(`Failed with status ${res.status}`);
-        }
-        const data = await res.json();
+        
+        const data = await apiRequest<any>(`/api/v1/jobs${params.toString() ? `?${params}` : ''}`);
         setJobs(Array.isArray(data) ? data : (data.jobs || []));
         setHasLoaded(true);
       } catch (err: any) {
@@ -196,214 +112,144 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         controllerRef.current.abort();
       }
     };
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken]);
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken, router, hasLoaded]);
 
-  const openApproveModal = (jobId: string) => {
-    const job = jobs.find(j => j.id === jobId);
-    setApproveJobId(jobId);
-    setApproveJobMaterial(job?.material || null);
-    setApproveJobPrinter(job?.printer || null);
-    onModalOpenChange?.(true);
-  };
-
-  const closeApproveModal = () => {
-    setApproveJobId(null);
-    setApproveJobMaterial(null);
-    setApproveJobPrinter(null);
-    onModalOpenChange?.(false);
-  };
-
-  const handleApprovedSuccess = () => {
-    if (approveJobId) {
-      setJobs(prev => prev.filter(j => j.id !== approveJobId));
+  const handleJobUpdate = async (jobId: string, updates: any) => {
+    try {
+      await apiRequest(`/api/v1/jobs/${jobId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      
+      // Update local state
+      setJobs(prevJobs => 
+        prevJobs.map(job => 
+          job.id === jobId ? { ...job, ...updates } : job
+        )
+      );
+      
+      onJobsMutated?.();
+    } catch (error) {
+      console.error('Failed to update job:', error);
+      throw error;
     }
-    onJobsMutated?.();
   };
 
-  const openStatusModal = (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => {
-    setStatusJobId(jobId);
-    setStatusAction(action);
-    onModalOpenChange?.(true);
-  };
-
-  const closeStatusModal = () => {
-    setStatusJobId(null);
-    setStatusAction(null);
-    onModalOpenChange?.(false);
-  };
-
-  const handleStatusSuccess = () => {
-    if (statusJobId) {
-      setJobs(prev => prev.filter(j => j.id !== statusJobId));
+  const handleJobDelete = async (jobId: string) => {
+    try {
+      await apiRequest(`/api/v1/jobs/${jobId}`, {
+        method: 'DELETE',
+      });
+      
+      // Remove from local state
+      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+      
+      onJobsMutated?.();
+    } catch (error) {
+      console.error('Failed to delete job:', error);
+      throw error;
     }
-    onJobsMutated?.();
   };
 
-  const handleReject = (jobId: string) => {
-    // Remove rejected job from current list
-    setJobs(prev => prev.filter(j => j.id !== jobId));
-    onJobsMutated?.();
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDir('desc');
+    }
   };
 
-  const handleMarkReviewed = (jobId: string) => {
-    // This callback is now used to trigger a local refresh when the modal completes.
-    // We will refetch the specific job to get the authoritative staff_viewed_at.
-    (async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/v1/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const updated = await res.json();
-        setJobs(prev => prev.map(j => (j.id === jobId ? { ...j, staff_viewed_at: updated.staff_viewed_at } : j)));
-      } catch {
-        // no-op; UI will correct on next list refresh
-      }
-    })();
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
-  if (!hasLoaded && loading) return <JobListSkeleton />;
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-600 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const sortedJobList = sortedJobs();
 
   return (
-    <div>
-      {/* Search + Bulk actions + Sort controls */}
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2">
-          {/* Search input (controlled by page) */}
-          <div className="relative">
-            <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={searchValue || ""}
-              onChange={(e) => onSearchInput?.(e.target.value)}
-              placeholder="Search name or email"
-              className="pl-7 pr-7 py-1.5 text-sm border rounded w-48 md:w-64 focus-ring"
-              aria-label="Search jobs by name or email"
-            />
-            {searchValue ? (
-              <button
-                type="button"
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
-                aria-label="Clear search"
-                onClick={() => onSearchInput?.("")}
-              >
-                <XIcon className="w-4 h-4" />
-              </button>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-50 bg-white"
-            onClick={() => {
-              if (allOpen) {
-                setCollapseAllSignal(v => v + 1);
-              } else {
-                setExpandAllSignal(v => v + 1);
-              }
-              setAllOpen(v => !v);
-            }}
-            aria-label={allOpen ? "Collapse all cards" : "Open all cards"}
-            title={allOpen ? "Collapse all" : "Open all"}
-          >
-            {allOpen ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-            <span className="sr-only">{allOpen ? 'Collapse all' : 'Open all'}</span>
-          </button>
+    <div className="space-y-4">
+      {/* Search and Sort Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        {/* Search Input */}
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search jobs..."
+            value={searchValue || ''}
+            onChange={(e) => onSearchInput?.(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
-        
+
+        {/* Sort Controls */}
         <div className="flex items-center gap-2">
-        <label htmlFor="sortBy" className="text-sm text-gray-600">Sort by:</label>
-        <select
-          id="sortBy"
-          className="border rounded px-2 py-1 text-sm"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortBy)}
-        >
-          <option value="time">Time</option>
-          <option value="name">Name</option>
-          <option value="printer">Printer</option>
-          <option value="color">Color</option>
-          <option value="class">Class</option>
-        </select>
-        <button
-          type="button"
-          aria-label="Toggle sort direction"
-          className="inline-flex items-center gap-1 border rounded px-2 py-1 text-sm hover:bg-gray-50 bg-white"
-          onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
-          title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
-        >
-          {sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-          <span className="sr-only">{sortDir === 'asc' ? 'Ascending' : 'Descending'}</span>
-        </button>
+          <select
+            value={`${sortBy}-${sortDir}`}
+            onChange={(e) => {
+              const [field, dir] = e.target.value.split('-');
+              setSortBy(field);
+              setSortDir(dir as 'asc' | 'desc');
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="created_at-desc">Time (Newest)</option>
+            <option value="created_at-asc">Time (Oldest)</option>
+            <option value="student_name-asc">Name (A→Z)</option>
+            <option value="student_name-desc">Name (Z→A)</option>
+            <option value="printer-asc">Printer (A→Z)</option>
+            <option value="printer-desc">Printer (Z→A)</option>
+            <option value="color-asc">Color (A→Z)</option>
+            <option value="color-desc">Color (Z→A)</option>
+            <option value="discipline-asc">Class (A→Z)</option>
+            <option value="discipline-desc">Class (Z→A)</option>
+          </select>
         </div>
       </div>
 
-      {isFetching && (
-        <div className="mb-2 text-xs text-gray-500" aria-live="polite">Updating results…</div>
-      )}
-      {error && (
-        <div className="mb-2 text-sm text-red-600" role="alert">{error}</div>
-      )}
+      {/* Job Count */}
+      <div className="text-sm text-gray-600">
+        {sortedJobList.length} job{sortedJobList.length !== 1 ? 's' : ''}
+        {isFetching && <span className="ml-2">(refreshing...)</span>}
+      </div>
 
-      {sortedJobs.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-          <p className="text-gray-500">No jobs found for this status.</p>
+      {/* Job Cards */}
+      {sortedJobList.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No jobs found</p>
+          {filters?.search && (
+            <p className="text-sm mt-2">Try adjusting your search terms</p>
+          )}
         </div>
       ) : (
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-200 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-        {sortedJobs.map(job => (
-          <JobCard 
-            key={job.id} 
-            job={job} 
-            currentStatus={filters?.status}
-            onApprove={openApproveModal}
-            onReject={handleReject}
-            onMarkReviewed={handleMarkReviewed}
-            onStatusAction={openStatusModal}
-            onModalOpenChange={onModalOpenChange}
-            expandSignal={expandAllSignal}
-            collapseSignal={collapseAllSignal}
-          />
-        ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {sortedJobList.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onUpdate={handleJobUpdate}
+              onDelete={handleJobDelete}
+              onModalOpenChange={onModalOpenChange}
+            />
+          ))}
         </div>
-      )}
-      {approveJobId && (
-        <ApprovalModal
-          jobId={approveJobId}
-          material={approveJobMaterial || undefined}
-          currentPrinter={approveJobPrinter || undefined}
-          onClose={closeApproveModal}
-          onApproved={handleApprovedSuccess}
-        />
-      )}
-      {statusJobId && statusAction === 'mark-picked-up' && (
-        <PaymentModal
-          jobId={statusJobId}
-          onClose={closeStatusModal}
-          onSuccess={handleStatusSuccess}
-        />
-      )}
-      {statusJobId && statusAction && statusAction !== 'mark-picked-up' && (
-        <StatusChangeModal
-          jobId={statusJobId}
-          action={statusAction}
-          title={
-            statusAction === 'mark-printing' ? 'Mark as Printing' :
-            statusAction === 'mark-complete' ? 'Mark as Complete' :
-            'Mark as Paid/Picked Up'
-          }
-          description={
-            statusAction === 'mark-printing' ? 'This will move the job into Printing.' : 'This will move the job to Completed.'
-          }
-          confirmVerb={
-            statusAction === 'mark-printing' ? 'Mark Printing' : 'Mark Complete'
-          }
-          onClose={closeStatusModal}
-          onSuccess={handleStatusSuccess}
-        />
       )}
     </div>
   );
