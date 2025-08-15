@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useCatalog } from '../../lib/use-catalog';
+import { apiRequest } from '../../lib/auth';
 
 interface CatalogEditorProps {
   featureFlag?: boolean;
@@ -39,21 +40,10 @@ export function CatalogEditor({ featureFlag = false }: CatalogEditorProps) {
       setIsUpdating(true);
       setUpdateStatus({ type: null, message: '' });
 
-      const response = await fetch('/api/v1/catalog', {
+      const result = await apiRequest<{ version: string }>('/api/v1/catalog', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ data: parsedData })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update catalog');
-      }
-
-      const result = await response.json();
       
       setUpdateStatus({
         type: 'success',

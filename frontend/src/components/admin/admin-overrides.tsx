@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { AlertTriangle, Unlock, CheckCircle, RotateCcw, XCircle } from "lucide-react";
 import { useToast } from "../ui/toast";
+import { apiRequest } from "../../lib/auth";
 
 export function AdminOverridesPanel() {
   const [jobId, setJobId] = useState("");
@@ -42,7 +43,6 @@ export function AdminOverridesPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const token = localStorage.getItem("token");
       const base = `/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin`;
       let path = "";
       let body: Record<string, any> = { staff_name: staffName.trim(), reason: reason.trim() };
@@ -65,19 +65,10 @@ export function AdminOverridesPanel() {
           setIsProcessing(false);
           return;
       }
-      const res = await fetch(path, {
+      await apiRequest(path, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(body),
       });
-      const text = await res.text();
-      if (!res.ok) {
-        setErrorMsg(text || "Override failed.");
-        return;
-      }
       setSuccessMsg("Override executed successfully.");
       show("Admin override completed");
       setJobId("");

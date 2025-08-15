@@ -9,6 +9,7 @@ import { AdminSettingsPanel } from "../../components/admin/admin-settings";
 import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
 import { DataManagementPanel } from "../../components/admin/data-management";
 import { EmailToolsPanel } from "../../components/admin/email-tools";
+import { checkAuthStatus } from "../../lib/auth";
 
 type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email";
 
@@ -16,10 +17,13 @@ export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-    }
+    const checkAuth = async () => {
+      const authUser = await checkAuthStatus();
+      if (!authUser.isAuthenticated) {
+        router.push("/login");
+      }
+    };
+    checkAuth();
   }, [router]);
 
   const [activeSection, setActiveSection] = useState<AdminSection>("settings");

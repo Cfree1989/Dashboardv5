@@ -519,8 +519,8 @@ This 3D Print Management System is a **functionally complete and architecturally
   - Add proper error handling for connection failures
 
 - [x] **Fix Metadata Synchronization** | **Risk**: Medium | **Effort**: M | **Files**: `backend/app/services/file_service.py` ✅ **COMPLETED**
-  - ✅ Implemented consistent metadata format with automatic backup/restoration
-  - ✅ Added validation for metadata integrity as part of atomic operations
+  -  Implemented consistent metadata format with automatic backup/restoration
+  -  Added validation for metadata integrity as part of atomic operations
 
 ### 🔧 LOW PRIORITY (Technical Debt)
 

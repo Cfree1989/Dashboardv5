@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { apiRequest } from "../../lib/auth";
 
 interface StaffMember {
   name: string;
@@ -19,23 +20,9 @@ export function StaffPanel() {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
       const params = new URLSearchParams();
       if (includeInactive) params.set("include_inactive", "true");
-      const res = await fetch(`/api/v1/staff?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      const data = await res.json();
+      const data = await apiRequest<any>(`/api/v1/staff?${params.toString()}`);
       setStaff(data.staff || []);
     } catch (e) {
       setError("Failed to load staff");
@@ -54,58 +41,28 @@ export function StaffPanel() {
     const trimmed = newName.trim();
     if (!trimmed) return;
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
-      const res = await fetch(`/api/v1/staff`, {
+      await apiRequest(`/api/v1/staff`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ name: trimmed }),
       });
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-        return;
-      }
-      if (res.status === 409) {
-        setError("That name already exists");
-        return;
-      }
-      if (!res.ok) throw new Error("Add failed");
       setNewName("");
       fetchStaff();
-    } catch (e) {
-      setError("Failed to add staff");
+    } catch (e: any) {
+      if (e.message?.includes('409')) {
+        setError("That name already exists");
+      } else {
+        setError("Failed to add staff");
+      }
     }
   };
 
   const toggleActive = async (name: string, isActive: boolean) => {
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        window.location.href = "/login";
-        return;
-      }
-      const res = await fetch(`/api/v1/staff/${encodeURIComponent(name)}`, {
+      await apiRequest(`/api/v1/staff/${encodeURIComponent(name)}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ is_active: !isActive }),
       });
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) throw new Error("Update failed");
       fetchStaff();
     } catch (e) {
       setError("Failed to update staff");

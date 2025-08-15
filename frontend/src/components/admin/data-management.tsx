@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Archive, Trash2, AlertTriangle, CheckCircle, Settings } from "lucide-react";
 import { useToast } from "../ui/toast";
 import { CatalogEditor } from "./catalog-editor";
+import { apiRequest } from "../../lib/auth";
 
 export function DataManagementPanel() {
   const [archiveDays, setArchiveDays] = useState(45);
@@ -33,18 +34,10 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/v1/admin/archive`, {
+      const data = await apiRequest(`/api/v1/admin/archive`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ retention_days: archiveDays, staff_name: staffName.trim() }),
       });
-      const text = await res.text();
-      if (!res.ok) {
-        setErrorMsg(text || "Archive failed.");
-        return;
-      }
-      const data = JSON.parse(text || "{}");
       const count = Number(data?.jobs_archived ?? 0);
       setPreviewCounts((p) => ({ ...p, archive: isNaN(count) ? 0 : count }));
       setSuccessMsg(`Archived ${count} job(s).`);
@@ -60,18 +53,10 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/v1/admin/prune`, {
+      const data = await apiRequest(`/api/v1/admin/prune`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ retention_days: pruneDays, staff_name: staffName.trim() }),
       });
-      const text = await res.text();
-      if (!res.ok) {
-        setErrorMsg(text || "Prune failed.");
-        return;
-      }
-      const data = JSON.parse(text || "{}");
       const count = Number(data?.jobs_deleted ?? 0);
       setPreviewCounts((p) => ({ ...p, prune: isNaN(count) ? 0 : count }));
       setSuccessMsg(`Deleted ${count} archived job(s).`);

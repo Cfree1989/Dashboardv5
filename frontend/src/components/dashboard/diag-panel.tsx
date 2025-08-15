@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { apiRequest } from "../../lib/auth";
 
 type DiagInfo = {
   db_engine?: string | null;
@@ -14,29 +15,16 @@ export function DiagPanel() {
   const [error, setError] = useState<string>("");
   const [info, setInfo] = useState<DiagInfo | null>(null);
 
+  // Load diagnostics automatically on mount
+  React.useEffect(() => {
+    fetchDiag();
+  }, []);
+
   const fetchDiag = async () => {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setError("Not logged in");
-        return;
-      }
-      const res = await fetch("/api/v1/_diag", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        setError("Unauthorized. Please log in again.");
-        localStorage.removeItem("token");
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) {
-        setError(`Request failed: ${res.status}`);
-        return;
-      }
-      const data = (await res.json()) as DiagInfo;
+      const data = await apiRequest<DiagInfo>("/api/v1/_diag");
       setInfo(data);
     } catch (e) {
       setError("Failed to fetch diagnostics");
@@ -49,13 +37,7 @@ export function DiagPanel() {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mt-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold text-gray-700">Diagnostics</h2>
-        <button
-          onClick={fetchDiag}
-          disabled={loading}
-          className="px-3 py-1 text-sm bg-gray-800 text-white rounded hover:bg-gray-900 disabled:opacity-50"
-        >
-          {loading ? "Loading..." : "Fetch"}
-        </button>
+        {loading && <span className="text-sm text-gray-500">Loading...</span>}
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {info && (
@@ -85,7 +67,7 @@ export function DiagPanel() {
         </div>
       )}
       {!info && !error && !loading && (
-        <p className="text-sm text-gray-500">Click Fetch to load system diagnostics.</p>
+        <p className="text-sm text-gray-500">Loading system diagnostics...</p>
       )}
     </div>
   );

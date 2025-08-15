@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import { useToast } from "../../ui/toast";
+import { apiRequest } from "../../../lib/auth";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -34,10 +35,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
       try {
         setLoadingStaff(true);
         setError("");
-        const token = localStorage.getItem("token");
-        const res = await fetch("/api/v1/staff", { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error("Failed to load staff");
-        const data = await res.json();
+        const data = await apiRequest<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -51,10 +49,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
       try {
         setLoadingJob(true);
         setError("");
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/v1/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error("Failed to load job details");
-        const data = await res.json();
+        const data = await apiRequest<any>(`/api/v1/jobs/${jobId}`);
         setJobDetails({
           material: data.material || 'filament',
           cost_usd: data.cost_usd || 0
@@ -98,16 +93,10 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
     try {
       setSubmitting(true);
       setError("");
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/v1/jobs/${jobId}/payment`, {
+      await apiRequest(`/api/v1/jobs/${jobId}/payment`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ staff_name: staffName, grams: parseFloat(grams), txn_no: txnNo, picked_up_by: pickedUpBy }),
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || "Payment failed");
-      }
       show('Payment recorded');
       onSuccess();
       onClose();

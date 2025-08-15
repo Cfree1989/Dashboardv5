@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, Trash2, ActivitySquare, Database, Mail } from "lucide-react";
 import { useToast } from "../ui/toast";
+import { apiRequest } from "../../lib/auth";
 
 type ServerAuditReport = {
   report_generated_at: string;
@@ -21,13 +22,10 @@ export function SystemHealthPanel() {
   const [health, setHealth] = useState<any | null>(null);
 
   async function fetchReport() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     try {
       setLoadingReport(true);
       setError("");
-      const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Failed to load audit report");
-      const data: ServerAuditReport = await res.json();
+      const data: ServerAuditReport = await apiRequest("/api/v1/admin/audit/report");
       setLastReport(data);
       setCurrentAudit(null);
     } catch (e) {
@@ -41,9 +39,8 @@ export function SystemHealthPanel() {
     fetchReport();
     (async () => {
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        const d = await fetch('/api/v1/_diag', { headers: { Authorization: `Bearer ${token}` }});
-        if (d.ok) setDiag(await d.json());
+        const d = await apiRequest('/api/v1/_diag');
+        setDiag(d);
       } catch {}
       try {
         const h = await fetch('/api/v1/health');
@@ -66,30 +63,24 @@ export function SystemHealthPanel() {
 
   const cleanUpOrphans = async () => {
     if (!lastReport) return;
-    const token = localStorage.getItem("token");
     for (const path of lastReport.orphaned_files) {
-      await fetch("/api/v1/admin/audit/orphaned-file", {
+      await apiRequest("/api/v1/admin/audit/orphaned-file", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ file_path: path, staff_name: "Admin User" }),
       });
     }
     // refresh
-    const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) setLastReport(await res.json());
+    await fetchReport();
   };
 
   const deleteStale = async (path: string) => {
     try {
-      const token = localStorage.getItem("token");
-      await fetch("/api/v1/admin/audit/stale-file", {
+      await apiRequest("/api/v1/admin/audit/stale-file", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ file_path: path, staff_name: "Admin User" }),
       });
       // refresh
-      const res = await fetch("/api/v1/admin/audit/report", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setLastReport(await res.json());
+      await fetchReport();
     } catch {
       setError("Failed to delete stale file");
     }
@@ -97,10 +88,8 @@ export function SystemHealthPanel() {
 
   const markReviewed = async (jobId: string, issues: string[]) => {
     try {
-      const token = localStorage.getItem("token");
-      await fetch("/api/v1/admin/audit/mark-reviewed", {
+      await apiRequest("/api/v1/admin/audit/mark-reviewed", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", issues }),
       });
       show("Marked reviewed");
@@ -113,13 +102,10 @@ export function SystemHealthPanel() {
 
   const repairMetadata = async (jobId: string) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/v1/admin/audit/repair-metadata", {
+      await apiRequest("/api/v1/admin/audit/repair-metadata", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
       });
-      if (!res.ok) throw new Error();
       show("Metadata repaired");
       await fetchReport();
     } catch {
@@ -129,13 +115,10 @@ export function SystemHealthPanel() {
 
   const repairLocation = async (jobId: string) => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/v1/admin/audit/repair-location", {
+      await apiRequest("/api/v1/admin/audit/repair-location", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
       });
-      if (!res.ok) throw new Error();
       show("Location repaired");
       await fetchReport();
     } catch {
@@ -147,13 +130,10 @@ export function SystemHealthPanel() {
     const path = prompt('Enter full path to the authoritative file (under storage):');
     if (!path) return;
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/v1/admin/audit/relink-file", {
+      await apiRequest("/api/v1/admin/audit/relink-file", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", file_path: path })
       });
-      if (!res.ok) throw new Error();
       show("File relinked");
       await fetchReport();
     } catch {

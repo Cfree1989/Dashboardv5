@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../ui/toast";
+import { apiRequest } from "../../../lib/auth";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -34,12 +35,7 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
       try {
         setLoadingStaff(true);
         setError("");
-        const token = localStorage.getItem("token");
-        const res = await fetch("/api/v1/staff", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Failed to load staff");
-        const data = await res.json();
+        const data = await apiRequest<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -64,23 +60,14 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
     try {
       setSubmitting(true);
       setError("");
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/v1/jobs/${jobId}/reject`, {
+      await apiRequest(`/api/v1/jobs/${jobId}/reject`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           staff_name: staffName,
           reasons: selectedReasons,
           custom_reason: customReason.trim(),
         }),
       });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to reject job");
-      }
       show('Job rejected');
       onRejected();
       onClose();

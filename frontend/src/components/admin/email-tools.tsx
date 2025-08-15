@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Mail, Clock, AlertCircle, Edit3, Save, X } from "lucide-react";
+import { apiRequest } from "../../lib/auth";
 
 export function EmailToolsPanel() {
   const [jobId, setJobId] = useState("");
@@ -15,19 +16,10 @@ export function EmailToolsPanel() {
     if (!jobId.trim() || !emailType) return;
     setIsResending(true);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const res = await fetch(`/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin/resend-email`, {
+      await apiRequest(`/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin/resend-email`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ staff_name: 'Admin User' }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to resend');
-      }
       setLastSent(new Date());
       setRateLimit((prev) => ({ remaining: Math.max(0, prev.remaining - 1), resetTime: new Date(Date.now() + 60000) }));
       setJobId("");
