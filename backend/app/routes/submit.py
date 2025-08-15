@@ -11,6 +11,10 @@ from app.services.token_service import generate_confirmation_token, verify_confi
 from app.services.file_service import move_authoritative
 from app.routes.jobs import _sync_authoritative_metadata
 from app.services.catalog_service import CatalogService
+from app.services.error_handling_service import get_error_handling_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
@@ -178,8 +182,15 @@ def submit_job():
         # Fire-and-forget best-effort submission confirmation email
         try:
             send_submission_confirmation_email(job)
-        except Exception:
-            pass
+        except Exception as e:
+            error_service = get_error_handling_service()
+            error_service.log_file_operation_error(
+                operation="send_submission_confirmation_email",
+                error=e,
+                job_id=str(job.id),
+                context={'email_type': 'submission_confirmation'}
+            )
+            logger.warning(f"Failed to send submission confirmation email for job {job.id}: {e}")
 
         return jsonify(job.to_dict()), 201
     except Exception as e:
@@ -208,12 +219,21 @@ def confirm_job(token: str):
     job.status = 'READYTOPRINT'
     move_authoritative(job, 'READYTOPRINT')
     db.session.commit()
+    
     # Sync metadata to reflect authoritative file and new status
+    error_service = get_error_handling_service()
     try:
         _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'StudentConfirmed')
-    except Exception:
+    except Exception as e:
+        error_service.log_metadata_sync_error(
+            error=e,
+            job_id=str(job.id),
+            metadata_path=getattr(job, 'metadata_path', 'unknown'),
+            context={'operation': 'confirm_job_metadata_sync'}
+        )
+        logger.warning(f"Failed to sync metadata during job confirmation for job {job.id}: {e}")
         # Non-fatal: do not block confirmation on metadata issues
-        pass
+    
     log_event('StudentConfirmed', {'status': job.status}, job_id=job.id)
     return jsonify(job.to_dict()), 200
 
@@ -251,9 +271,17 @@ def resend_confirmation():
 
     # Attempt send; do not fail the endpoint if email not configured
     sent = False
+    error_service = get_error_handling_service()
     try:
         sent = send_approval_email(job, confirmation_url)
-    except Exception:
+    except Exception as e:
+        error_service.log_file_operation_error(
+            operation="send_approval_email",
+            error=e,
+            job_id=str(job.id),
+            context={'email_type': 'approval', 'confirmation_url': confirmation_url}
+        )
+        logger.warning(f"Failed to send approval email for job {job.id}: {e}")
         sent = False
 
     # Log events
@@ -264,7 +292,13 @@ def resend_confirmation():
     try:
         job.confirmation_last_sent_at = datetime.utcnow()
         db.session.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        error_service.log_file_operation_error(
+            operation="update_confirmation_timestamp",
+            error=e,
+            job_id=str(job.id),
+            context={'operation': 'update_confirmation_timestamp'}
+        )
+        logger.warning(f"Failed to update confirmation timestamp for job {job.id}: {e}")
 
     return jsonify({'message': 'Confirmation email resent', 'job_id': job.id}), 200

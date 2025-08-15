@@ -16,6 +16,10 @@ import json
 from datetime import datetime, timezone
 from datetime import timedelta
 import shutil
+from app.services.error_handling_service import get_error_handling_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
@@ -320,49 +324,83 @@ def relink_file():
         abort(500, description='Failed to relink file')
 
 def _update_metadata_status(meta_path: Path, new_status: str, new_file_path: str | None = None) -> None:
-    try:
-        if not meta_path.exists():
-            return
-        data = _safe_read_json(meta_path)
-        data['status'] = new_status
-        if new_file_path:
-            try:
-                resolved = str(Path(new_file_path).resolve())
-            except Exception:
-                resolved = new_file_path
-            data['file_path'] = resolved
-        meta_path.write_text(json.dumps(data, indent=2), encoding='utf-8')
-    except Exception:
-        # Non-fatal metadata sync
-        pass
+    error_service = get_error_handling_service()
+    
+    success, error_msg = error_service.handle_metadata_operation_with_error_handling(
+        job_id="admin_operation",
+        metadata_path=str(meta_path),
+        operation_func=lambda: _update_metadata_file_content(meta_path, new_status, new_file_path)
+    )
+    
+    if not success:
+        logger.error(f"Failed to update metadata status for {meta_path}: {error_msg}")
+
+
+def _update_metadata_file_content(meta_path: Path, new_status: str, new_file_path: str | None = None) -> None:
+    """Update metadata file content with proper error handling."""
+    if not meta_path.exists():
+        return
+    
+    data = _safe_read_json(meta_path)
+    data['status'] = new_status
+    
+    if new_file_path:
+        try:
+            resolved = str(Path(new_file_path).resolve())
+        except Exception:
+            resolved = new_file_path
+        data['file_path'] = resolved
+    
+    meta_path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+
 
 def _metadata_path_for_job(job: Job) -> Path:
     try:
         file_dir = Path(job.file_path).parent
         base = Path(job.file_path).stem
         return file_dir / f"{base}_metadata.json"
-    except Exception:
+    except Exception as e:
+        error_service = get_error_handling_service()
+        error_service.log_metadata_sync_error(
+            error=e,
+            job_id=str(job.id),
+            metadata_path=getattr(job, 'metadata_path', 'unknown'),
+            context={'operation': 'metadata_path_for_job'}
+        )
+        logger.error(f"Failed to generate metadata path for job {job.id}: {e}")
         return Path(job.metadata_path) if getattr(job, 'metadata_path', None) else Path('')
 
+
 def _write_metadata_for_job(job: Job, target_meta: Path) -> None:
-    try:
-        target_meta.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            'student_name': job.student_name,
-            'student_email': job.student_email,
-            'discipline': job.discipline,
-            'class_number': job.class_number,
-            'printer': job.printer,
-            'color': getattr(job, 'color', None),
-            'material': getattr(job, 'material', None),
-            'status': job.status,
-            'display_name': job.display_name,
-            'authoritative_filename': Path(job.file_path).name if getattr(job, 'file_path', None) else None,
-            'file_path': str(Path(job.file_path).resolve()) if getattr(job, 'file_path', None) else None,
-        }
-        target_meta.write_text(json.dumps(payload, indent=2), encoding='utf-8')
-    except Exception:
-        pass
+    error_service = get_error_handling_service()
+    
+    success, error_msg = error_service.handle_metadata_operation_with_error_handling(
+        job_id=str(job.id),
+        metadata_path=str(target_meta),
+        operation_func=lambda: _write_metadata_content(job, target_meta)
+    )
+    
+    if not success:
+        logger.error(f"Failed to write metadata for job {job.id}: {error_msg}")
+
+
+def _write_metadata_content(job: Job, target_meta: Path) -> None:
+    """Write metadata content with proper error handling."""
+    target_meta.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        'student_name': job.student_name,
+        'student_email': job.student_email,
+        'discipline': job.discipline,
+        'class_number': job.class_number,
+        'printer': job.printer,
+        'color': getattr(job, 'color', None),
+        'material': getattr(job, 'material', None),
+        'status': job.status,
+        'display_name': job.display_name,
+        'authoritative_filename': Path(job.file_path).name if getattr(job, 'file_path', None) else None,
+        'file_path': str(Path(job.file_path).resolve()) if getattr(job, 'file_path', None) else None,
+    }
+    target_meta.write_text(json.dumps(payload, indent=2), encoding='utf-8')
 
 
 @bp.route('/archive', methods=['POST'])
@@ -473,4 +511,64 @@ def prune_jobs():
 
 
 ## Removed: delete-all-jobs endpoint
+
+
+@bp.route('/error-monitoring', methods=['GET'])
+@token_required
+def get_error_monitoring():
+    """Get error monitoring statistics and recent errors."""
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip()
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    
+    error_service = get_error_handling_service()
+    error_summary = error_service.get_error_summary()
+    
+    # Add recovery suggestions for recent errors
+    recent_errors_with_suggestions = []
+    for error_info in error_summary['recent_errors']:
+        suggestions = error_service.get_recovery_suggestions(error_info)
+        recent_errors_with_suggestions.append({
+            **error_info,
+            'recovery_suggestions': suggestions
+        })
+    
+    return jsonify({
+        'error_summary': {
+            'total_errors': error_summary['total_errors'],
+            'error_counts': error_summary['error_counts'],
+            'critical_errors': error_summary['critical_errors'],
+            'high_errors': error_summary['high_errors']
+        },
+        'recent_errors': recent_errors_with_suggestions,
+        'monitoring_timestamp': datetime.now(timezone.utc).isoformat()
+    }), 200
+
+
+@bp.route('/error-monitoring/clear', methods=['POST'])
+@token_required
+def clear_error_monitoring():
+    """Clear error monitoring data."""
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip()
+    if not staff_name:
+        return jsonify({'message': 'staff_name is required'}), 400
+    
+    error_service = get_error_handling_service()
+    error_service.recent_errors.clear()
+    error_service.error_counts.clear()
+    
+    # Log the clearing action
+    evt = Event(
+        job_id=None,  # System-level event
+        event_type='ErrorMonitoringCleared',
+        details={'cleared_by': staff_name},
+        triggered_by=staff_name,
+        workstation_id=getattr(g, 'workstation_id', 'unknown')
+    )
+    db.session.add(evt)
+    db.session.commit()
+    
+    return jsonify({'message': 'Error monitoring data cleared'}), 200
 

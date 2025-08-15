@@ -19,6 +19,10 @@ from decimal import Decimal, ROUND_HALF_UP
 from app.services.file_service import move_authoritative
 from app.services.file_service import STATUS_TO_DIR
 from app.services.catalog_service import CatalogService
+from app.services.error_handling_service import get_error_handling_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -46,58 +50,97 @@ def list_jobs():
 
 # --- Metadata helpers ---
 def _load_metadata(job: Job) -> dict:
+    error_service = get_error_handling_service()
+    
     try:
-        with open(job.metadata_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
+        return _load_metadata_file(job.metadata_path)
+    except Exception as e:
+        error_service.log_metadata_sync_error(
+            error=e,
+            job_id=str(job.id),
+            metadata_path=job.metadata_path,
+            context={'operation': 'load_metadata'}
+        )
+        logger.warning(f"Failed to load metadata for job {job.id}: {e}")
         return {}
 
 
+def _load_metadata_file(metadata_path: str) -> dict:
+    """Load metadata from file with proper error handling."""
+    with open(metadata_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
 def _save_metadata(job: Job, data: dict) -> None:
-    try:
-        meta_path = Path(job.metadata_path)
-        meta_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(meta_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
-    except Exception:
-        # Non-fatal: metadata sync should not block workflow
-        pass
+    error_service = get_error_handling_service()
+    
+    success, error_msg = error_service.handle_metadata_operation_with_error_handling(
+        job_id=str(job.id),
+        metadata_path=job.metadata_path,
+        operation_func=lambda: _save_metadata_file(job.metadata_path, data)
+    )
+    
+    if not success:
+        logger.error(f"Failed to save metadata for job {job.id}: {error_msg}")
+        # Don't raise here as metadata sync should not block workflow, but log the error
+
+
+def _save_metadata_file(metadata_path: str, data: dict) -> None:
+    """Save metadata to file with proper error handling."""
+    meta_path = Path(metadata_path)
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
 
 
 def _sync_authoritative_metadata(job: Job, authoritative_filename: str, staff_name: str | None, event_type: str) -> None:
-    try:
-        meta = _load_metadata(job)
-        history = meta.get('authoritative_history', [])
-        prev = meta.get('authoritative_filename')
-        changed = False
-        if authoritative_filename and authoritative_filename != prev:
-            history.append({
-                'ts': datetime.utcnow().isoformat(),
-                'by': staff_name,
-                'event': event_type,
-                'from': prev,
-                'to': authoritative_filename,
-            })
-            meta['authoritative_history'] = history
-            meta['authoritative_filename'] = authoritative_filename
-            changed = True
+    error_service = get_error_handling_service()
+    
+    success, error_msg = error_service.handle_metadata_operation_with_error_handling(
+        job_id=str(job.id),
+        metadata_path=job.metadata_path,
+        operation_func=lambda: _sync_metadata_content(job, authoritative_filename, staff_name, event_type)
+    )
+    
+    if not success:
+        logger.error(f"Failed to sync metadata for job {job.id}: {error_msg}")
+        # Don't raise here as metadata sync should not block workflow, but log the error
 
-        # Keep other fields in sync
-        if meta.get('status') != job.status:
-            meta['status'] = job.status
-            changed = True
-        if meta.get('display_name') != job.display_name:
-            meta['display_name'] = job.display_name
-            changed = True
-        if meta.get('file_path') != job.file_path:
-            meta['file_path'] = job.file_path
-            changed = True
-        meta['updated_at'] = datetime.utcnow().isoformat()
-        if changed:
-            _save_metadata(job, meta)
-    except Exception:
-        # Non-fatal
-        pass
+
+def _sync_metadata_content(job: Job, authoritative_filename: str, staff_name: str | None, event_type: str) -> None:
+    """Sync metadata content with proper error handling."""
+    meta = _load_metadata(job)
+    history = meta.get('authoritative_history', [])
+    prev = meta.get('authoritative_filename')
+    changed = False
+    
+    if authoritative_filename and authoritative_filename != prev:
+        history.append({
+            'ts': datetime.utcnow().isoformat(),
+            'by': staff_name,
+            'event': event_type,
+            'from': prev,
+            'to': authoritative_filename,
+        })
+        meta['authoritative_history'] = history
+        meta['authoritative_filename'] = authoritative_filename
+        changed = True
+
+    # Keep other fields in sync
+    if meta.get('status') != job.status:
+        meta['status'] = job.status
+        changed = True
+    if meta.get('display_name') != job.display_name:
+        meta['display_name'] = job.display_name
+        changed = True
+    if meta.get('file_path') != job.file_path:
+        meta['file_path'] = job.file_path
+        changed = True
+    
+    meta['updated_at'] = datetime.utcnow().isoformat()
+    
+    if changed:
+        _save_metadata(job, meta)
 
 @bp.route('/<job_id>', methods=['GET'])
 @token_required
