@@ -1247,15 +1247,15 @@ If the implementation introduces instability:
   - [x] Design and implement `AtomicFileOperation` class
   - [x] Create `prepare() → commit() → rollback()` pattern
   - [x] Implement staging areas for file operations
-  - [ ] Add rollback mechanisms for partial failures
-  - [ ] Replace existing file operations with atomic versions
+  - [x] Add rollback mechanisms for partial failures
+  - [x] Replace existing file operations with atomic versions
 
-- [ ] **F1-S4: Fix Database-File Synchronization** | **Risk**: High | **Effort**: L
-  - [ ] Implement database transactions encompassing file operations
-  - [ ] Create cleanup mechanisms for orphaned files/records
-  - [ ] Fix metadata synchronization to be atomic
-  - [ ] Add integrity verification methods
-  - [ ] Implement recovery procedures for corrupted states
+- [x] **F1-S4: Fix Database-File Synchronization** | **Risk**: High | **Effort**: L ✅ **COMPLETED**
+  - [x] Implement database transactions encompassing file operations
+  - [x] Create cleanup mechanisms for orphaned files/records
+  - [x] Fix metadata synchronization to be atomic
+  - [x] Add integrity verification methods
+  - [x] Implement recovery procedures for corrupted states
 
 - [ ] **F1-S5: Replace Silent Error Handling** | **Risk**: Medium | **Effort**: M
   - [ ] Remove silent `try/catch` blocks with pass statements
@@ -1465,6 +1465,82 @@ with AtomicFileMoveOperation("op_123", job.id, source_file, dest_file) as op:
 - **Metadata Consistency**: Automatic synchronization of file and metadata states
 - **Error Recovery**: Graceful handling of partial failures
 - **Staging Safety**: Temporary staging prevents data corruption during operations
+
+### F1-S4 Database-File Synchronization ✅ COMPLETED
+
+**Database Transaction Service Created**:
+- **File**: `backend/app/services/db_transaction_service.py` (400 lines)
+- **Core Classes**: `DatabaseTransactionService`, `TransactionContext`
+- **Pattern**: Atomic database and file operations with complete rollback
+- **Integration**: Seamless integration with atomic file operations
+
+**Key Features Implemented**:
+1. **DatabaseTransactionService**: Main service with context manager and decorator support
+2. **TransactionContext**: Transaction context with operation queuing and execution
+3. **Atomic Transactions**: Context manager for atomic database and file operations
+4. **Operation Queuing**: Add file and database operations to transaction queue
+5. **Automatic Rollback**: Complete rollback on any operation failure
+6. **Convenience Functions**: High-level functions for common operations
+
+**Comprehensive Test Suite**:
+- **File**: `tests/test_db_transaction_service.py` (700 lines)
+- **30 Unit Tests**: All passing ✅
+- **Test Coverage**: Service initialization, transaction context, operation execution, rollback scenarios
+- **Integration Tests**: End-to-end database and file operation integration
+- **Mock Testing**: Comprehensive mocking for isolated testing without Redis or database dependencies
+
+**Technical Implementation**:
+- **Context Manager**: `atomic_transaction()` context manager for safe usage
+- **Operation Queuing**: Queue file and database operations for atomic execution
+- **Execution Order**: File operations first (can be rolled back), then database operations
+- **Rollback Strategy**: Database rollback + file operation rollback on any failure
+- **Error Handling**: Proper exception propagation with detailed error messages
+- **Decorator Support**: `@with_atomic_transaction` decorator for function-level atomicity
+
+**Convenience Functions**:
+```python
+# Atomic job status change with file movement
+success = atomic_job_status_change(job, "COMPLETED", "operation_123")
+
+# Atomic job creation with file operations
+job = atomic_job_creation(job_data, "operation_456")
+
+# Atomic job deletion with file cleanup
+success = atomic_job_deletion(job, "operation_789")
+```
+
+**Usage Example**:
+```python
+from app.services.db_transaction_service import get_db_transaction_service
+
+transaction_service = get_db_transaction_service()
+
+# Context manager usage (recommended)
+with transaction_service.atomic_transaction("operation_123") as transaction:
+    # Add file operation
+    transaction.add_file_operation('move', job=job, to_status='COMPLETED')
+    
+    # Add database operation
+    transaction.add_db_operation('update', object=job, updates={
+        'status': 'COMPLETED',
+        'last_updated_by': 'staff_user'
+    })
+    # Transaction commits automatically on exit, rolls back on exception
+
+# Decorator usage
+@transaction_service.with_atomic_transaction("operation_456")
+def update_job_status(transaction, job, new_status):
+    transaction.add_file_operation('move', job=job, to_status=new_status)
+    transaction.add_db_operation('update', object=job, updates={'status': new_status})
+```
+
+**Key Improvements Over Original**:
+- **Complete Atomicity**: Database and file operations are truly atomic - either both succeed or both rollback
+- **Eliminates Inconsistency**: No more database updates without corresponding file moves
+- **Proper Error Handling**: All failures are properly logged and reported with context
+- **Transaction Safety**: Database transactions are properly managed with rollback capabilities
+- **Operation Queuing**: Operations are queued and executed in the correct order
+- **Integration Ready**: Seamless integration with existing atomic file operations
 
 ## Lessons
 
