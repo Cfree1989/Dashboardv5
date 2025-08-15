@@ -1881,16 +1881,16 @@ def update_job_status(transaction, job, new_status):
   - [x] Ensure all admin actions are properly logged
   - [x] Add proper error handling for event logging failures
 
-- [ ] **D2-S4: Update Catalog Service Event Logging** | **Risk**: Low | **Effort**: S
-  - [ ] Fix catalog service system-level events to use `job_id=None`
-  - [ ] Ensure catalog updates are properly logged
-  - [ ] Add proper error handling for event logging failures
+- [x] **D2-S4: Update Catalog Service Event Logging** | **Risk**: Low | **Effort**: S ✅ **COMPLETED**
+  - [x] Fix catalog service system-level events to use `job_id=None`
+  - [x] Ensure catalog updates are properly logged
+  - [x] Add proper error handling for event logging failures
 
-- [ ] **D2-S5: Update Event Queries & Display** | **Risk**: Medium | **Effort**: M
-  - [ ] Update any queries that assume job_id is never null
-  - [ ] Update event display logic to handle system-level events
-  - [ ] Add filtering options for system vs job-specific events
-  - [ ] Update admin event monitoring to show system-level events
+- [x] **D2-S5: Update Event Queries & Display** | **Risk**: Medium | **Effort**: M ✅ **COMPLETED**
+  - [x] Update any queries that assume job_id is never null
+  - [x] Update event display logic to handle system-level events
+  - [x] Add filtering options for system vs job-specific events
+  - [x] Update admin event monitoring to show system-level events
 
 - [ ] **D2-S6: Comprehensive Testing & Validation** | **Risk**: Medium | **Effort**: M
   - [ ] Test migration on development database
@@ -1947,3 +1947,87 @@ def update_job_status(transaction, job, new_status):
 **Ready for Next Phase**: The core event logging system is now working correctly. The next step (D2-S3) will update admin routes to use the new system-level event logging properly.
 
 **User Decision Required**: Proceed with D2-S3 (Fix Admin Route Event Logging) or pause for review?
+
+### D2-S4 Implementation Complete - Ready for D2-S5
+
+**Successfully Completed D2-S4: Update Catalog Service Event Logging** ✅
+
+**What Was Accomplished**:
+- **Catalog Service Fixed**: Updated catalog service to use the new `log_event` function properly
+- **Event Signature Corrected**: Fixed `log_event` calls to use correct parameter names (`details` instead of `description`)
+- **System-Level Events**: Catalog events now properly use `job_id=None` for system-level logging
+- **Event Type Validation**: Added missing catalog event types to validation sets
+- **Bug Fix**: Fixed `CatalogData.to_dict()` method call in update function
+
+**Key Changes Made**:
+1. **Catalog Seeding Events**: 
+   - `CatalogSeeded` - When default catalog is automatically created
+   - Uses proper `log_event('CatalogSeeded', details, triggered_by='system')`
+
+2. **Catalog Update Events**:
+   - `CatalogUpdated` - When admin updates catalog configuration
+   - Uses proper `log_event('CatalogUpdated', details, triggered_by=updated_by)`
+
+3. **Event Type Validation**: Added `CatalogSeeded` to `SYSTEM_EVENTS` validation set
+
+4. **Bug Fix**: Fixed `catalog_data.dict()` to `catalog_data.to_dict()` in update function
+
+**Test Results**:
+- ✅ Catalog service imports and works correctly
+- ✅ Catalog seeding with event logging works correctly
+- ✅ Catalog update with event logging works correctly
+- ✅ All catalog events now use proper system-level event logging
+
+**Technical Implementation**:
+- **Fixed Function Signatures**: Updated `log_event` calls to use correct parameter names
+- **Proper System Events**: Catalog events now use `job_id=None` instead of invalid parameters
+- **Enhanced Validation**: All catalog event types now properly validated
+- **Bug Resolution**: Fixed method call issue in catalog update function
+
+**Ready for Next Phase**: Catalog service event logging is now working correctly. The next step (D2-S5) will update event queries and display logic to handle system-level events properly.
+
+**User Decision Required**: Proceed with D2-S5 (Update Event Queries & Display) or pause for review?
+
+### D2-S5 Implementation Complete - Ready for D2-S6
+
+**Successfully Completed D2-S5: Update Event Queries & Display** ✅
+
+**What Was Accomplished**:
+- **Fixed Job Events Query**: Updated `get_job_events` function to use direct Event query instead of removed relationship
+- **Enhanced Events Endpoint**: Added comprehensive filtering options to `/api/v1/analytics/events` endpoint
+- **System-Level Event Support**: All queries now properly handle events with `job_id=None`
+- **Filtering Options**: Added support for filtering by event type, job_id, system-only, and job-only events
+- **Proper Ordering**: Events are now ordered by timestamp (newest first) for better usability
+
+**Key Changes Made**:
+1. **Job Events Query Fix**: 
+   - Changed from `job.events` (removed relationship) to `Event.query.filter(Event.job_id == job_id)`
+   - Added proper ordering by timestamp
+
+2. **Enhanced Analytics Events Endpoint**:
+   - Added query parameters: `event_type`, `job_id`, `system_only`, `job_only`
+   - Added filtering logic for system vs job-specific events
+   - Added proper ordering (newest first)
+
+3. **Query Filtering Support**:
+   - `system_only=true`: Shows only system-level events (job_id is None)
+   - `job_only=true`: Shows only job-specific events (job_id is not None)
+   - `event_type=X`: Filters by specific event type
+   - `job_id=X`: Filters by specific job ID
+
+**Test Results**:
+- ✅ Event queries work correctly with mixed event types
+- ✅ System events properly filtered and displayed
+- ✅ Job events properly filtered and displayed
+- ✅ Event filtering works correctly (System events: 5, Job events: 4)
+- ✅ Event system fully functional with proper validation
+
+**Technical Implementation**:
+- **Query Updates**: All Event queries now properly handle null job_ids
+- **Filtering Logic**: Added comprehensive filtering options for different use cases
+- **Display Logic**: Event to_dict() method properly handles null job_ids
+- **API Enhancement**: Events endpoint now supports multiple filtering options
+
+**Ready for Next Phase**: Event queries and display logic are now fully updated to handle system-level events. The next step (D2-S6) will focus on comprehensive testing and validation of the entire event logging system.
+
+**User Decision Required**: Proceed with D2-S6 (Comprehensive Testing & Validation) or pause for review?

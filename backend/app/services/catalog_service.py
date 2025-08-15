@@ -90,9 +90,9 @@ class CatalogService:
             # Log the seeding event
             try:
                 log_event(
-                    event_type='CatalogSeeded',
-                    description='Default catalog configuration seeded',
-                    job_id=None
+                    'CatalogSeeded',
+                    {'description': 'Default catalog configuration seeded'},
+                    triggered_by='system'
                 )
             except Exception:
                 # Don't fail if event logging fails
@@ -113,7 +113,7 @@ class CatalogService:
         
         # Update the catalog
         catalog.version = new_version
-        catalog.data = catalog_data.dict()
+        catalog.data = catalog_data.to_dict()
         catalog.updated_by = updated_by
         
         db.session.commit()
@@ -121,9 +121,9 @@ class CatalogService:
         # Log the update event
         try:
             log_event(
-                event_type='CatalogUpdated',
-                description=f'Catalog updated to version {new_version} by {updated_by}',
-                job_id=None
+                'CatalogUpdated',
+                {'description': f'Catalog updated to version {new_version} by {updated_by}'},
+                triggered_by=updated_by
             )
         except Exception:
             # Don't fail if event logging fails

@@ -156,7 +156,7 @@ def get_job_events(job_id):
     job = Job.query.get(job_id)
     if not job:
         abort(404, description='Job not found')
-    events = job.events
+    events = Event.query.filter(Event.job_id == job_id).order_by(Event.timestamp).all()
     return jsonify([e.to_dict() for e in events]), 200
 
 

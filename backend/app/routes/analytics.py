@@ -540,7 +540,32 @@ def financial():
 @bp.route('/events', methods=['GET'])
 @token_required
 def list_events():
-    events = Event.query.all()
+    """Get all events with optional filtering"""
+    # Get query parameters
+    event_type = request.args.get('event_type')
+    job_id = request.args.get('job_id')
+    system_only = request.args.get('system_only', 'false').lower() == 'true'
+    job_only = request.args.get('job_only', 'false').lower() == 'true'
+    
+    # Build query
+    query = Event.query
+    
+    # Apply filters
+    if event_type:
+        query = query.filter(Event.event_type == event_type)
+    
+    if job_id:
+        query = query.filter(Event.job_id == job_id)
+    
+    if system_only:
+        query = query.filter(Event.job_id.is_(None))
+    
+    if job_only:
+        query = query.filter(Event.job_id.isnot(None))
+    
+    # Order by timestamp (newest first)
+    events = query.order_by(Event.timestamp.desc()).all()
+    
     return jsonify([e.to_dict() for e in events]), 200
 
 

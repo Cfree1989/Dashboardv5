@@ -13,7 +13,7 @@ JOB_SPECIFIC_EVENTS = {
 SYSTEM_EVENTS = {
     'AllJobsDeleted', 'MockJobsGenerated', 'CatalogUpdated', 
     'ErrorMonitoringCleared', 'AdminAction', 'SystemMaintenance',
-    'OrphanedFileDeleted', 'StaleFileDeleted'
+    'OrphanedFileDeleted', 'StaleFileDeleted', 'CatalogSeeded'
 }
 
 def log_event(event_type, details=None, triggered_by=None, workstation_id=None, job_id=None):
