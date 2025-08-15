@@ -80,3 +80,8 @@ You are a senior software architect and refactoring specialist. I'm a beginner w
 
 ## Getting Started
 I'm ready to point you to the first chunk of code. After each analysis, you'll guide me to the most logical next area based on what you discovered.
+
+First pass: "Focus only on my Flask backend - routes, services, and core logic"
+Second pass: "Now analyze my React frontend components and state management" 
+Third pass: "Look at my config, Docker, and infrastructure files"
+Fourth pass: "Check my file handling and storage logic specifically"

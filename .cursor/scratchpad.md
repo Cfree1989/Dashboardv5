@@ -1029,3 +1029,99 @@ Success criteria:
   - Rollback to previous versions
   - Import/export catalog configurations
   - Template catalogs for different use cases
+
+## New Workstream — Codebase Health Check & Refactor Planning (Planner)
+
+### Background & Motivation
+- The user has requested a comprehensive codebase health check and refactor planning exercise
+- This is a large codebase that needs to be analyzed in focused chunks to identify technical debt, code smells, and improvement opportunities
+- The goal is to provide actionable steps for cleanup while maintaining system stability
+- The user is a beginner who needs clear, non-technical guidance on what to fix and how
+
+### Key Challenges & Analysis
+- **Large Codebase**: Need to break analysis into manageable chunks to avoid overwhelming the user
+- **Beginner-Friendly Guidance**: Must provide clear, actionable steps without technical jargon
+- **Safety First**: All suggested changes must be reversible and low-risk
+- **System Stability**: Cannot break existing functionality during cleanup
+- **Dependency Awareness**: Need to understand how changes in one area affect others
+
+### Success Criteria
+- Complete analysis of all major codebase areas (backend routes/services, frontend components, config/infrastructure, file handling)
+- Identify top 3 issues per chunk with specific file locations and severity ratings
+- Provide copy-pasteable code examples for immediate fixes
+- Create prioritized action plan for refactoring
+- Ensure no critical security or data loss risks are introduced
+
+### High-level Task Breakdown
+- **AUDIT-S1. Backend Analysis**: Focus on Flask routes, services, and core logic
+  - Analyze `backend/app/routes/` for API endpoint organization and consistency
+  - Review `backend/app/services/` for business logic separation
+  - Check `backend/app/models/` for data model consistency
+  - Success: Complete health check of backend with prioritized issues list
+
+- **AUDIT-S2. Frontend Analysis**: Analyze React components and state management
+  - Review `frontend/src/components/` for component organization and reusability
+  - Check `frontend/src/app/` for page structure and routing
+  - Analyze `frontend/src/lib/` for utility functions and API clients
+  - Success: Complete health check of frontend with component improvement plan
+
+- **AUDIT-S3. Infrastructure Analysis**: Review config, Docker, and deployment files
+  - Analyze `docker-compose.yml`, Dockerfiles, and environment configuration
+  - Check for hardcoded values, security issues, and deployment inconsistencies
+  - Review package.json, requirements.txt, and dependency management
+  - Success: Infrastructure health assessment with deployment improvement plan
+
+- **AUDIT-S4. File Handling Analysis**: Focus on storage logic and file operations
+  - Review file upload, storage, and protocol handler logic
+  - Check for path handling consistency and security validation
+  - Analyze metadata.json handling and file resilience patterns
+  - Success: File system health check with security and reliability improvements
+
+### Critical Checks (Always Verify)
+- [ ] Status names match canonical list (UPLOADED, PENDING, READYTOPRINT, etc.)
+- [ ] File type preference logic (.3mf over .stl/.obj) is consistent
+- [ ] No routes that silently mutate files AND send emails without proper error handling
+- [ ] Config/secrets aren't hard-coded in source files
+- [ ] Docker setup matches actual ports/environment usage
+- [ ] Protocol handler security validation is robust
+- [ ] Database migrations are safe and reversible
+
+### Risks & Mitigations
+- **Analysis Paralysis**: Focus on top 3 issues per chunk to keep actionable
+- **Breaking Changes**: All suggestions must be reversible and tested
+- **Scope Creep**: Stick to health check, not feature additions
+- **Dependency Confusion**: Document relationships between chunks clearly
+
+### Rollback Plan
+- All suggested changes are incremental and can be reverted individually
+- No database schema changes without explicit approval
+- No breaking API changes without versioning strategy
+
+### Next Steps
+- Await user direction on which chunk to analyze first
+- Follow the structured analysis format from the Audit Prompt
+- Provide clear, actionable guidance for each identified issue
+- Guide user to next logical chunk based on dependencies and severity
+
+### Executor Status Update — AUDIT-S1 Backend Analysis
+
+**Analysis Completed**: ✅ **COMPLETED**
+- **Files Analyzed**: 
+  - `backend/app/__init__.py` (app factory and configuration)
+  - `backend/app/routes/jobs.py` (1016 lines - largest route file)
+  - `backend/app/routes/analytics.py` (988 lines - complex analytics logic)
+  - `backend/app/routes/admin.py` (477 lines - admin operations)
+  - `backend/app/services/file_service.py` (82 lines - file operations)
+  - `backend/app/models/job.py` (84 lines - core data model)
+  - `backend/app/utils/decorators.py` (23 lines - authentication)
+  - `backend/app/services/auth_service.py` (24 lines - JWT handling)
+  - `backend/app/services/event_service.py` (14 lines - event logging)
+  - `backend/app/services/catalog_service.py` (246 lines - catalog management)
+
+**Key Findings**:
+- **Critical Issues**: Large monolithic route files (jobs.py: 1016 lines, analytics.py: 988 lines)
+- **High Issues**: Inconsistent error handling patterns, mixed concerns in routes
+- **Medium Issues**: Magic strings, hardcoded values, duplicate logic
+- **Low Issues**: Minor code organization and documentation gaps
+
+**Next Steps**: Ready to provide structured health check report with actionable recommendations
