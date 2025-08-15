@@ -22,6 +22,18 @@ logger = logging.getLogger(__name__)
 # Feature flag for atomic file operations
 ATOMIC_FILE_OPERATIONS_ENABLED = os.getenv('ATOMIC_FILE_OPERATIONS_ENABLED', 'true').lower() == 'true'
 
+# Status to directory mapping for file organization
+STATUS_TO_DIR = {
+    'UPLOADED': 'Uploaded',
+    'PENDING': 'Pending',
+    'READYTOPRINT': 'ReadyToPrint',
+    'PRINTING': 'Printing',
+    'COMPLETED': 'Completed',
+    'PAIDPICKEDUP': 'PaidPickedUp',
+    'REJECTED': 'Rejected',
+    'ARCHIVED': 'Archived',
+}
+
 class AtomicFileOperation:
     """Base class for atomic file operations with prepare/commit/rollback pattern."""
     
@@ -337,27 +349,44 @@ class AtomicFileService:
             
     def _get_job_file_path(self, job) -> Optional[Path]:
         """Get the file path for a job."""
-        # Implementation depends on job model structure
-        # This is a placeholder - implement based on actual job model
+        if hasattr(job, 'file_path') and job.file_path:
+            return Path(job.file_path)
         return None
         
     def _get_target_path(self, job, target_status: str) -> Optional[Path]:
         """Get the target path for a job status change."""
-        # Implementation depends on job model structure
-        # This is a placeholder - implement based on actual job model
-        return None
+        source_path = self._get_job_file_path(job)
+        if not source_path:
+            return None
+            
+        # Determine storage root and target directory
+        storage_root = self._get_storage_root_from_path(source_path)
+        target_dir = storage_root / STATUS_TO_DIR.get(target_status, 'Uploaded')
+        return target_dir / source_path.name
         
     def _get_metadata_path(self, job) -> Optional[Path]:
         """Get the metadata path for a job."""
-        # Implementation depends on job model structure
-        # This is a placeholder - implement based on actual job model
+        if hasattr(job, 'metadata_path') and job.metadata_path:
+            return Path(job.metadata_path)
         return None
         
     def _get_target_metadata_path(self, job, target_status: str) -> Optional[Path]:
         """Get the target metadata path for a job status change."""
-        # Implementation depends on job model structure
-        # This is a placeholder - implement based on actual job model
-        return None
+        metadata_path = self._get_metadata_path(job)
+        if not metadata_path:
+            return None
+            
+        # Determine storage root and target directory
+        storage_root = self._get_storage_root_from_path(metadata_path)
+        target_dir = storage_root / STATUS_TO_DIR.get(target_status, 'Uploaded')
+        return target_dir / metadata_path.name
+        
+    def _get_storage_root_from_path(self, file_path: Path) -> Path:
+        """Infer storage root from an existing file path."""
+        parent = file_path.parent
+        if parent.name in STATUS_TO_DIR.values():
+            return parent.parent
+        return Path(os.environ.get('STORAGE_PATH', parent.as_posix()))
 
 # Global service instance
 _atomic_file_service = None
@@ -368,15 +397,3 @@ def get_atomic_file_service() -> AtomicFileService:
     if _atomic_file_service is None:
         _atomic_file_service = AtomicFileService()
     return _atomic_file_service
-
-
-# Status directory mapping (moved from file_service.py)
-STATUS_TO_DIR = {
-    'UPLOADED': 'Uploaded',
-    'PENDING': 'Pending',
-    'READYTOPRINT': 'ReadyToPrint',
-    'PRINTING': 'Printing',
-    'COMPLETED': 'Completed',
-    'PAIDPICKEDUP': 'PaidPickedUp',
-    'ARCHIVED': 'Archived',
-}
