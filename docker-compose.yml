@@ -44,8 +44,8 @@ services:
     image: postgres:15
     environment:
       - POSTGRES_DB=3d_print_system
-      - POSTGRES_USER=fablab_user
-      - POSTGRES_PASSWORD=fablab
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

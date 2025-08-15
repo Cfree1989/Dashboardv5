@@ -28,14 +28,39 @@ git clone <repository-url>
 cd Dashboardv5
 ```
 
-2. Start the development environment:
+2. **Configure Environment Variables** (CRITICAL - Security Setup):
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and update the following CRITICAL values:
+# - POSTGRES_PASSWORD: Generate a secure password
+# - SECRET_KEY: Generate a secure secret key
+# - STAFF_PASSWORD: Set a secure staff password
+# - MAIL_USERNAME/MAIL_PASSWORD: Use real email credentials
+
+# Generate secure credentials:
+python -c "import secrets; print('Secure SECRET_KEY:', secrets.token_urlsafe(32))"
+python -c "import secrets; print('Secure POSTGRES_PASSWORD:', secrets.token_urlsafe(16))"
+python -c "import secrets; print('Secure STAFF_PASSWORD:', secrets.token_urlsafe(12))"
+```
+
+3. Start the development environment:
 ```bash
 docker-compose up -d --build
 ```
 
-3. Access the application:
+4. Access the application:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
+
+### Security Notes
+
+⚠️ **IMPORTANT**: This system contains sensitive configuration. Always:
+- Use secure, randomly generated passwords
+- Never commit `.env` files to version control
+- Use different credentials for development, staging, and production
+- Regularly rotate passwords and secret keys
 
 ## Project Structure
 
@@ -109,12 +134,27 @@ PostgreSQL database with the following main tables:
 
 ## Configuration
 
-Environment variables are configured in `docker-compose.yml`:
+Environment variables are configured in the `.env` file (copy from `.env.example`):
 
-- `DATABASE_URL` - PostgreSQL connection string
+### Critical Security Variables
+- `POSTGRES_PASSWORD` - Database password (generate secure random)
+- `SECRET_KEY` - Flask secret key (generate secure random)
+- `STAFF_PASSWORD` - Staff authentication password (generate secure random)
+- `MAIL_USERNAME/MAIL_PASSWORD` - Email service credentials
+
+### Application Configuration
+- `DATABASE_URL` - PostgreSQL connection string (auto-generated)
 - `REDIS_URL` - Redis connection string
-- `SECRET_KEY` - Flask secret key
-- `MAIL_*` - Email configuration
+- `FRONTEND_PUBLIC_URL` - Frontend URL for email links
+- `STORAGE_PATH` - File storage directory
+- `ALLOWED_MODEL_EXTS` - Allowed file extensions for uploads
+
+### Development Settings
+- `FLASK_ENV` - Flask environment (development/production)
+- `FLASK_DEBUG` - Debug mode toggle
+- `ANALYTICS_CACHE_TTL` - Analytics cache duration
+
+See `.env.example` for complete documentation of all available variables.
 
 ## Contributing
 

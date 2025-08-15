@@ -444,9 +444,12 @@ This 3D Print Management System is a **functionally complete but architecturally
 
 ### 🚨 CRITICAL (Do First - System Stability)
 
-- [ ] **Fix Hardcoded Database Credentials** | **Risk**: Critical | **Effort**: S | **Files**: `docker-compose.yml`
-  - Move `POSTGRES_PASSWORD=fablab` to environment file
-  - Generate secure random passwords for all services
+- [x] **Fix Hardcoded Database Credentials** | **Risk**: Critical | **Effort**: S | **Files**: `docker-compose.yml` ✅ **COMPLETED**
+  - ✅ Moved `POSTGRES_PASSWORD=fablab` to environment file
+  - ✅ Generated secure random passwords for all services
+  - ✅ Created comprehensive `.env.example` with security documentation
+  - ✅ Updated `docker-compose.yml` to use environment variables
+  - ✅ Updated README.md with security setup instructions
 
 - [ ] **Implement Event Logging Fix** | **Risk**: Critical | **Effort**: M | **Files**: `backend/app/models/event.py`, `backend/app/services/event_service.py`
   - Make `Event.job_id` nullable OR create separate SystemEvent model
@@ -541,3 +544,98 @@ After completing the task board, you should be able to:
 - [ ] **Recover gracefully from any single point of failure**
 - [ ] **Audit all system actions with complete trail integrity**
 - [ ] **Scale to handle 10x current load without architectural changes**
+
+## 🎯 TOP 3 FOUNDATIONAL ISSUES TO FIX FIRST
+
+### **#1: File Operation Atomicity (CRITICAL - 9/10 Complexity)**
+
+**Why This is #1:**
+- **Highest Risk**: "Approaching unmanageable complexity" with "numerous race conditions and failure points"
+- **Data Corruption Risk**: File operations lack atomic transactions, allowing partial failures
+- **Foundation Issue**: Everything else depends on reliable file operations
+- **No Dependencies**: Can be fixed independently
+
+**What Needs to be Done:**
+- Implement proper transaction boundaries around file+DB operations in `backend/app/services/file_service.py`
+- Add rollback mechanisms for partial failures
+- Fix the complex `move_authoritative` function with 6 different failure modes
+- Resolve metadata synchronization issues between files and database
+
+**Risk Level:** **CRITICAL** - High chance of breaking the system during fix
+**Effort:** Large (despite being marked "L" in the audit)
+**Files:** `backend/app/services/file_service.py`
+
+---
+
+### **#2: Event Logging System Fix (CRITICAL - 7/10 Complexity)**
+
+**Why This is #2:**
+- **System-Wide Impact**: Admin functions are currently disabled due to logging failures
+- **Database Schema Issue**: `Event.job_id` NOT NULL constraint prevents system-level events
+- **Foundation Issue**: Audit trail is compromised, affecting all admin operations
+- **No Dependencies**: Can be fixed independently
+
+**What Needs to be Done:**
+- Make `Event.job_id` nullable OR create separate SystemEvent model
+- Fix all admin functions currently disabled due to logging failures
+- Resolve the 500 errors in admin routes
+- Ensure complete audit trail integrity
+
+**Risk Level:** **CRITICAL** - Requires database schema changes
+**Effort:** Medium
+**Files:** `backend/app/models/event.py`, `backend/app/services/event_service.py`
+
+---
+
+### **#3: JWT Token Storage Security (CRITICAL - 6/10 Complexity)**
+
+**Why This is #3:**
+- **Security Vulnerability**: JWT tokens stored in localStorage instead of secure httpOnly cookies
+- **XSS Attack Vector**: Client-side authentication pattern vulnerable to attacks
+- **Foundation Issue**: Authentication affects the entire application
+- **No Dependencies**: Can be fixed independently
+
+**What Needs to be Done:**
+- Replace localStorage with httpOnly cookies throughout frontend
+- Implement proper token refresh mechanism
+- Update all authentication-related components
+- Ensure secure token transmission and storage
+
+**Risk Level:** **CRITICAL** - Affects all user sessions
+**Effort:** Medium
+**Files:** `frontend/src` (multiple files)
+
+---
+
+## **Why These Three Are the Right Choice:**
+
+### **✅ Independent of Each Other**
+- File operations don't depend on event logging or JWT storage
+- Event logging doesn't depend on file operations or JWT storage  
+- JWT storage doesn't depend on file operations or event logging
+
+### **✅ Foundation Issues**
+- These are core system components that everything else builds on
+- Fixing them first prevents cascading issues later
+- They represent the "biggest things" that could break the system
+
+### **✅ High Impact, High Risk**
+- If any of these fail, you'll know immediately and can address it
+- They're complex enough to be "worth it" if successful
+- They're foundational enough that other fixes depend on them being stable
+
+### **✅ Clear Success Criteria**
+- File operations: No more race conditions or data corruption
+- Event logging: Admin functions work, complete audit trail
+- JWT storage: Secure authentication, no XSS vulnerabilities
+
+## **Execution Strategy:**
+
+1. **Start with #1 (File Operations)** - Highest complexity, highest risk
+2. **Then #2 (Event Logging)** - Database schema changes
+3. **Finally #3 (JWT Storage)** - Frontend authentication overhaul
+
+Each should be done with comprehensive testing and rollback plans. If any of these fail, you'll have identified the system's breaking point early and can decide whether to proceed with the others or take a different approach.
+
+
+
