@@ -2068,3 +2068,107 @@ def update_job_status(transaction, job, new_status):
 **CRITICAL SYSTEM AUDIT ISSUE #2 RESOLVED** ✅
 
 The Event Logging System Fix (D2) has been successfully completed, resolving the critical system audit issue where admin functions were broken due to database schema constraints. The system now has a complete, reliable audit trail for both job-specific and system-level events.
+
+## New Workstream — D3. JWT Token Storage Security (Planner)
+
+### Background & Motivation
+**Critical Security Vulnerability**: JWT tokens are currently stored in localStorage, making them vulnerable to XSS attacks. This is the #3 critical issue from the System Audit that must be resolved before production deployment.
+
+**Why This is Priority #3**:
+- **Security Risk**: localStorage is accessible via JavaScript, creating XSS attack vectors
+- **Foundation Issue**: Authentication affects the entire application
+- **Production Blocking**: Cannot deploy to production with insecure token storage
+- **No Dependencies**: Can be fixed independently of other systems
+
+### Success Criteria
+- JWT tokens stored in httpOnly cookies instead of localStorage
+- Proper token refresh mechanism implemented
+- All authentication flows work correctly
+- No XSS vulnerabilities from client-side token access
+- Secure token transmission and storage throughout application
+
+### High-level Task Breakdown
+
+#### **D3-S1: Backend Cookie Configuration** | **Risk**: Medium | **Effort**: S
+- [ ] Configure Flask to set httpOnly cookies for JWT tokens
+- [ ] Update JWT token generation to include proper cookie settings
+- [ ] Add secure cookie configuration for production environments
+- [ ] Test cookie-based token storage in development
+- **Success Criteria**: Backend can set and validate httpOnly JWT cookies
+
+#### **D3-S2: Frontend Authentication Overhaul** | **Risk**: High | **Effort**: M
+- [ ] Remove all localStorage JWT token storage
+- [ ] Update login flow to handle cookie-based authentication
+- [ ] Modify token refresh logic to work with cookies
+- [ ] Update logout to clear cookies properly
+- **Success Criteria**: Frontend uses cookies instead of localStorage for all auth operations
+
+#### **D3-S3: API Client Updates** | **Risk**: Medium | **Effort**: S
+- [ ] Update API client to send cookies with requests
+- [ ] Remove manual Authorization header injection
+- [ ] Test all API endpoints with cookie-based auth
+- [ ] Update error handling for authentication failures
+- **Success Criteria**: All API calls work with cookie-based authentication
+
+#### **D3-S4: Token Refresh Implementation** | **Risk**: Medium | **Effort**: M
+- [ ] Implement automatic token refresh mechanism
+- [ ] Add refresh token rotation for security
+- [ ] Handle token expiration gracefully
+- [ ] Add proper error handling for refresh failures
+- **Success Criteria**: Seamless token refresh without user intervention
+
+#### **D3-S5: Security Testing & Validation** | **Risk**: Low | **Effort**: S
+- [ ] Test XSS attack vectors are eliminated
+- [ ] Verify cookies are properly secured (httpOnly, secure, sameSite)
+- [ ] Test authentication flows in different browsers
+- [ ] Validate token refresh security
+- **Success Criteria**: All security tests pass, no localStorage token access
+
+### Risks & Mitigations
+- **Session Loss**: Users may lose sessions during transition → Implement graceful migration
+- **Browser Compatibility**: httpOnly cookies work differently across browsers → Test thoroughly
+- **Development Environment**: Local development may need special handling → Configure dev/prod settings
+
+### Rollback Plan
+- Keep localStorage fallback during transition period
+- Feature flag to switch between cookie and localStorage storage
+- Database backup before deployment
+
+**Estimated Effort**: 2-3 days  
+**Risk Level**: Medium (affects all user sessions)  
+**Files**: `frontend/src` (multiple), `backend/app/routes/auth.py`, `backend/app/services/token_service.py`
+
+### Project Status Board — D3. JWT Token Storage Security
+- [ ] **D3-S1: Backend Cookie Configuration** | **Risk**: Medium | **Effort**: S
+- [ ] **D3-S2: Frontend Authentication Overhaul** | **Risk**: High | **Effort**: M
+- [ ] **D3-S3: API Client Updates** | **Risk**: Medium | **Effort**: S
+- [ ] **D3-S4: Token Refresh Implementation** | **Risk**: Medium | **Effort**: M
+- [ ] **D3-S5: Security Testing & Validation** | **Risk**: Low | **Effort**: S
+
+## Executor's Feedback or Assistance Requests
+
+### Current Status
+- All Pre-E2E gap items completed ✅
+- Docker Compose deployment working correctly ✅
+- Module resolution issues resolved ✅
+- JobCard UI improvements completed ✅
+- Global Search UX Stabilization completed ✅
+- **FI1. Payment Accuracy & Finance Variance workstream completed** ✅
+- **D2. Admin System-Level Event Logging 500 Error completed** ✅
+- **C1. Admin Catalog for Printers/Materials/Colors - Phase 1 MVP completed** ✅
+- **CRITICAL SECURITY FIX: Hardcoded Database Credentials resolved** ✅
+- **F1. File Operation Atomicity Fix - CRITICAL SYSTEM AUDIT ISSUE #1 RESOLVED** ✅
+- **D2. Event Logging System Fix - CRITICAL SYSTEM AUDIT ISSUE #2 RESOLVED** ✅
+- **Next Priority: D3. JWT Token Storage Security** - Critical security vulnerability requiring immediate attention
+- Site fully functional with all core features working and polished UI
+
+### Next Steps
+- **D3. JWT Token Storage Security** is the next critical task requiring immediate attention
+- This addresses the #3 critical security vulnerability from the System Audit
+- Estimated effort: 2-3 days with medium risk level
+- Success will enable production deployment with secure authentication
+
+---
+
+**Last Updated**: Current session  
+**Next Review**: After D3 JWT Token Storage Security completion
