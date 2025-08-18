@@ -4,6 +4,7 @@ import { User, Mail, Printer, Palette, FileText, CheckCircle, XCircle, Eye, EyeO
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
+import ApprovalModal from './modals/approval-modal';
 import ConfirmDialog from './modals/confirm-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { apiRequest, getLegacyToken } from '../../lib/auth';
@@ -99,6 +100,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [isResendingConfirm, setIsResendingConfirm] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const { show } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -226,10 +228,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const handleApprove = async () => {
-    setIsApproving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    onApprove?.(job.id);
-    setIsApproving(false);
+    setShowApprovalModal(true);
+    onModalOpenChange?.(true);
   };
 
   const handleReject = async () => {
@@ -772,6 +772,23 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
             // Delegate to parent to remove from list
             onReject?.(job.id);
             setShowRejectModal(false);
+          }}
+        />
+      )}
+      {showApprovalModal && (
+        <ApprovalModal
+          jobId={job.id}
+          material={job.material}
+          currentPrinter={job.printer}
+          onClose={() => {
+            setShowApprovalModal(false);
+            onModalOpenChange?.(false);
+          }}
+          onApproved={() => {
+            // Delegate to parent to remove from list
+            onApprove?.(job.id);
+            setShowApprovalModal(false);
+            onModalOpenChange?.(false);
           }}
         />
       )}

@@ -28,26 +28,46 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [searchValue]);
 
-  // Check authentication on mount
+  const fetchCounts = useCallback(async () => {
+    try {
+      const data = await apiRequest<Record<string, number>>('/api/v1/jobs/counts');
+      setCounts(data);
+      
+      // Play sound if UPLOADED count increased (new job submitted)
+      const currentUploaded = data.UPLOADED || 0;
+      const previousUploaded = counts.UPLOADED || 0;
+      if (currentUploaded > previousUploaded && !pauseRefresh) {
+        playNewUploadSound();
+      }
+    } catch (err) {
+      console.error('Failed to fetch counts:', err);
+    }
+  }, [pauseRefresh]); // Remove counts from dependencies to avoid infinite loop
+
+  // Check authentication on mount and load initial data
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndLoad = async () => {
+      setLoading(true);
       try {
-        const token = getLegacyToken();
-        if (!token) {
-          router.push('/login');
-          return;
-        }
+        // Test authentication by making a request to a protected endpoint
+        await apiRequest('/api/v1/auth/protected');
+        // If we get here, authentication is successful, so load counts
+        await fetchCounts();
       } catch {
         router.push('/login');
+      } finally {
+        setLoading(false);
       }
     };
-    checkAuth();
-  }, [router]);
+    checkAuthAndLoad();
+  }, [router, fetchCounts]);
 
-  // Recompute counts immediately when search changes
+  // Recompute counts when search changes
   useEffect(() => {
-    fetchCounts();
-  }, [debouncedSearch]);
+    if (counts && Object.keys(counts).length > 0) {
+      fetchCounts();
+    }
+  }, [debouncedSearch, fetchCounts]);
 
   // Auto-refresh every 45s: update counts and trigger list refresh (mute sound while searching)
   useEffect(() => {
@@ -86,31 +106,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const fetchCounts = useCallback(async () => {
-    try {
-      const data = await apiRequest<Record<string, number>>('/api/v1/jobs/counts');
-      setCounts(data);
-      
-      // Play sound if UPLOADED count increased (new job submitted)
-      const currentUploaded = data.UPLOADED || 0;
-      const previousUploaded = counts.UPLOADED || 0;
-      if (currentUploaded > previousUploaded && !pauseRefresh) {
-        playNewUploadSound();
-      }
-    } catch (err) {
-      console.error('Failed to fetch counts:', err);
-    }
-  }, [counts, pauseRefresh]);
 
-  // Initial load
-  useEffect(() => {
-    const loadInitial = async () => {
-      setLoading(true);
-      await fetchCounts();
-      setLoading(false);
-    };
-    loadInitial();
-  }, [fetchCounts]);
 
   if (loading) {
     return (

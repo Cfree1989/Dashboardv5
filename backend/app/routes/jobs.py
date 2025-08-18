@@ -48,6 +48,21 @@ def list_jobs():
     return jsonify([job.to_dict() for job in jobs]), 200
 
 
+@bp.route('/counts', methods=['GET'])
+@token_required
+def get_job_counts():
+    """Get job counts by status for dashboard tabs."""
+    try:
+        from sqlalchemy import func
+        rows = db.session.query(Job.status, func.count()).group_by(Job.status).all()
+        counts = {status: int(count) for status, count in rows}
+        return jsonify(counts), 200
+    except Exception as e:
+        logger.error(f"Failed to get job counts: {e}")
+        return jsonify({'error': 'Failed to get job counts'}), 500
+
+
+
 # --- Metadata helpers ---
 def _load_metadata(job: Job) -> dict:
     error_service = get_error_handling_service()
