@@ -3,9 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
-import { LastUpdated } from '../../components/dashboard/last-updated';
 import { DiagPanel } from '../../components/dashboard/diag-panel';
-import { apiRequest, logout, getLegacyToken } from '../../lib/auth';
+import { apiRequest, getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
 import { useRef } from 'react';
 
@@ -118,13 +117,6 @@ export default function DashboardPage() {
     fetchCounts(); // keep counts in sync on tab change
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-  };
-
-
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -153,21 +145,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">3D Print Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <LastUpdated lastUpdated={lastUpdated} />
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <StatusTabs
           currentStatus={status}
           stats={counts}
@@ -186,6 +164,5 @@ export default function DashboardPage() {
 
         <DiagPanel />
       </div>
-    </div>
   );
 }
