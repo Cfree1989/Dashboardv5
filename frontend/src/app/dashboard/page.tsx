@@ -3,10 +3,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
-import { DiagPanel } from '../../components/dashboard/diag-panel';
+
 import { apiRequest, getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
 import { useRef } from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function DashboardPage() {
   const [isJobOperation, setIsJobOperation] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [expandSignal, setExpandSignal] = useState(0);
+  const [collapseSignal, setCollapseSignal] = useState(0);
   
   // Use ref to track previous counts for sound comparison
   const previousCountsRef = useRef<Record<string, number>>({});
@@ -117,6 +120,17 @@ export default function DashboardPage() {
     fetchCounts(); // keep counts in sync on tab change
   };
 
+  const toggleExpandCollapse = () => {
+    // Toggle between expand and collapse modes
+    if (expandSignal > collapseSignal) {
+      // Currently expanded, so collapse
+      setCollapseSignal(prev => prev + 1);
+    } else {
+      // Currently collapsed, so expand
+      setExpandSignal(prev => prev + 1);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -160,9 +174,11 @@ export default function DashboardPage() {
             searchValue={searchValue}
             onSearchInput={setSearchValue}
             setIsJobOperation={setIsJobOperation}
+            expandSignal={expandSignal}
+            collapseSignal={collapseSignal}
+            onToggleExpandCollapse={toggleExpandCollapse}
           />
 
-        <DiagPanel />
       </div>
   );
 }

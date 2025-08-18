@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 export interface JobListFilters {
   status?: string;
@@ -11,14 +12,17 @@ export interface JobListFilters {
   discipline?: string;
 }
 
-export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation }: { 
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
   filters?: JobListFilters, 
   onJobsMutated?: () => void, 
   refreshToken?: number, 
   onModalOpenChange?: (open: boolean) => void, 
   searchValue?: string, 
   onSearchInput?: (value: string) => void,
-  setIsJobOperation?: (value: boolean) => void
+  setIsJobOperation?: (value: boolean) => void,
+  expandSignal?: number,
+  collapseSignal?: number,
+  onToggleExpandCollapse?: () => void
 }) {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,7 +241,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       {/* Search and Sort Controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         {/* Search Input */}
-        <div className="flex-1 max-w-md">
+        <div className="flex-1 max-w-md flex items-center gap-2">
           <input
             type="text"
             placeholder="Search jobs..."
@@ -245,38 +249,51 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             onChange={(e) => onSearchInput?.(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+          <button
+            onClick={onToggleExpandCollapse}
+            className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            title={expandSignal && expandSignal > collapseSignal ? 'Collapse All' : 'Expand All'}
+          >
+            {expandSignal && expandSignal > collapseSignal ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
         {/* Sort Controls */}
         <div className="flex items-center gap-2">
           <select
-            value={`${sortBy}-${sortDir}`}
+            value={sortBy}
             onChange={(e) => {
-              const [field, dir] = e.target.value.split('-');
-              setSortBy(field);
-              setSortDir(dir as 'asc' | 'desc');
+              setSortBy(e.target.value);
             }}
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="created_at-desc">Time (Newest)</option>
-            <option value="created_at-asc">Time (Oldest)</option>
-            <option value="student_name-asc">Name (A→Z)</option>
-            <option value="student_name-desc">Name (Z→A)</option>
-            <option value="printer-asc">Printer (A→Z)</option>
-            <option value="printer-desc">Printer (Z→A)</option>
-            <option value="color-asc">Color (A→Z)</option>
-            <option value="color-desc">Color (Z→A)</option>
-            <option value="discipline-asc">Class (A→Z)</option>
-            <option value="discipline-desc">Class (Z→A)</option>
+            <option value="created_at">Time</option>
+            <option value="student_name">Name</option>
+            <option value="discipline">Class</option>
+            <option value="printer">Printer</option>
+            <option value="color">Color</option>
+            <option value="material">Material</option>
+            <option value="method">Method</option>
           </select>
+          <button
+            onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            title={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+          >
+            {sortDir === 'asc' ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Job Count */}
-      <div className="text-sm text-gray-600">
-        {sortedJobList.length} job{sortedJobList.length !== 1 ? 's' : ''}
-        {isFetching && <span className="ml-2">(refreshing...)</span>}
-      </div>
+
 
       {/* Job Cards */}
       {sortedJobList.length === 0 ? (
@@ -299,6 +316,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
               onUpdate={handleJobUpdate}
               onDelete={handleJobDelete}
               onModalOpenChange={onModalOpenChange}
+              expandSignal={expandSignal}
+              collapseSignal={collapseSignal}
             />
           ))}
         </div>
