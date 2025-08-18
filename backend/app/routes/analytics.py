@@ -606,9 +606,9 @@ def staff_overview():
         # Calculate key metrics
         total_actions = len(staff_events)
         approvals = action_counts.get('StaffApproved', 0)
-        rejections = action_counts.get('JobRejected', 0)
+        rejections = action_counts.get('StaffRejected', 0)
         completions = action_counts.get('JobMarkedComplete', 0)
-        payments = action_counts.get('PaymentProcessed', 0)
+        payments = action_counts.get('PaymentRecorded', 0)
         
         # Calculate response time (time from job creation to first staff action)
         response_times = []
@@ -735,7 +735,7 @@ def staff_performance():
     
     # Calculate quality metrics
     total_approvals = len([e for e in staff_events if e.event_type == 'StaffApproved'])
-    total_rejections = len([e for e in staff_events if e.event_type == 'JobRejected'])
+    total_rejections = len([e for e in staff_events if e.event_type == 'StaffRejected'])
     total_reviewed = total_approvals + total_rejections
     
     approval_rate = round((total_approvals / max(total_reviewed, 1)) * 100, 1) if total_reviewed > 0 else 0
@@ -790,13 +790,13 @@ def staff_comparison():
         # Calculate metrics
         total_actions = len(staff_events)
         approvals = len([e for e in staff_events if e.event_type == 'StaffApproved'])
-        rejections = len([e for e in staff_events if e.event_type == 'JobRejected'])
+        rejections = len([e for e in staff_events if e.event_type == 'StaffRejected'])
         completions = len([e for e in staff_events if e.event_type == 'JobMarkedComplete'])
         
         # Calculate average response time
         response_times = []
         for event in staff_events:
-            if event.event_type in ['StaffApproved', 'JobRejected']:
+            if event.event_type in ['StaffApproved', 'StaffRejected']:
                 job_created = Event.query.filter(
                     Event.job_id == event.job_id,
                     Event.event_type == 'JobCreated'

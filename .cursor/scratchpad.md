@@ -640,8 +640,8 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react';
 - ✅ Fix resend modal email sending
 - ✅ Fix resend button functionality  
 - ✅ Fix resend modal flickering and staff loading
-- Fix analytics data population issues
-- Update payment status text
+- ✅ Fix analytics data population issues (event type mismatches)
+- ✅ Update payment status text
 - Fix note area flickering and job card collapse
 
 **Phase 1B: UX Polish (1-2 hours)**
@@ -676,12 +676,38 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react';
 
 **Files Modified**:
 - `frontend/src/components/dashboard/job-card.tsx`: Fixed modal state management, staff loading, error handling, and eliminated flickering
+- `backend/app/routes/analytics.py`: Fixed event type mismatches for staff analytics (StaffRejected vs JobRejected, PaymentRecorded vs PaymentProcessed)
 
 **Key Learning**: The `onModalOpenChange` calls were causing flickering by interfering with the auto-refresh mechanism. Working modals (ApprovalModal, RejectionModal) don't use this pattern.
 
+**Analytics Fix**: Staff analytics was looking for wrong event types - `JobRejected` instead of `StaffRejected` and `PaymentProcessed` instead of `PaymentRecorded`.
+
 **Testing Status**: ✅ **VERIFIED WORKING** - Resend email modal now opens smoothly without flickering and staff dropdown is populated immediately.
 
-**Next Priority**: Continue with remaining critical fixes (analytics data, payment status text, note area flickering)
+**✅ PAYMENT STATUS TEXT FIX COMPLETED:**
+
+**What was accomplished:**
+- ✅ **Updated StatusTabs Component**: Changed PAIDPICKEDUP status display from "Picked Up" to "Paid & Picked Up" in `frontend/src/components/dashboard/status-tabs.tsx`
+- ✅ **Updated StatusChangeModal**: Changed success message from "Marked Paid/Picked Up" to "Marked Paid & Picked Up" in `frontend/src/components/dashboard/modals/status-change-modal.tsx`
+- ✅ **Verified Consistency**: PaymentModal already had correct text "This will record payment and move the job to Paid & Picked Up"
+- ✅ **Build Verification**: Changes compiled successfully (unrelated TypeScript error in admin file)
+
+**Root Cause Analysis:**
+- **Status Display Inconsistency**: StatusTabs component was displaying "Picked Up" instead of "Paid & Picked Up" as specified in masterplan
+- **Success Message Inconsistency**: StatusChangeModal success message used inconsistent formatting
+
+**Solution Implemented:**
+- **StatusTabs Update**: Changed `{ key: "PAIDPICKEDUP", title: "Picked Up" }` to `{ key: "PAIDPICKEDUP", title: "Paid & Picked Up" }`
+- **StatusChangeModal Update**: Changed success message to use consistent "Paid & Picked Up" format
+- **Maintained Functionality**: All existing functionality preserved, only display text updated
+
+**Success Criteria Met:**
+- ✅ Dashboard tabs now display "Paid & Picked Up" instead of "Picked Up"
+- ✅ Status change success messages use consistent formatting
+- ✅ No impact on existing functionality or API calls
+- ✅ Changes follow masterplan specifications for status display
+
+**Next Priority**: Fix note area flickering and job card collapse
 
 **✅ IMPLEMENTATION COMPLETED:**
 - **Build Status**: ✅ Compiled successfully (unrelated TypeScript error in admin file)

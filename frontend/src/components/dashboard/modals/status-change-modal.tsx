@@ -55,7 +55,7 @@ export default function StatusChangeModal({ jobId, action, title, description, c
         ? 'Marked Printing'
         : action === 'mark-complete'
           ? 'Marked Complete'
-          : 'Marked Paid/Picked Up';
+          : 'Marked Paid & Picked Up';
       show(msg);
       onSuccess();
       onClose();
