@@ -268,6 +268,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             <JobCard
               key={job.id}
               job={job}
+              currentStatus={filters?.status || 'UPLOADED'}
               onApprove={handleJobApprove}
               onReject={handleJobReject}
               onUpdate={handleJobUpdate}
