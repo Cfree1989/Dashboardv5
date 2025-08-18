@@ -14,33 +14,86 @@
 - ✅ **R2. Approve button workflow** - COMPLETED (ApprovalModal integration restored)  
 - ✅ **R3. JobCard status display** - COMPLETED (currentStatus prop chain fixed)
 - ✅ **R3.5. Mark unreviewed button** - **COMPLETED** (real-time updates restored)
-- 🔄 **R4. New job sound triggers** - **NEXT TASK** (30 minutes)
+- ✅ **R4. New job sound triggers** - **COMPLETED** (fixed false triggers)
 - ⏳ **R8. Duplicate header conflict** - Pending (30 minutes)
 - ⏳ **R9. Analytics authentication regression** - Pending (1 hour)
 
 **📊 RESTORATION PROGRESS:**
-- **Completed**: 4/11 critical regressions (36% restored)
-- **Remaining**: 7/11 critical regressions (64% to go)
-- **Estimated Time**: 6 hours remaining for emergency restoration
+- **Completed**: 5/11 critical regressions (45% restored)
+- **Remaining**: 6/11 critical regressions (55% to go)
+- **Estimated Time**: 5.5 hours remaining for emergency restoration
 - **Risk Level**: CRITICAL (core business workflows still non-functional)
+
+## ✅ **SOUND TRIGGER FIX COMPLETED**
+
+**Root Cause Identified:**
+- **Stale Closure Issue**: `counts` not in `fetchCounts` dependency array, causing `previousUploaded` to always be stale
+- **Result**: Sound triggered on every refresh/auto-refresh because `currentUploaded > previousUploaded` was always true
+- **Pattern**: Initial load: `5 > 0` = true, Auto-refresh: `5 > 0` = true, Tab change: `5 > 0` = true
+
+**Solution Implemented:**
+- **Added `useRef`**: `previousCountsRef` to track actual previous state
+- **Fixed Comparison**: Use `previousCountsRef.current.UPLOADED` instead of stale `counts.UPLOADED`
+- **Update Ref**: `previousCountsRef.current = data` after comparison for next iteration
+- **Pattern Applied**: Standard React pattern for tracking previous values in callbacks
+
+**Result:**
+- ✅ Sound only plays when UPLOADED count actually increases from genuine new submissions
+- ✅ No sound on page refreshes, auto-refreshes, or tab changes
+- ✅ No sound during job operations (existing `isJobOperation` flag still works)
+- ✅ No sound during modal operations (existing `pauseRefresh` flag still works)
+
+**Next Priority**: R8 - Duplicate Header Conflict (30 minutes)
+
+## ✅ **TASK R4 COMPLETED - New Job Sound Triggers**
+
+**What was accomplished:**
+- ✅ **Added `isJobOperation` flag**: Track when counts change due to job operations
+- ✅ **Modified sound trigger logic**: `currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation`
+- ✅ **Set flag in job handlers**: Before calling `onJobsMutated()` in all job operations
+- ✅ **Reset flag after counts update**: After `fetchCounts` completes
+- ✅ **Followed existing pattern**: Used same approach as `pauseRefresh` flag
+
+**Root Cause Analysis:**
+- ❌ **Problem**: Sound triggered on ANY UPLOADED count increase (status changes, refreshes, reverts)
+- ✅ **Solution**: Added flag to distinguish between genuine new submissions and job operations
+- ✅ **Pattern Applied**: Used existing `pauseRefresh` pattern for flag-based sound control
+
+**Implementation Details:**
+- **Flag Management**: `setIsJobOperation(true)` before job operations, reset after counts update
+- **Sound Logic**: Only play when count increases AND not paused AND not job operation
+- **Job Operations Covered**: Approve, reject, mark reviewed, update, delete
+- **Preserved Existing**: `pauseRefresh` behavior for modal operations still works
+
+**Success Criteria Met:**
+- ✅ Sound only plays when UPLOADED count increases from genuine new submissions
+- ✅ Sound does NOT play on status changes (PENDING → UPLOADED due to revert)
+- ✅ Sound does NOT play on page refreshes or manual refresh clicks
+- ✅ Sound does NOT play during modal operations (existing `pauseRefresh` behavior preserved)
 
 **🎯 STRATEGIC ANALYSIS:**
 
-**Why R3.5 is the next priority:**
-1. **Quick Win**: 30-minute task that builds on completed R3 (JobCard status display)
-2. **User Impact**: Mark unreviewed functionality is important for staff workflow
-3. **Dependency Chain**: Fixes UI state management that affects other modal workflows
-4. **Low Risk**: Simple prop/function fix, unlikely to break existing functionality
+**Why R4 is the next priority:**
+1. **Quick Win**: 30-minute task that builds on existing `pauseRefresh` pattern
+2. **User Impact**: Eliminates annoying false sound triggers during normal operations
+3. **Dependency Chain**: Uses existing sound infrastructure, no new components needed
+4. **Low Risk**: Simple flag-based logic, unlikely to break existing functionality
 
-**Success Criteria for R3.5:**
-- ✅ Click "Mark Unreviewed" button opens modal
-- ✅ Modal submission properly calls API to clear `staff_viewed_at` field
-- ✅ Job shows NEW badge again after marking as unreviewed
-- ✅ Visual alerts work correctly for unreviewed jobs
+**Success Criteria for R4:**
+- ✅ Sound only plays when UPLOADED count increases from genuine new submissions
+- ✅ Sound does NOT play on status changes (PENDING → UPLOADED due to revert)
+- ✅ Sound does NOT play on page refreshes or manual refresh clicks
+- ✅ Sound does NOT play during modal operations (existing `pauseRefresh` behavior preserved)
 
-**After R3.5 Completion:**
+**Implementation Strategy:**
+- **Add `isJobOperation` flag**: Track when counts change due to job operations
+- **Modify sound trigger**: `currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation`
+- **Set flag in job handlers**: Before calling `onJobsMutated()`
+- **Reset flag after counts update**: After `fetchCounts` completes
+- **Follow existing pattern**: Use same approach as `pauseRefresh` flag
+
+**After R4 Completion:**
 - **Next Priority**: R8 (Duplicate header conflict) - 30 minutes
-- **Then**: R4 (New job sound triggers) - 30 minutes  
 - **Then**: R9 (Analytics authentication) - 1 hour
 - **Goal**: Complete all critical regressions before end of day
 

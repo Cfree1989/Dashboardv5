@@ -11,7 +11,15 @@ export interface JobListFilters {
   discipline?: string;
 }
 
-export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput }: { filters?: JobListFilters, onJobsMutated?: () => void, refreshToken?: number, onModalOpenChange?: (open: boolean) => void, searchValue?: string, onSearchInput?: (value: string) => void }) {
+export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation }: { 
+  filters?: JobListFilters, 
+  onJobsMutated?: () => void, 
+  refreshToken?: number, 
+  onModalOpenChange?: (open: boolean) => void, 
+  searchValue?: string, 
+  onSearchInput?: (value: string) => void,
+  setIsJobOperation?: (value: boolean) => void
+}) {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
@@ -128,6 +136,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         )
       );
       
+      setIsJobOperation?.(true);
       onJobsMutated?.();
     } catch (error) {
       console.error('Failed to update job:', error);
@@ -144,6 +153,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       // Remove from local state
       setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
       
+      setIsJobOperation?.(true);
       onJobsMutated?.();
     } catch (error) {
       console.error('Failed to delete job:', error);
@@ -156,6 +166,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       // Remove from local state (job will move to PENDING status)
       setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
       
+      setIsJobOperation?.(true);
       onJobsMutated?.();
     } catch (error) {
       console.error('Failed to approve job:', error);
@@ -168,6 +179,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       // Remove from local state (job will move to REJECTED status)
       setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
       
+      setIsJobOperation?.(true);
       onJobsMutated?.();
     } catch (error) {
       console.error('Failed to reject job:', error);
@@ -184,6 +196,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           : job
       ));
       
+      setIsJobOperation?.(true);
       onJobsMutated?.();
     } catch (error) {
       console.error('Failed to mark job as reviewed:', error);

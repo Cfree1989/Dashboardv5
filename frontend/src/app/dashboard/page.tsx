@@ -7,6 +7,7 @@ import { LastUpdated } from '../../components/dashboard/last-updated';
 import { DiagPanel } from '../../components/dashboard/diag-panel';
 import { apiRequest, logout, getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
+import { useRef } from 'react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -19,8 +20,13 @@ export default function DashboardPage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pauseRefresh, setPauseRefresh] = useState(false);
+  const [isJobOperation, setIsJobOperation] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Use ref to track previous counts for sound comparison
+  const previousCountsRef = useRef<Record<string, number>>({});
+  const isFirstLoadRef = useRef(true);
 
   // Debounce search input
   useEffect(() => {
@@ -33,16 +39,27 @@ export default function DashboardPage() {
       const data = await apiRequest<Record<string, number>>('/api/v1/jobs/counts');
       setCounts(data);
       
-      // Play sound if UPLOADED count increased (new job submitted)
+      // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
+      // Skip sound on first load to prevent playing on page refresh
       const currentUploaded = data.UPLOADED || 0;
-      const previousUploaded = counts.UPLOADED || 0;
-      if (currentUploaded > previousUploaded && !pauseRefresh) {
+      const previousUploaded = previousCountsRef.current.UPLOADED || 0;
+      if (currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation && !isFirstLoadRef.current) {
         playNewUploadSound();
       }
+      
+      // Update ref with current data for next comparison
+      previousCountsRef.current = data;
+      
+      // Mark first load as complete
+      isFirstLoadRef.current = false;
+      
+      // Reset job operation flag after counts update
+      setIsJobOperation(false);
     } catch (err) {
       console.error('Failed to fetch counts:', err);
+      setIsJobOperation(false);
     }
-  }, [pauseRefresh]); // Remove counts from dependencies to avoid infinite loop
+  }, [pauseRefresh, isJobOperation]); // Remove counts from dependencies to avoid infinite loop
 
   // Check authentication on mount and load initial data
   useEffect(() => {
@@ -157,17 +174,15 @@ export default function DashboardPage() {
           onStatusChange={updateStatus}
         />
 
-        <JobList
-          filters={{
-            status,
-            search: debouncedSearch,
-          }}
-          onJobsMutated={fetchCounts}
-          refreshToken={refreshTick}
-          onModalOpenChange={setPauseRefresh}
-          searchValue={searchValue}
-          onSearchInput={setSearchValue}
-        />
+        <JobList 
+            filters={{ status, search: debouncedSearch }} 
+            onJobsMutated={fetchCounts}
+            refreshToken={refreshTick}
+            onModalOpenChange={setPauseRefresh}
+            searchValue={searchValue}
+            onSearchInput={setSearchValue}
+            setIsJobOperation={setIsJobOperation}
+          />
 
         <DiagPanel />
       </div>
