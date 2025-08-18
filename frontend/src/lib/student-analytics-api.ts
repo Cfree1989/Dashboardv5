@@ -1,4 +1,5 @@
 import type { StudentAnalyticsData, StudentAnalyticsFilters } from '../types/analytics';
+import { apiRequest } from './auth';
 
 export async function fetchStudentAnalyticsData(filters: StudentAnalyticsFilters): Promise<StudentAnalyticsData> {
   const qp = new URLSearchParams();
@@ -15,46 +16,12 @@ export async function fetchStudentAnalyticsData(filters: StudentAnalyticsFilters
     qp.set('end_date', filters.endDate);
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-  
-  // Fetch overview data
-  const overviewResponse = await fetch(`${baseUrl}/api/v1/analytics/student/overview?${qp.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-  
-  if (!overviewResponse.ok) {
-    throw new Error('Failed to fetch student overview data');
-  }
-  
-  const overviewJson = await overviewResponse.json();
-  
-  // Fetch performance data
-  const performanceResponse = await fetch(`${baseUrl}/api/v1/analytics/student/performance?${qp.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-  
-  if (!performanceResponse.ok) {
-    throw new Error('Failed to fetch student performance data');
-  }
-  
-  const performanceJson = await performanceResponse.json();
-  
-  // Fetch trends data
-  const trendsResponse = await fetch(`${baseUrl}/api/v1/analytics/student/trends?${qp.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-  
-  if (!trendsResponse.ok) {
-    throw new Error('Failed to fetch student trends data');
-  }
-  
-  const trendsJson = await trendsResponse.json();
+  // Fetch all student analytics data using apiRequest
+  const [overviewJson, performanceJson, trendsJson] = await Promise.all([
+    apiRequest<any>(`/api/v1/analytics/student/overview?${qp.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/student/performance?${qp.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/student/trends?${qp.toString()}`),
+  ]);
   
   // Map snake_case JSON to camelCase TypeScript types
   return {

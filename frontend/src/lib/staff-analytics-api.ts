@@ -1,9 +1,7 @@
 import type { StaffAnalyticsData, StaffAnalyticsFilters, StaffOverviewData, StaffPerformanceData, StaffComparisonResult, StaffPerformance } from '../types/analytics';
+import { apiRequest } from './auth';
 
 export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Promise<StaffAnalyticsData> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  
   // Build query parameters
   const qp = new URLSearchParams();
   
@@ -19,13 +17,10 @@ export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Pr
   if (params.staff) qp.set('staff', params.staff);
 
   // Fetch all staff analytics data
-  const [overviewRes, comparisonRes] = await Promise.all([
-    fetch(`/api/v1/analytics/staff/overview?${qp.toString()}`, { headers: h }),
-    fetch(`/api/v1/analytics/staff/comparison?${qp.toString()}`, { headers: h }),
+  const [overviewJson, comparisonJson] = await Promise.all([
+    apiRequest<any>(`/api/v1/analytics/staff/overview?${qp.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/staff/comparison?${qp.toString()}`),
   ]);
-
-  const overviewJson = await overviewRes.json();
-  const comparisonJson = await comparisonRes.json();
 
   // Parse overview data and map staff_performance to camelCase
   const rawStaffPerf: Record<string, any> = overviewJson.staff_performance ?? {};
@@ -68,8 +63,7 @@ export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Pr
   let performance: StaffPerformanceData | undefined;
   if (params.staff) {
     try {
-      const performanceRes = await fetch(`/api/v1/analytics/staff/performance?${qp.toString()}`, { headers: h });
-      const performanceJson = await performanceRes.json();
+      const performanceJson = await apiRequest<any>(`/api/v1/analytics/staff/performance?${qp.toString()}`);
       
       performance = {
         staffName: performanceJson.staff_name ?? '',

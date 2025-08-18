@@ -1,9 +1,7 @@
 import type { AnalyticsData, OverviewData, TrendData, ResourcesData, FinancialData, AnalyticsFilters } from '../types/analytics';
+import { apiRequest } from './auth';
 
 export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<AnalyticsData> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  
   // Build query parameters
   const qp = new URLSearchParams();
   
@@ -26,17 +24,12 @@ export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<Anal
     qpTrends.set('days', String(days));
   }
 
-  const [oRes, tRes, rRes, fRes] = await Promise.all([
-    fetch(`/api/v1/analytics/overview?${qp.toString()}`, { headers: h }),
-    fetch(`/api/v1/analytics/trends?${qpTrends.toString()}`, { headers: h }),
-    fetch(`/api/v1/analytics/resources?${qp.toString()}`, { headers: h }),
-    fetch(`/api/v1/analytics/financial?${qp.toString()}`, { headers: h }),
+  const [overviewJson, trendsJson, resourcesJson, financialJson] = await Promise.all([
+    apiRequest<any>(`/api/v1/analytics/overview?${qp.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/trends?${qpTrends.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/resources?${qp.toString()}`),
+    apiRequest<any>(`/api/v1/analytics/financial?${qp.toString()}`),
   ]);
-
-  const overviewJson = await oRes.json();
-  const trendsJson = await tRes.json();
-  const resourcesJson = await rRes.json();
-  const financialJson = await fRes.json();
 
   const overview: OverviewData = {
     totalSubmissions: overviewJson.total_submissions ?? 0,
