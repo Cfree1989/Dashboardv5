@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
-import { apiRequest, getLegacyToken } from '../../lib/auth';
+import { apiRequest } from '../../lib/auth';
 
 export interface JobListFilters {
   status?: string;
@@ -71,11 +71,6 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   };
 
   useEffect(() => {
-    const token = getLegacyToken();
-    if (!token) {
-      router.push('/login');
-      return;
-    }
     // cancel any in-flight
     if (controllerRef.current) {
       controllerRef.current.abort();

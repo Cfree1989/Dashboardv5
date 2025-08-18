@@ -25,9 +25,10 @@ describe('PaymentModal', () => {
   });
 
   it('validates inputs and posts payment with attribution', async () => {
-    // Mock: staff list then payment POST
+    // Mock: staff list, job details, then payment POST
     jest.spyOn(global, 'fetch')
       .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Bob', is_active: true }] }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ material: 'filament', cost_usd: 5.0 }) } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as any);
 
     const onClose = jest.fn();
@@ -59,8 +60,8 @@ describe('PaymentModal', () => {
     expect(onClose).toHaveBeenCalled();
 
     const calls = (global.fetch as jest.Mock).mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(2);
-    const [url, init] = calls[1];
+    expect(calls.length).toBeGreaterThanOrEqual(3);
+    const [url, init] = calls[2];
     expect(url).toMatch(/\/api\/v1\/jobs\/abc\/payment$/);
     expect(init.method).toBe('POST');
     const body = JSON.parse(init.body as string);
@@ -73,6 +74,7 @@ describe('PaymentModal', () => {
   it('shows an error if POST fails and keeps modal open', async () => {
     jest.spyOn(global, 'fetch')
       .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Eve', is_active: true }] }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ material: 'filament', cost_usd: 5.0 }) } as any)
       .mockResolvedValueOnce({ ok: false, text: async () => 'Validation error' } as any);
 
     const onClose = jest.fn();

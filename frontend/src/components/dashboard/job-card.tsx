@@ -5,6 +5,8 @@ import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
 import ApprovalModal from './modals/approval-modal';
+import StatusChangeModal from './modals/status-change-modal';
+import PaymentModal from './modals/payment-modal';
 import ConfirmDialog from './modals/confirm-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { apiRequest, getLegacyToken } from '../../lib/auth';
@@ -101,6 +103,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showStatusChangeModal, setShowStatusChangeModal] = useState<null | { action: string, title: string, description: string, confirmVerb: string }>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const { show } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -134,6 +138,8 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setShowMore(false);
     }
   }, [collapseSignal]);
+
+
 
   // Load staff for admin actions
   useEffect(() => {
@@ -678,7 +684,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                )}
               {currentStatus === "READYTOPRINT" && (
                <button
-                 onClick={() => onStatusAction?.(job.id, "mark-printing")}
+                 onClick={() => {
+                   setShowStatusChangeModal({
+                     action: "mark-printing",
+                     title: "Mark as Printing",
+                     description: "This will mark the job as currently being printed.",
+                     confirmVerb: "Mark Printing"
+                   });
+                 }}
                  className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
                >
                  <Printer className="w-4 h-4 mr-1" />
@@ -697,7 +710,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
              {currentStatus === "PRINTING" && (
                <button
-                 onClick={() => onStatusAction?.(job.id, "mark-complete")}
+                 onClick={() => {
+                   setShowStatusChangeModal({
+                     action: "mark-complete",
+                     title: "Mark as Complete",
+                     description: "This will mark the job as completed and ready for pickup.",
+                     confirmVerb: "Mark Complete"
+                   });
+                 }}
                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
                >
                  <CheckCircle className="w-4 h-4 mr-1" />
@@ -706,11 +726,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
              )}
              {currentStatus === "COMPLETED" && (
                <button
-                 onClick={() => onStatusAction?.(job.id, "mark-picked-up")}
+                 onClick={() => {
+                   setShowPaymentModal(true);
+                 }}
                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
                >
                  <CheckCircle className="w-4 h-4 mr-1" />
-                 <span className="hidden sm:inline">Mark Paid/Picked Up</span>
+                 <span className="hidden sm:inline">Record Payment</span>
                </button>
              )}
               {(["UPLOADED","PENDING","READYTOPRINT","PRINTING","COMPLETED"].includes(currentStatus)) && (
@@ -939,6 +961,36 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
              </div>
            </div>
          </div>
+       )}
+       {showStatusChangeModal && (
+         <StatusChangeModal
+           jobId={job.id}
+           action={showStatusChangeModal.action as "mark-printing" | "mark-complete" | "mark-picked-up"}
+           title={showStatusChangeModal.title}
+           description={showStatusChangeModal.description}
+           confirmVerb={showStatusChangeModal.confirmVerb}
+           onClose={() => {
+             setShowStatusChangeModal(null);
+           }}
+           onSuccess={() => {
+             // Remove job from current list since it will move to a different status
+             onReject?.(job.id);
+             setShowStatusChangeModal(null);
+           }}
+         />
+       )}
+       {showPaymentModal && (
+         <PaymentModal
+           jobId={job.id}
+           onClose={() => {
+             setShowPaymentModal(false);
+           }}
+           onSuccess={() => {
+             // Remove job from current list since it will move to PAIDPICKEDUP status
+             onReject?.(job.id);
+             setShowPaymentModal(false);
+           }}
+         />
        )}
      </div>
      </TooltipProvider>

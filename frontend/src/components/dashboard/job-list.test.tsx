@@ -115,19 +115,21 @@ describe('JobList component', () => {
   it('opens payment modal for COMPLETED job and removes card on success', async () => {
     // 1) Initial jobs fetch (COMPLETED)
     (global.fetch as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c1', display_name: 'Completed Job' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c1', display_name: 'Completed Job', status: 'COMPLETED' }] }) })
       // 2) Staff list for PaymentModal
       .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Bob', is_active: true }] }) })
-      // 3) Payment POST
+      // 3) Job details for PaymentModal
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ material: 'filament', cost_usd: 5.0 }) })
+      // 4) Payment POST
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) });
 
     const onJobsMutated = jest.fn();
     render(<JobList filters={{ status: 'COMPLETED' }} onJobsMutated={onJobsMutated} />);
 
     // Wait for action button to appear (ensures job rendered)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark Paid/Picked Up' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Record Payment' })).toBeInTheDocument());
     // Open payment modal
-    const payBtn = screen.getByText('Mark Paid/Picked Up');
+    const payBtn = screen.getByText('Record Payment');
     fireEvent.click(payBtn);
 
     // Wait for modal and staff to load
@@ -154,16 +156,18 @@ describe('JobList component', () => {
   it('shows error toast/message if payment fails and keeps modal open', async () => {
     // 1) Initial jobs fetch (COMPLETED)
     (global.fetch as any)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c2', display_name: 'Completed Err Job' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'c2', display_name: 'Completed Err Job', status: 'COMPLETED' }] }) })
       // 2) Staff list for PaymentModal
       .mockResolvedValueOnce({ ok: true, json: async () => ({ staff: [{ name: 'Alice', is_active: true }] }) })
-      // 3) Payment POST fails
+      // 3) Job details for PaymentModal
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ material: 'filament', cost_usd: 5.0 }) })
+      // 4) Payment POST fails
       .mockResolvedValueOnce({ ok: false, text: async () => 'Bad Request' });
 
     render(<JobList filters={{ status: 'COMPLETED' }} />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark Paid/Picked Up' })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'Mark Paid/Picked Up' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Record Payment' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Record Payment' }));
 
     await waitFor(() => expect(screen.getByText('Record Payment & Pickup')).toBeInTheDocument());
     await waitFor(() => expect(screen.queryByText('Loading staff...')).not.toBeInTheDocument());
