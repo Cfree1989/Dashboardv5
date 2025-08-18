@@ -20,7 +20,7 @@ export function StatusTabs({ currentStatus, onStatusChange, stats, matchCounts, 
     { key: "READYTOPRINT", title: "Ready to Print" },
     { key: "PRINTING", title: "Printing" },
     { key: "COMPLETED", title: "Completed" },
-    { key: "PAIDPICKEDUP", title: "Paid & Picked Up" },
+    { key: "PAIDPICKEDUP", title: "Picked Up" },
     { key: "REJECTED", title: "Rejected" },
     { key: "ARCHIVED", title: "Archived" },
   ]
