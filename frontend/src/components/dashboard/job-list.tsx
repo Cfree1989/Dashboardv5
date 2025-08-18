@@ -241,7 +241,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       {/* Search and Sort Controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         {/* Search Input */}
-        <div className="flex-1 max-w-md flex items-center gap-2">
+        <div className="flex-1 max-w-sm flex items-center gap-2">
           <div className="relative flex-1">
             <input
               type="text"
@@ -285,7 +285,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             onChange={(e) => {
               setSortBy(e.target.value);
             }}
-            className="appearance-none px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="appearance-none px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
           >
             <option value="created_at">Time</option>
             <option value="student_name">Name</option>
