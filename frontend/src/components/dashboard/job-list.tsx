@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, X } from 'lucide-react';
 
 export interface JobListFilters {
   status?: string;
@@ -242,13 +242,29 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         {/* Search Input */}
         <div className="flex-1 max-w-md flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={searchValue || ''}
-            onChange={(e) => onSearchInput?.(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search jobs..."
+              value={searchValue || ''}
+              onChange={(e) => onSearchInput?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  onSearchInput?.('');
+                }
+              }}
+              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            {searchValue && searchValue.trim() && (
+              <button
+                onClick={() => onSearchInput?.('')}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
           <button
             onClick={onToggleExpandCollapse}
             className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"

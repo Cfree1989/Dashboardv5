@@ -21,6 +21,7 @@ from app.services.file_service import STATUS_TO_DIR
 from app.services.catalog_service import CatalogService
 from app.services.error_handling_service import get_error_handling_service
 import logging
+from sqlalchemy import or_
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,19 @@ def get_job_counts():
     """Get job counts by status for dashboard tabs."""
     try:
         from sqlalchemy import func
-        rows = db.session.query(Job.status, func.count()).group_by(Job.status).all()
+        search = request.args.get('search')
+        
+        query = Job.query
+        if search:
+            # Filter jobs by search term
+            query = query.filter(
+                or_(
+                    Job.student_name.ilike(f'%{search}%'),
+                    Job.student_email.ilike(f'%{search}%')
+                )
+            )
+        
+        rows = query.with_entities(Job.status, func.count()).group_by(Job.status).all()
         counts = {status: int(count) for status, count in rows}
         return jsonify(counts), 200
     except Exception as e:

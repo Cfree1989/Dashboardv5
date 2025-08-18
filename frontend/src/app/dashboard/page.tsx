@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [expandSignal, setExpandSignal] = useState(0);
   const [collapseSignal, setCollapseSignal] = useState(0);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   
   // Use ref to track previous counts for sound comparison
   const previousCountsRef = useRef<Record<string, number>>({});
@@ -35,6 +36,23 @@ export default function DashboardPage() {
     const timer = setTimeout(() => setDebouncedSearch(searchValue), 400);
     return () => clearTimeout(timer);
   }, [searchValue]);
+
+  // Calculate search match counts by status
+  const fetchSearchMatchCounts = useCallback(async () => {
+    if (!debouncedSearch.trim()) {
+      setMatchCounts({});
+      return;
+    }
+    
+    try {
+      // Use the more efficient backend approach - get counts directly with search filter
+      const counts = await apiRequest<Record<string, number>>('/api/v1/jobs/counts?search=' + encodeURIComponent(debouncedSearch));
+      setMatchCounts(counts);
+    } catch (err) {
+      console.error('Failed to fetch search match counts:', err);
+      setMatchCounts({});
+    }
+  }, [debouncedSearch]);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -87,6 +105,11 @@ export default function DashboardPage() {
       fetchCounts();
     }
   }, [debouncedSearch, fetchCounts]);
+
+  // Calculate search match counts when search changes
+  useEffect(() => {
+    fetchSearchMatchCounts();
+  }, [fetchSearchMatchCounts]);
 
   // Auto-refresh every 45s: update counts and trigger list refresh (mute sound while searching)
   useEffect(() => {
@@ -164,6 +187,8 @@ export default function DashboardPage() {
           currentStatus={status}
           stats={counts}
           onStatusChange={updateStatus}
+          matchCounts={matchCounts}
+          searchActive={!!debouncedSearch}
         />
 
         <JobList 
