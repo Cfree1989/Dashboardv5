@@ -2,9 +2,10 @@
 
 ## Project Status
 
-**Current Phase**: Pre-E2E Implementation  
-**Overall Progress**: ~100% (core functionality complete, Docker deployment working, analytics enhancements complete, ALL CRITICAL SYSTEM AUDIT ISSUES RESOLVED, authentication transition fix completed)  
-**Next Priority**: E2E testing → Production deployment
+**Current Phase**: **EMERGENCY RESTORATION** 🚨  
+**Overall Progress**: ~60% (MAJOR REGRESSIONS: authentication transition broke working system - dashboard, analytics, modals disconnected)  
+**Next Priority**: **RESTORE BROKEN FUNCTIONALITY** → Then E2E testing → Production deployment  
+**Critical Issue**: Working system (8 jobs, functional approve buttons, colored header) degraded to broken state (1 job, non-functional modals, missing features)
 
 ## System Overview
 
@@ -43,51 +44,177 @@
 **Solution**: Implemented comprehensive atomic file operation framework with Redis locking, staging areas, and database transaction integration  
 **Result**: Complete elimination of race conditions, proper error handling, and data integrity guarantees
 
-## 🎯 Active Workstreams
+## 🚨 EMERGENCY: RESTORE BROKEN FUNCTIONALITY
 
-### Pre-E2E Gap Items (Must Complete Before E2E)
+**CRITICAL ISSUE**: Authentication transition broke a perfectly working system. Before had 8 jobs, working counts, functional approve buttons. After has 1 job, all counts at 0, broken approve workflow.
 
-#### P1. Submit Rate Limiting (Must-do)
-- **Backend**: Add `@limiter.limit("3 per hour")` to `POST /api/v1/submit`
-- **Tests**: `tests/test_submit_rate_limit.py` - 4 submissions → 3x 201, 1x 429
-- **Success**: Fourth submission within hour returns 429
+### 🔥 P0 REGRESSIONS (MUST FIX BEFORE E2E)
 
-#### P2. Expired/Resend Confirmation (Optional)
-- **Backend**: `POST /api/v1/submit/resend-confirmation` (rate-limited 1/hour)
-- **Frontend**: `/confirm/expired` page with resend button
-- **Tests**: Happy path, invalid job, rate limit, event logging
+#### R1. **BROKEN: Job Counts Endpoint (CRITICAL - 2 hours)**
+- **Issue**: Dashboard tabs show 0 for all statuses despite diagnostics showing real data
+- **Root Cause**: Missing `/api/v1/jobs/counts` endpoint or broken implementation  
+- **Backend**: Create/fix `@bp.route('/counts', methods=['GET'])` in `jobs.py`
+- **Backend**: Return `{'UPLOADED': count, 'PENDING': count, ...}` from database
+- **Frontend**: Verify `fetchCounts()` in dashboard correctly processes response
+- **Test**: Dashboard tabs display correct counts matching diagnostic data
+- **Success**: Tabs show real counts (Uploaded 8, Ready to Print 3, etc.) instead of 0
 
-#### P3. Revert Endpoints (Optional)
-- **Backend**: `POST /jobs/<id>/revert-completion` (COMPLETED → PRINTING)
-- **Backend**: `POST /jobs/<id>/revert-pickup` (PAIDPICKEDUP → COMPLETED)
-- **Tests**: Guards, file moves, metadata sync, events
+#### R2. **BROKEN: Approve Button Functionality (CRITICAL - 3 hours)**  
+- **Issue**: Clicking approve button does nothing, no modal appears
+- **Root Cause**: ApprovalModal removed from job-card.tsx or integration broken
+- **Frontend**: Restore `ApprovalModal` import in `job-card.tsx`
+- **Frontend**: Fix `handleApprove` - remove mock code, add proper modal state management
+- **Frontend**: Add `showApprovalModal` state and modal rendering
+- **Frontend**: Connect modal `onApproved` callback to refresh job data
+- **Test**: Click approve → modal opens → can fill form → submits successfully
+- **Success**: Full approve workflow restored (modal opens, form submits, job moves to PENDING)
 
-#### P4. Soft-Delete + Confirmation (Optional)
-- **Backend**: Change DELETE to soft-delete: set status `ARCHIVED`, move files to `Archived/`, log event; add `POST /api/v1/jobs/<id>/hard-delete` (admin-only) for permanent removal when needed
-- **Frontend**: Delete action requires typing job `short_id` to confirm
-- **Tests**: Delete moves files to Archived and sets status; hard-delete removes row and files; guards and events verified
+#### R3. **BROKEN: Job Loading/Display (CRITICAL - 1 hour)**
+- **Issue**: Only 1 job visible instead of 8 jobs that were working before
+- **Root Cause**: Job list filtering/loading broken by authentication changes
+- **Frontend**: Investigate `job-list.tsx` API call and data processing
+- **Frontend**: Verify authentication headers in job fetching requests  
+- **Frontend**: Check if search/filter logic accidentally filtering out jobs
+- **Test**: Dashboard loads all jobs that appear in diagnostics
+- **Success**: Dashboard displays all 8+ jobs with proper pagination/scrolling
 
-#### P5. Payments Export (Optional)
-- **Backend**: `POST /api/v1/export/payments` (CSV/XLSX summary)
-- **Tests**: Date parsing, filtering, event logging
+#### R4. **Visual Regression Investigation (HIGH - 1 hour)**
+- **Issue**: Dashboard layout appears different/degraded from before
+- **Frontend**: Compare current CSS/styling with functional version
+- **Frontend**: Check if authentication transition affected component rendering
+- **Frontend**: Verify proper CSS classes and Tailwind styling applied
+- **Test**: Dashboard matches the clean, professional appearance from "before" image
+- **Success**: Restored polished UI with proper spacing, colors, and layout
 
-#### P6. Background Audio (Optional)
-- **Frontend**: `sound-utils.ts` with `playNewUploadSound()`
-- **Dashboard**: Detect UPLOADED count increase → play sound
-- **Tests**: Mock function called on count increase
+#### R7. **BROKEN: Duplicate Header Conflict (CRITICAL - 30 minutes)**
+- **Issue**: Header buttons have no color and have moved - conflicting header implementations
+- **Root Cause**: `dashboard/page.tsx` creates inline header while `dashboard/layout.tsx` already includes HeaderNav
+- **Frontend**: Remove duplicate header section from dashboard page (lines 145-156)
+- **Frontend**: Verify HeaderNav component works properly across all pages
+- **Frontend**: Ensure navigation, refresh, and logout buttons function correctly
+- **Test**: Header shows proper colored buttons (Dashboard, Admin, Analytics, Refresh, Logout)
+- **Success**: Single HeaderNav with proper styling and functionality across all authenticated pages
 
-#### P7. Health Alias (Sanity)
-- **Backend**: Confirm `/api/v1/health` alias exists alongside `/health`
+#### R8. **BROKEN: Analytics Authentication Regression (CRITICAL - 1 hour)**
+- **Issue**: Analytics pages completely broken due to authentication transition failures
+- **Root Cause**: `analytics-api.ts`, `staff-analytics-api.ts`, `student-analytics-api.ts` still use `localStorage.getItem('token')` 
+- **Frontend**: Replace all `localStorage.getItem('token')` with `apiRequest()` calls in analytics APIs
+- **Frontend**: Update fetch calls to use cookie-based authentication instead of Bearer tokens
+- **Frontend**: Verify all analytics endpoints work with new authentication
+- **Test**: Analytics page loads data, staff analytics functional, student analytics working
+- **Success**: All analytics functionality restored with secure cookie authentication
 
-### Project Status Board — Pre-E2E
-- [x] P1. Submit rate limiting — backend + tests ✅ **COMPLETED**
-- [x] P2. Expired/resend confirmation — backend + frontend + tests ✅ **COMPLETED**
-- [x] P3. Revert endpoints — backend + tests ✅ **COMPLETED**
-- [x] P4. Soft-delete + confirmation — backend + frontend + tests ✅ **COMPLETED**
-- [x] P5. Payments export — backend + tests ✅ **COMPLETED**
-- [x] P6. Background audio trigger — frontend + tests ✅ **COMPLETED**
-- [x] P7. Health alias — backend ✅ **COMPLETED**
+#### R9. **BROKEN: Orphaned Modal Components (CRITICAL - 2 hours)**
+- **Issue**: StatusChangeModal and PaymentModal exist but are never imported/used anywhere
+- **Root Cause**: Authentication transition cleanup removed modal integrations from job-card.tsx
+- **Frontend**: Restore `StatusChangeModal` import and integration for mark-printing/mark-complete/mark-picked-up buttons
+- **Frontend**: Restore `PaymentModal` import and integration for payment recording workflow  
+- **Frontend**: Add proper modal state management and props passing
+- **Frontend**: Connect modal callbacks to refresh job data and counts
+- **Test**: Status change buttons open modals, payment recording works end-to-end
+- **Success**: Full workflow modals functional (approve, reject, status changes, payment)
 
+#### R10. **BROKEN: Missing Global Expand/Collapse Controls (HIGH - 1 hour)**
+- **Issue**: expandSignal/collapseSignal props exist in JobCard but no UI to trigger them
+- **Root Cause**: Global expand/collapse control buttons missing from dashboard UI
+- **Frontend**: Add "Expand All"/"Collapse All" buttons to dashboard header or job list controls
+- **Frontend**: Implement state management to increment expandSignal/collapseSignal counters
+- **Frontend**: Pass signals down to JobCard components via JobList
+- **Test**: Expand All opens all job details, Collapse All closes them
+- **Success**: Users can quickly expand/collapse all job cards for better workflow efficiency
+
+### 🎯 PRE-E2E RESTORATION BOARD
+
+**Phase 0: Emergency Restoration (Complete First)**
+- [ ] **R1. Job counts endpoint** - Dashboard tab counts functional ⏱️ 2h
+- [ ] **R2. Approve button workflow** - Modal opens and processes approvals ⏱️ 3h  
+- [ ] **R3. Job loading display** - All jobs visible like before ⏱️ 1h
+- [ ] **R4. Visual regression fixes** - UI matches working version ⏱️ 1h
+- [ ] **R5. Missing JobCard props** - Connect onApprove, expandSignal, currentStatus ⏱️ 1h
+- [ ] **R6. Approval modal integration** - Restore ApprovalModal import and state ⏱️ 1h
+- [ ] **R7. Duplicate header conflict** - Remove conflicting inline header ⏱️ 30min
+- [ ] **R8. Analytics authentication regression** - Fix analytics API authentication ⏱️ 1h
+- [ ] **R9. Orphaned modal components** - Restore StatusChangeModal and PaymentModal ⏱️ 2h
+- [ ] **R10. Global expand/collapse controls** - Add missing UI controls ⏱️ 1h
+
+**📊 UPDATED RESOURCE REQUIREMENTS:**
+- **Emergency Restoration Phase**: 13.5 hours (nearly doubled from original 7h estimate)
+- **Complexity**: High (systematic disconnections across multiple subsystems)
+- **Risk Level**: CRITICAL (core business workflows completely non-functional)
+- **Verification Phase**: 4-5 hours (expanded to test all restored integrations)
+
+**🎯 STRATEGIC PRIORITY:** Immediate Executor mode required - this is **full-scale system restoration**, not minor tweaks.
+
+**Phase 1: Verification (After Restoration)**
+- [ ] **V1. End-to-end workflow test** - Submit → Approve → Complete manually
+- [ ] **V2. All modal functionality** - Reject, payment, status change modals work
+- [ ] **V3. Admin functionality** - Admin pages fully operational  
+- [ ] **V4. Authentication integrity** - Secure cookie auth working properly
+
+**Phase 2: E2E Preparation (After Verification)**  
+- [ ] **E2E1. Testing framework setup** - Playwright installation and config
+- [ ] **E2E2. Core workflow tests** - Automated student submission to payment
+- [ ] **E2E3. Staff workflow tests** - Approval, rejection, status management
+- [ ] **E2E4. Admin workflow tests** - User management, system health, archival
+
+### 📋 RESTORATION SUCCESS CRITERIA
+
+**System Restored When:**
+- ✅ Dashboard tabs show real counts (not all zeros)  
+- ✅ All submitted jobs visible in dashboard (8+ jobs, not just 1)
+- ✅ Approve button opens modal and processes submissions
+- ✅ UI matches the clean, professional "before" appearance
+- ✅ All existing functionality works as it did before critical fixes
+
+**Ready for E2E When:**
+- ✅ Complete manual workflow test (submit → approve → complete → payment)
+- ✅ All modals functional (approve, reject, payment, status change) 
+- ✅ Admin functions working (staff management, archival, health monitoring)
+- ✅ Authentication secure and stable across all workflows
+
+### ⚠️ CRITICAL LEARNING
+
+**The "critical fixes" broke a working system.** Priority is restoration, not improvement. Must verify each fix doesn't introduce new regressions to the functional workflow that existed before.
+
+### 🔍 **SYSTEMATIC REGRESSION ANALYSIS**
+
+**Investigation Method**: Comprehensive frontend codebase review comparing expected functionality vs actual implementation
+
+**Regression Patterns Discovered:**
+
+#### **Pattern 1: Component Integration Failures**
+- **ApprovalModal**: ❌ Built & functional but not imported in `job-card.tsx`
+- **StatusChangeModal**: ❌ Complete component but never used anywhere
+- **PaymentModal**: ❌ Full implementation but missing integration 
+- **ReviewModal**: ✅ Properly integrated (working)
+- **RejectionModal**: ✅ Properly integrated (working)
+- **Result**: 60% of modals disconnected from workflow
+
+#### **Pattern 2: Prop Chain Disconnections**
+- **JobCard expects**: 12 props including `currentStatus`, `onApprove`, `expandSignal`
+- **JobList provides**: Only 4 props (`job`, `onUpdate`, `onDelete`, `onModalOpenChange`)
+- **Missing**: `currentStatus`, `onApprove`, `onReject`, `onStatusAction`, `expandSignal`, `collapseSignal`
+- **Result**: Buttons visible but non-functional due to missing callbacks
+
+#### **Pattern 3: Authentication Transition Incomplete**
+- **Modal files**: ✅ Fixed to use `apiRequest()`
+- **Analytics APIs**: ❌ Still using `localStorage.getItem('token')`
+- **Files affected**: `analytics-api.ts`, `staff-analytics-api.ts`, `student-analytics-api.ts`
+- **Result**: Analytics pages completely broken with authentication failures
+
+#### **Pattern 4: Duplicate Implementations**
+- **Header**: Dashboard page creates inline header while layout includes HeaderNav
+- **Approve logic**: Mock timeout function instead of modal integration
+- **Result**: Conflicting UI implementations, non-functional features
+
+#### **Pattern 5: Missing UI Controls**
+- **Expand/collapse infrastructure**: ✅ Built into JobCard with props support
+- **Global controls**: ❌ No buttons to trigger expand all/collapse all
+- **Result**: Individual cards can collapse but no bulk operations
+
+**Root Cause**: Authentication transition cleanup was **overly aggressive**, removing working integrations along with security fixes.
+
+**Scope Impact**: What appeared to be "minor authentication fixes" actually **systematically disconnected** multiple subsystems.
 
 ## 📋 COMPREHENSIVE TASK CHECKLIST
 
@@ -339,20 +466,32 @@
 - Focus on setup guides and troubleshooting
 - Estimated effort: 1 week
 
-### 📊 PROGRESS SUMMARY
-- **Core Features**: 100% Complete ✅
-- **Pre-E2E Items**: 100% Complete ✅
-- **UI Improvements**: 100% Complete ✅
-- **Analytics**: 100% Complete ✅
-- **System Stability & Security**: 100% Complete ✅
-- **Admin Features**: 100% Complete ✅
+### 📊 PROGRESS SUMMARY - **CORRECTED ASSESSMENT**
+
+#### **🚨 CRITICAL REGRESSION IMPACT:**
+- **Dashboard Functionality**: 40% Working (counts broken, approve broken, header broken, job loading broken)
+- **Modal Workflows**: 40% Working (2/5 modals functional, 3/5 disconnected)  
+- **Analytics System**: 0% Working (all authentication broken)
+- **Authentication**: 60% Working (modals fixed, APIs broken, admin mixed)
+- **Admin Functions**: 80% Working (most panels work, some may have regressions)
+
+#### **FEATURE COMPLETION STATUS:**
+- **Core Backend Features**: 100% Complete ✅ (API endpoints working)
+- **Core Frontend Integration**: 60% Complete ❌ (major disconnections)
+- **Pre-E2E Items**: 100% Complete ✅ (backend functionality)  
+- **UI Components**: 100% Built, 60% Connected ❌ (components exist but disconnected)
+- **Analytics**: 100% Built, 0% Functional ❌ (authentication broken)
+- **System Stability & Security**: 90% Complete ❌ (auth transition incomplete)
+- **Admin Features**: 100% Built, 80% Functional ⚠️ (most working, some may have issues)
 - **Payment Accuracy & Finance**: 100% Complete ✅
-- **Catalog System**: 100% Complete ✅
+- **Catalog System**: 100% Complete ✅  
 - **Documentation**: 0% Complete ❌
 - **Testing**: 0% Complete ❌
 - **Production**: 0% Complete ❌
 
-**Overall Project Completion**: ~100% (Core functionality complete, UI polished, analytics fully implemented, all critical security issues resolved, authentication transition fix completed)
+**Actual Project Status**: ~60% Functional ❌ (Backend solid, Frontend systematically broken)
+
+**Critical Reality**: System **regressed from working state** - authentication transition **disconnected functional integrations**
 
 ---
 
