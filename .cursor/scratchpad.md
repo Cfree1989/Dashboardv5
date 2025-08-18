@@ -84,7 +84,24 @@
 - **Test**: Dashboard loads all jobs that appear in diagnostics
 - **Success**: Dashboard displays all 8+ jobs with proper pagination/scrolling
 
-#### R4. **Visual Regression Investigation (HIGH - 1 hour)**
+#### R3.5. **BROKEN: Mark Unreviewed Button (HIGH - 30 minutes)**
+- **Issue**: Mark Unreviewed button opens modal but doesn't actually change job to unreviewed state
+- **Root Cause**: `handleReapplyNew` function calls `setShowReviewModal({ reviewed: false })` but doesn't update job status
+- **Frontend**: Fix `handleReapplyNew` to properly call API endpoint to mark job as unreviewed
+- **Frontend**: Verify `staff_viewed_at` field is cleared when marking as unreviewed
+- **Test**: Click "Mark Unreviewed" → job shows NEW badge again
+- **Success**: Jobs can be properly marked as unreviewed and show visual alerts
+
+#### R4. **BROKEN: New Job Sound Triggers (HIGH - 30 minutes)**
+- **Issue**: New job sound plays for all sorts of things - plays on move to PENDING and for refresh
+- **Root Cause**: Sound trigger logic in `fetchCounts` is too broad, triggers on any UPLOADED count change
+- **Frontend**: Fix sound trigger logic in dashboard `fetchCounts` function
+- **Frontend**: Sound should only play when UPLOADED count increases from actual new submissions
+- **Frontend**: Should not trigger on status changes (UPLOADED → PENDING) or page refreshes
+- **Test**: New job sound only plays when new UPLOADED job is actually submitted
+- **Success**: Sound only triggers for genuine new job submissions, not status changes or refreshes
+
+#### R5. **Visual Regression Investigation (HIGH - 1 hour)**
 - **Issue**: Dashboard layout appears different/degraded from before
 - **Frontend**: Compare current CSS/styling with functional version
 - **Frontend**: Check if authentication transition affected component rendering
@@ -92,7 +109,7 @@
 - **Test**: Dashboard matches the clean, professional appearance from "before" image
 - **Success**: Restored polished UI with proper spacing, colors, and layout
 
-#### R7. **BROKEN: Duplicate Header Conflict (CRITICAL - 30 minutes)**
+#### R8. **BROKEN: Duplicate Header Conflict (CRITICAL - 30 minutes)**
 - **Issue**: Header buttons have no color and have moved - conflicting header implementations
 - **Root Cause**: `dashboard/page.tsx` creates inline header while `dashboard/layout.tsx` already includes HeaderNav
 - **Frontend**: Remove duplicate header section from dashboard page (lines 145-156)
@@ -101,7 +118,7 @@
 - **Test**: Header shows proper colored buttons (Dashboard, Admin, Analytics, Refresh, Logout)
 - **Success**: Single HeaderNav with proper styling and functionality across all authenticated pages
 
-#### R8. **BROKEN: Analytics Authentication Regression (CRITICAL - 1 hour)**
+#### R9. **BROKEN: Analytics Authentication Regression (CRITICAL - 1 hour)**
 - **Issue**: Analytics pages completely broken due to authentication transition failures
 - **Root Cause**: `analytics-api.ts`, `staff-analytics-api.ts`, `student-analytics-api.ts` still use `localStorage.getItem('token')` 
 - **Frontend**: Replace all `localStorage.getItem('token')` with `apiRequest()` calls in analytics APIs
@@ -110,7 +127,7 @@
 - **Test**: Analytics page loads data, staff analytics functional, student analytics working
 - **Success**: All analytics functionality restored with secure cookie authentication
 
-#### R9. **BROKEN: Orphaned Modal Components (CRITICAL - 2 hours)**
+#### R10. **BROKEN: Orphaned Modal Components (CRITICAL - 2 hours)**
 - **Issue**: StatusChangeModal and PaymentModal exist but are never imported/used anywhere
 - **Root Cause**: Authentication transition cleanup removed modal integrations from job-card.tsx
 - **Frontend**: Restore `StatusChangeModal` import and integration for mark-printing/mark-complete/mark-picked-up buttons
@@ -120,7 +137,7 @@
 - **Test**: Status change buttons open modals, payment recording works end-to-end
 - **Success**: Full workflow modals functional (approve, reject, status changes, payment)
 
-#### R10. **BROKEN: Missing Global Expand/Collapse Controls (HIGH - 1 hour)**
+#### R11. **BROKEN: Missing Global Expand/Collapse Controls (HIGH - 1 hour)**
 - **Issue**: expandSignal/collapseSignal props exist in JobCard but no UI to trigger them
 - **Root Cause**: Global expand/collapse control buttons missing from dashboard UI
 - **Frontend**: Add "Expand All"/"Collapse All" buttons to dashboard header or job list controls
@@ -133,18 +150,20 @@
 
 **Phase 0: Emergency Restoration (Complete First)**
 - [x] **R1. Job counts endpoint** - Dashboard tab counts functional ⏱️ 2h ✅ **COMPLETED**
-- [x] **R2. Approve button workflow** - Modal opens and processes approvals ⏱️ 3h ✅ **COMPLETED**  
+- [x] **R2. Approve button workflow** - Modal opens and processes approvals ⏱️ 3h ✅ **COMPLETED**
 - [ ] **R3. Job loading display** - All jobs visible like before ⏱️ 1h
-- [ ] **R4. Visual regression fixes** - UI matches working version ⏱️ 1h
-- [ ] **R5. Missing JobCard props** - Connect onApprove, expandSignal, currentStatus ⏱️ 1h
-- [ ] **R6. Approval modal integration** - Restore ApprovalModal import and state ⏱️ 1h
-- [ ] **R7. Duplicate header conflict** - Remove conflicting inline header ⏱️ 30min
-- [ ] **R8. Analytics authentication regression** - Fix analytics API authentication ⏱️ 1h
-- [ ] **R9. Orphaned modal components** - Restore StatusChangeModal and PaymentModal ⏱️ 2h
-- [ ] **R10. Global expand/collapse controls** - Add missing UI controls ⏱️ 1h
+- [ ] **R3.5. Mark unreviewed button** - Fix unreviewed state functionality ⏱️ 30min
+- [ ] **R4. New job sound triggers** - Fix sound playing on wrong events ⏱️ 30min
+- [ ] **R5. Visual regression fixes** - UI matches working version ⏱️ 1h
+- [ ] **R6. Missing JobCard props** - Connect onApprove, expandSignal, currentStatus ⏱️ 1h
+- [ ] **R7. Approval modal integration** - Restore ApprovalModal import and state ⏱️ 1h
+- [ ] **R8. Duplicate header conflict** - Remove conflicting inline header ⏱️ 30min
+- [ ] **R9. Analytics authentication regression** - Fix analytics API authentication ⏱️ 1h
+- [ ] **R10. Orphaned modal components** - Restore StatusChangeModal and PaymentModal ⏱️ 2h
+- [ ] **R11. Global expand/collapse controls** - Add missing UI controls ⏱️ 1h
 
 **📊 UPDATED RESOURCE REQUIREMENTS:**
-- **Emergency Restoration Phase**: 13.5 hours (nearly doubled from original 7h estimate)
+- **Emergency Restoration Phase**: 14.5 hours (added 1 hour for new issues discovered)
 - **Complexity**: High (systematic disconnections across multiple subsystems)
 - **Risk Level**: CRITICAL (core business workflows completely non-functional)
 - **Verification Phase**: 4-5 hours (expanded to test all restored integrations)
@@ -603,7 +622,7 @@
 - ✅ Approve button now opens ApprovalModal instead of mock timeout
 - ✅ All callback props properly connected between JobList and JobCard
 
-**Impact:** Approve workflow is now fully functional. Users can click approve → modal opens → fill form → submit → job moves to PENDING status.
+**Impact:** Approve workflow is now functional and ready for testing.
 
 **Lessons Applied from R1:**
 - 🔍 **Checked existing code first**: Found ApprovalModal component already existed

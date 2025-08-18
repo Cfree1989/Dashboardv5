@@ -229,7 +229,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const handleApprove = async () => {
     setShowApprovalModal(true);
-    onModalOpenChange?.(true);
   };
 
   const handleReject = async () => {
@@ -780,15 +779,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           jobId={job.id}
           material={job.material}
           currentPrinter={job.printer}
-          onClose={() => {
-            setShowApprovalModal(false);
-            onModalOpenChange?.(false);
-          }}
+          onClose={() => setShowApprovalModal(false)}
           onApproved={() => {
             // Delegate to parent to remove from list
             onApprove?.(job.id);
             setShowApprovalModal(false);
-            onModalOpenChange?.(false);
           }}
         />
       )}

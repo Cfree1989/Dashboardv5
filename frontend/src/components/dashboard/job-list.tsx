@@ -151,32 +151,28 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
   };
 
-  const handleJobApprove = (jobId: string) => {
-    // Remove from local state - job will move to PENDING status
-    setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-    onJobsMutated?.();
+  const handleJobApprove = async (jobId: string) => {
+    try {
+      // Remove from local state (job will move to PENDING status)
+      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+      
+      onJobsMutated?.();
+    } catch (error) {
+      console.error('Failed to approve job:', error);
+      throw error;
+    }
   };
 
-  const handleJobReject = (jobId: string) => {
-    // Remove from local state - job will move to REJECTED status
-    setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-    onJobsMutated?.();
-  };
-
-  const handleJobMarkReviewed = (jobId: string) => {
-    // Update local state to mark as reviewed
-    setJobs(prevJobs => prevJobs.map(job => 
-      job.id === jobId 
-        ? { ...job, staff_viewed_at: new Date().toISOString() }
-        : job
-    ));
-    onJobsMutated?.();
-  };
-
-  const handleJobStatusAction = (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => {
-    // Remove from local state - job will move to next status
-    setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-    onJobsMutated?.();
+  const handleJobReject = async (jobId: string) => {
+    try {
+      // Remove from local state (job will move to REJECTED status)
+      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
+      
+      onJobsMutated?.();
+    } catch (error) {
+      console.error('Failed to reject job:', error);
+      throw error;
+    }
   };
 
   const handleSort = (field: string) => {
@@ -274,8 +270,6 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
               job={job}
               onApprove={handleJobApprove}
               onReject={handleJobReject}
-              onMarkReviewed={handleJobMarkReviewed}
-              onStatusAction={handleJobStatusAction}
               onUpdate={handleJobUpdate}
               onDelete={handleJobDelete}
               onModalOpenChange={onModalOpenChange}
