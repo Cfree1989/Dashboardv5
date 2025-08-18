@@ -141,41 +141,28 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
 
 
-  // Load staff for admin actions
+  // Load staff for admin actions and modals
   useEffect(() => {
     const loadStaff = async () => {
       try {
+        setLoadingStaff(true);
         const data = await apiRequest<any>('/api/v1/staff');
         const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
+        setStaff(activeStaff); // Set staff state for all modals
         if (activeStaff.length > 0) {
           setAdminStaffName(activeStaff[0].name);
         }
       } catch (e) {
         // Fallback to 'Admin User' if staff loading fails
         setAdminStaffName('Admin User');
+      } finally {
+        setLoadingStaff(false);
       }
     };
     loadStaff();
   }, []);
 
-  // Ensure staff list is populated when opening the resend modal
-  useEffect(() => {
-    const ensureStaffForResend = async () => {
-      try {
-        setLoadingStaff(true);
-        const data = await apiRequest<any>('/api/v1/staff');
-        const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
-        setStaff(activeStaff);
-      } catch {
-        // no-op; dropdown will remain with placeholder
-      } finally {
-        setLoadingStaff(false);
-      }
-    };
-    if (showResendModal && staff.length === 0) {
-      ensureStaffForResend();
-    }
-  }, [showResendModal]);
+  // Staff data is already loaded on component mount, no need for separate resend modal loading
   
   const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
 
@@ -255,16 +242,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setSaveMessage("");
     setSaveError("");
     onModalOpenChange?.(true);
-    // lazy-load staff
-    try {
-      setLoadingStaff(true);
-      const data = await apiRequest<any>('/api/v1/staff');
-      setStaff((data?.staff || []).filter((s: any) => s.is_active));
-    } catch (e) {
-      setSaveError('Failed to load staff list');
-    } finally {
-      setLoadingStaff(false);
-    }
+    // Staff is already loaded on component mount
   };
 
   const cancelEditNotes = () => {
@@ -672,7 +650,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                    onClick={() => {
                      setShowResendModal(true);
                      setResendStaffName("");
-                     onModalOpenChange?.(true);
                    }}
                    className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 focus-ring btn-transition whitespace-nowrap"
                    title="Resend confirmation email"
@@ -683,15 +660,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                  </button>
                )}
               {currentStatus === "READYTOPRINT" && (
-               <button
-                 onClick={() => {
-                   setShowStatusChangeModal({
-                     action: "mark-printing",
-                     title: "Mark as Printing",
-                     description: "This will mark the job as currently being printed.",
-                     confirmVerb: "Mark Printing"
-                   });
-                 }}
+                                <button
+                   onClick={() => {
+                     setShowStatusChangeModal({
+                       action: "mark-printing",
+                       title: "Mark as Printing",
+                       description: "This will mark the job as currently being printed.",
+                       confirmVerb: "Mark Printing"
+                     });
+                   }}
                  className="flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 focus-ring btn-transition whitespace-nowrap"
                >
                  <Printer className="w-4 h-4 mr-1" />
@@ -709,15 +686,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
              </button>
 
              {currentStatus === "PRINTING" && (
-               <button
-                 onClick={() => {
-                   setShowStatusChangeModal({
-                     action: "mark-complete",
-                     title: "Mark as Complete",
-                     description: "This will mark the job as completed and ready for pickup.",
-                     confirmVerb: "Mark Complete"
-                   });
-                 }}
+                                <button
+                   onClick={() => {
+                     setShowStatusChangeModal({
+                       action: "mark-complete",
+                       title: "Mark as Complete",
+                       description: "This will mark the job as completed and ready for pickup.",
+                       confirmVerb: "Mark Complete"
+                     });
+                   }}
                  className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 focus-ring btn-transition whitespace-nowrap"
                >
                  <CheckCircle className="w-4 h-4 mr-1" />
@@ -725,7 +702,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                </button>
              )}
              {currentStatus === "COMPLETED" && (
-               <button
+                                           <button
                  onClick={() => {
                    setShowPaymentModal(true);
                  }}
@@ -888,10 +865,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
        )}
        {showResendModal && (
          <div className="fixed inset-0 z-50 flex items-center justify-center">
-           <div className="absolute inset-0 bg-black/40" onClick={() => {
-             setShowResendModal(false);
-             onModalOpenChange?.(false);
-           }} />
+                       <div className="absolute inset-0 bg-black/40" onClick={() => {
+              setShowResendModal(false);
+            }} />
            <div className="relative bg-white w-full max-w-md rounded-xl shadow-lg border border-gray-200 p-6">
              <h3 className="text-lg font-semibold text-gray-900 mb-2">Resend Confirmation Email</h3>
              <p className="text-sm text-gray-600 mb-4">This will send a new confirmation email to the student for job <span className="font-mono">{job.short_id || job.id?.slice(0,8)}</span>.</p>
@@ -914,11 +890,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                </div>
                
                <div className="flex items-center justify-end space-x-2">
-                 <button 
-                   onClick={() => {
-                     setShowResendModal(false);
-                     onModalOpenChange?.(false);
-                   }} 
+                                   <button 
+                    onClick={() => {
+                      setShowResendModal(false);
+                    }}  
                    className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 focus-ring btn-transition"
                  >
                    Cancel
@@ -932,15 +907,24 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                      
                      try {
                        setIsResendingConfirm(true);
-                                               await apiRequest(`/api/v1/jobs/${job.id}/admin/resend-email`, {
-                          method: 'POST',
-                          body: JSON.stringify({ staff_name: resendStaffName })
-                        });
-                       show('Confirmation email resent successfully');
-                       setShowResendModal(false);
-                       onModalOpenChange?.(false);
-                     } catch (e) {
-                       show('Failed to resend confirmation email');
+                       const response = await apiRequest<any>(`/api/v1/jobs/${job.id}/admin/resend-email`, {
+                         method: 'POST',
+                         body: JSON.stringify({ staff_name: resendStaffName })
+                       });
+                       
+                       // Check if email was actually sent
+                       if (response && (response as any).message) {
+                         show('Confirmation email resent successfully');
+                       } else {
+                         show('Email sent but no confirmation received');
+                       }
+                       
+                                               setShowResendModal(false);
+                     } catch (e: any) {
+                       // Provide more specific error messages
+                       const errorMessage = e?.message || 'Failed to resend confirmation email';
+                       show(`Error: ${errorMessage}`);
+                       console.error('Resend email error:', e);
                      } finally {
                        setIsResendingConfirm(false);
                      }
