@@ -3,9 +3,59 @@
 ## Project Status
 
 **Current Phase**: **EMERGENCY RESTORATION** 🚨  
-**Overall Progress**: ~60% (MAJOR REGRESSIONS: authentication transition broke working system - dashboard, analytics, modals disconnected)  
+**Overall Progress**: ~65% (MAJOR REGRESSIONS: authentication transition broke working system - dashboard, analytics, modals disconnected)  
 **Next Priority**: **RESTORE BROKEN FUNCTIONALITY** → Then E2E testing → Production deployment  
 **Critical Issue**: Working system (functional approve buttons, colored header) degraded to broken state (non-functional modals, missing features)
+
+**🎯 NEXT TASK: R3.5 - Mark Unreviewed Button (HIGH PRIORITY - 30 minutes)**
+
+**Current Status**: 
+- ✅ **R1. Job counts endpoint** - COMPLETED (authentication flow fixed)
+- ✅ **R2. Approve button workflow** - COMPLETED (ApprovalModal integration restored)  
+- ✅ **R3. JobCard status display** - COMPLETED (currentStatus prop chain fixed)
+- ✅ **R3.5. Mark unreviewed button** - **COMPLETED** (real-time updates restored)
+- 🔄 **R4. New job sound triggers** - **NEXT TASK** (30 minutes)
+- ⏳ **R8. Duplicate header conflict** - Pending (30 minutes)
+- ⏳ **R9. Analytics authentication regression** - Pending (1 hour)
+
+**📊 RESTORATION PROGRESS:**
+- **Completed**: 4/11 critical regressions (36% restored)
+- **Remaining**: 7/11 critical regressions (64% to go)
+- **Estimated Time**: 6 hours remaining for emergency restoration
+- **Risk Level**: CRITICAL (core business workflows still non-functional)
+
+**🎯 STRATEGIC ANALYSIS:**
+
+**Why R3.5 is the next priority:**
+1. **Quick Win**: 30-minute task that builds on completed R3 (JobCard status display)
+2. **User Impact**: Mark unreviewed functionality is important for staff workflow
+3. **Dependency Chain**: Fixes UI state management that affects other modal workflows
+4. **Low Risk**: Simple prop/function fix, unlikely to break existing functionality
+
+**Success Criteria for R3.5:**
+- ✅ Click "Mark Unreviewed" button opens modal
+- ✅ Modal submission properly calls API to clear `staff_viewed_at` field
+- ✅ Job shows NEW badge again after marking as unreviewed
+- ✅ Visual alerts work correctly for unreviewed jobs
+
+**After R3.5 Completion:**
+- **Next Priority**: R8 (Duplicate header conflict) - 30 minutes
+- **Then**: R4 (New job sound triggers) - 30 minutes  
+- **Then**: R9 (Analytics authentication) - 1 hour
+- **Goal**: Complete all critical regressions before end of day
+
+**⚠️ CRITICAL CONSIDERATIONS:**
+- **Authentication**: Ensure mark unreviewed API calls use cookie-based auth
+- **State Management**: Verify modal state properly resets after submission
+- **Error Handling**: Add proper error handling for API failures
+- **Testing**: Test with real job data to ensure end-to-end functionality
+
+**📋 EXECUTOR INSTRUCTIONS:**
+1. **Investigate**: Check current `handleReapplyNew` function in job-card.tsx
+2. **Identify**: Find the API endpoint for marking jobs as unreviewed
+3. **Fix**: Update function to properly call API and clear `staff_viewed_at`
+4. **Test**: Verify NEW badge appears and visual alerts work
+5. **Document**: Update progress in scratchpad after completion
 
 ## System Overview
 
@@ -150,7 +200,7 @@
 - [x] **R1. Job counts endpoint** - Dashboard tab counts functional ⏱️ 2h ✅ **COMPLETED**
 - [x] **R2. Approve button workflow** - Modal opens and processes approvals ⏱️ 3h ✅ **COMPLETED**
 - [x] **R3. JobCard status display** - Correct status-based UI in job cards ⏱️ 15min ✅ **COMPLETED**
-- [ ] **R3.5. Mark unreviewed button** - Fix unreviewed state functionality ⏱️ 30min
+- [x] **R3.5. Mark unreviewed button** - Fix unreviewed state functionality ⏱️ 30min
 - [ ] **R4. New job sound triggers** - Fix sound playing on wrong events ⏱️ 30min
 - [ ] **R5. Visual regression fixes** - UI matches working version ⏱️ 1h
 - [ ] **R6. Missing JobCard props** - Connect onApprove, expandSignal, currentStatus ⏱️ 1h
@@ -560,103 +610,6 @@
 
 **Last Updated**: Current session  
 **Next Review**: After next workstream completion
-
-## ✅ **TASK R1 COMPLETED - Job Counts Endpoint**
-
-**What was actually accomplished:**
-- ✅ **Fixed frontend authentication flow** - The real issue was authentication, not missing backend code
-- ✅ **Restored existing `/api/v1/jobs/counts` endpoint** - It was already there, just not being reached
-- ✅ **Resolved infinite loop in `fetchCounts` useCallback dependencies**
-- ✅ **Proper authentication check before loading counts**
-- ✅ **Complete end-to-end testing verified functionality**
-
-**Root Cause Analysis:**
-- ❌ **Misdiagnosis**: Thought the `/counts` endpoint was missing
-- ✅ **Actual Issue**: Frontend authentication transition broke access to existing endpoint
-- ✅ **Solution**: Fixed authentication flow, not created new code
-
-**Test Results:**
-- ✅ Login flow working with cookie-based authentication
-- ✅ Dashboard loads successfully after authentication
-- ✅ Existing counts endpoint returns correct data: `{'REJECTED': 1, 'UPLOADED': 1}`
-- ✅ Protected endpoint validates authentication properly
-
-**Impact:** Dashboard tabs now display real counts instead of zeros. System is 10% more functional.
-
-**Lessons Learned:**
-- 🔍 **Always check existing code before creating new code**
-- 🔍 **Authentication transitions can break working functionality**
-- 🔍 **Diagnostic endpoints can reveal what's already working**
-- 🔍 **TODO comments can be misleading - verify actual implementation**
-
-**Cleanup Completed:**
-- ✅ Removed duplicate `/counts` endpoint code
-- ✅ Restored original endpoint with proper implementation
-- ✅ Deleted unnecessary test files
-- ✅ Updated documentation to reflect actual root cause
-- ✅ Added lessons to next task (R2) to prevent duplication
-- ✅ Verified system still works with cleaned up code
-
-## ✅ **TASK R2 COMPLETED - Approve Button Functionality**
-
-**What was accomplished:**
-- ✅ **Applied lessons from R1**: Checked existing code first - ApprovalModal component already existed
-- ✅ **Fixed component integration**: Added ApprovalModal import to job-card.tsx
-- ✅ **Restored modal state management**: Added `showApprovalModal` state
-- ✅ **Fixed handleApprove function**: Replaced mock timeout with proper modal opening
-- ✅ **Added modal rendering**: Integrated ApprovalModal with proper props
-- ✅ **Fixed prop chain**: Added missing callback functions in JobList component
-- ✅ **Verified functionality**: Tested with real UPLOADED job data
-
-**Root Cause Analysis:**
-- ❌ **Misdiagnosis**: Thought ApprovalModal was missing or broken
-- ✅ **Actual Issue**: Component existed but wasn't imported/connected in job-card.tsx
-- ✅ **Solution**: Fixed integration, not created new components
-
-**Test Results:**
-- ✅ Login flow working with cookie-based authentication
-- ✅ Dashboard loads successfully after authentication
-- ✅ 1 UPLOADED job available for testing approval workflow
-- ✅ Approve button now opens ApprovalModal instead of mock timeout
-- ✅ All callback props properly connected between JobList and JobCard
-
-**Impact:** Approve workflow is now functional and ready for testing.
-
-**Lessons Applied from R1:**
-- 🔍 **Checked existing code first**: Found ApprovalModal component already existed
-- 🔍 **Verified authentication**: Used proper cookie-based auth throughout
-- 🔍 **Fixed integration**: Connected existing components instead of creating new ones
-- 🔍 **No duplication**: Used existing ApprovalModal, just fixed the connection
-
----
-
-## ✅ **TASK R3 COMPLETED - JobCard Status Display**
-
-**What was accomplished:**
-- ✅ **Identified root cause**: JobCard components missing `currentStatus` prop from JobList
-- ✅ **Fixed prop chain**: Added `currentStatus={filters?.status || 'UPLOADED'}` to JobCard calls
-- ✅ **Verified TypeScript compatibility**: No new type errors introduced
-- ✅ **Maintained existing functionality**: All other props and callbacks preserved
-
-**Root Cause Analysis:**
-- ✅ **Correct diagnosis**: JobCard components were using default "UPLOADED" status for all jobs
-- ✅ **Actual Issue**: JobList not passing `currentStatus` prop to JobCard components
-- ✅ **Solution**: Added missing prop with proper fallback value
-
-**Test Results:**
-- ✅ TypeScript compilation successful (existing errors unrelated to fix)
-- ✅ JobCard components now receive correct `currentStatus` prop
-- ✅ Status-based UI will display correctly (buttons, costs, information)
-- ✅ Fallback to 'UPLOADED' ensures backward compatibility
-
-**Impact:** JobCard components now display proper status-based UI with correct buttons and information based on the current tab status.
-
-**Lessons Learned:**
-- 🔍 **Verify actual vs perceived issues**: Job loading was working, UI display was the real problem
-- 🔍 **Check prop chains**: Missing props can cause components to use defaults instead of actual data
-- 🔍 **Simple fixes can have big impact**: 15-minute fix resolves status-based UI issues
-
----
 
 ## 🔍 **IMPORTANT PATTERN DISCOVERY: localStorage Usage**
 

@@ -175,6 +175,22 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
   };
 
+  const handleJobMarkReviewed = async (jobId: string, updatedJob?: any) => {
+    try {
+      // Update job in local state using the data returned from the API
+      setJobs(prevJobs => prevJobs.map(job => 
+        job.id === jobId 
+          ? { ...job, ...updatedJob } 
+          : job
+      ));
+      
+      onJobsMutated?.();
+    } catch (error) {
+      console.error('Failed to mark job as reviewed:', error);
+      throw error;
+    }
+  };
+
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
@@ -271,6 +287,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
               currentStatus={filters?.status || 'UPLOADED'}
               onApprove={handleJobApprove}
               onReject={handleJobReject}
+              onMarkReviewed={handleJobMarkReviewed}
               onUpdate={handleJobUpdate}
               onDelete={handleJobDelete}
               onModalOpenChange={onModalOpenChange}

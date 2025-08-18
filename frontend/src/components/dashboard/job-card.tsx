@@ -45,7 +45,7 @@ interface JobCardProps {
   currentStatus?: string;
   onApprove?: (jobId: string) => void;
   onReject?: (jobId: string) => void;
-  onMarkReviewed?: (jobId: string) => void;
+  onMarkReviewed?: (jobId: string, updatedJob?: Job) => void;
   onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
   onUpdate?: (jobId: string, updates: any) => Promise<void>;
   onDelete?: (jobId: string) => Promise<void>;
@@ -758,7 +758,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
           onUpdated={(updatedJob) => {
             // Optimistically reflect returned state in the card via callback to parent when available
             // Fallback: reload page section can be triggered by parent on next refetch
-            onMarkReviewed?.(job.id);
+            onMarkReviewed?.(job.id, updatedJob);
             setShowReviewModal(null);
           }}
         />
