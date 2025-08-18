@@ -285,7 +285,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             onChange={(e) => {
               setSortBy(e.target.value);
             }}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="appearance-none px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="created_at">Time</option>
             <option value="student_name">Name</option>
@@ -320,7 +320,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedJobList.map((job) => (
             <JobCard
               key={job.id}
