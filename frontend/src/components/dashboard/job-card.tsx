@@ -85,10 +85,18 @@ function convertToWindowsPath(filePath: string): string {
 }
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
-  // DIAGNOSTIC: Track component re-renders
-  console.log(`[${job.id}] JobCard re-render - expandSignal: ${expandSignal}, collapseSignal: ${collapseSignal}`);
+  // DIAGNOSTIC: Track component re-renders vs mounts
+  console.log(`[${job.id}] JobCard render - expandSignal: ${expandSignal}, collapseSignal: ${collapseSignal}`);
   
   const [showMore, setShowMore] = useState(false);
+  
+  // DIAGNOSTIC: Detect component mounting
+  useEffect(() => {
+    console.log(`[${job.id}] JobCard MOUNTED - initial showMore: ${showMore}`);
+    return () => {
+      console.log(`[${job.id}] JobCard UNMOUNTING`);
+    };
+  }, []); // Empty deps = only on mount/unmount
   
   // DIAGNOSTIC: Track showMore state changes
   useEffect(() => {
@@ -134,14 +142,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   // Respond to global expand/collapse signals
   useEffect(() => {
-    if (typeof expandSignal === 'number') {
+    if (typeof expandSignal === 'number' && expandSignal > 0) {
       // Open details
+      console.log(`[${job.id}] Global expand signal triggered: ${expandSignal}, setting showMore=true`);
       setShowMore(true);
     }
-  }, [expandSignal]);
+  }, [expandSignal, job.id]);
 
   useEffect(() => {
-    if (typeof collapseSignal === 'number') {
+    if (typeof collapseSignal === 'number' && collapseSignal > 0) {
       // Close details
       console.log(`[${job.id}] Global collapse signal triggered: ${collapseSignal}, setting showMore=false`);
       setShowMore(false);
@@ -246,23 +255,23 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const beginEditNotes = async () => {
-    console.log(`[${job.id}] beginEditNotes: showMore=${showMore}, about to call onModalOpenChange(true)`);
+    console.log(`[${job.id}] beginEditNotes: showMore=${showMore}, NOT calling onModalOpenChange (notes editing doesn't need auto-refresh pause)`);
     setIsEditingNotes(true);
     setNotesDraft("");
     setSaveMessage("");
     setSaveError("");
-    onModalOpenChange?.(true);
-    console.log(`[${job.id}] beginEditNotes: onModalOpenChange(true) called`);
+    // REMOVED: onModalOpenChange?.(true); - Notes editing doesn't need auto-refresh pause like real modals
     // Staff is already loaded on component mount
   };
 
   const cancelEditNotes = () => {
+    console.log(`[${job.id}] cancelEditNotes: NOT calling onModalOpenChange (notes editing doesn't need auto-refresh pause)`);
     setIsEditingNotes(false);
     setNotesDraft(jobNotes || "");
     setNotesStaffName("");
     setSaveMessage("");
     setSaveError("");
-    onModalOpenChange?.(false);
+    // REMOVED: onModalOpenChange?.(false); - Notes editing doesn't need auto-refresh pause like real modals
   };
 
   const openOpenFileModal = async () => {
@@ -322,7 +331,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setSaveMessage('Saved');
       setIsEditingNotes(false);
       setNotesDraft("");
-      onModalOpenChange?.(false);
+      // REMOVED: onModalOpenChange?.(false); - Notes saving doesn't need auto-refresh pause like real modals
     } catch (e) {
       setSaveError('Failed to add note. Please try again.');
     } finally {
