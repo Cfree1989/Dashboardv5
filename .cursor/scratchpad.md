@@ -276,18 +276,20 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
     - Success: Widget-level crashes are contained without losing whole page
   - [x] Step 5: Tests (TDD where feasible) ✅ Partially Completed
     - File: `frontend/src/components/error-boundary.test.tsx`
-    - Covered: child throws → fallback renders; reporter silenced via console spy
+      - Covered: child throws → fallback renders; single reporter call asserted
+    - Added: `frontend/src/components/analytics/trend-charts.error-boundary.test.tsx` (chart throw → section fallback)
+    - Added: `frontend/src/components/dashboard/job-list.error-boundary.test.tsx` (JobCard throw → list fallback)
     - Deferred: retry remount nuance (verify in integration later)
     - Optional page-level smoke: simulate throwing child inside Dashboard page and assert only section fallback appears
     - Success: Tests pass and protect against regressions
-  - [ ] Step 6: Documentation & DX
-    - Add short usage note in code comment of `error-boundary.tsx` with example
+  - [x] Step 6: Documentation & DX ✅ Completed
+    - Added short usage note in code comment of `frontend/src/components/error-boundary.tsx` with example
     - Success: Clear guidance for future components
   
   - Verification checklist
-    - [ ] Throwing error inside a chart does not blank entire page
-    - [ ] Fallback shows clear message and Retry works
-    - [ ] Console shows a single well-formed error log entry
+    - [x] Throwing error inside a chart does not blank entire page (covered by `trend-charts.error-boundary.test.tsx`)
+    - [ ] Fallback shows clear message and Retry works (fallback confirmed; retry deferred to integration)
+    - [x] Console shows a single well-formed error log entry (asserted in `error-boundary.test.tsx`)
     - [ ] Existing global `app/error.tsx` still handles route-level crashes
 
 - [ ] **A5. Refactor Massive Route Files** (HIGH Risk - Maintainability)
