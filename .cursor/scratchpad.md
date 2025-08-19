@@ -218,7 +218,12 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
   - [x] Add local resource limits (`mem_limit`/`cpus`) and `deploy.resources` entries for services ✅ **COMPLETED**
   - [x] Added logging rotation and `no-new-privileges` security options for services ✅ **COMPLETED**
   - [x] Restarted dev stack and verified services are healthy and accessible as expected ✅ **COMPLETED**
-  - [x] Review and harden remaining service configuration items (env handling, secrets, mounts) ❌ **PENDING**
+  - [x] Review and harden remaining service configuration items (env handling, secrets, mounts) ✅ **COMPLETED**
+    - [x] Standardized command array-form for `redis` and `worker` to avoid shell parsing issues
+    - [x] Added `security_opt: no-new-privileges:true` and json-file logging options to all prod services
+    - [x] Switched prod `storage` to a named volume and made `scripts` read-only bind mount
+    - [x] Standardized worker queue and `REDIS_URL` env
+    - [x] Validated both compose files via `docker compose config`
 
 - [x] **A2. Separate Development/Production Infrastructure** (HIGH Risk) ✅ **COMPLETED**
   - [x] Create separate docker-compose.dev.yml and docker-compose.prod.yml

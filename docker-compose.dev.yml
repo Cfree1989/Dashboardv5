@@ -150,7 +150,7 @@ services:
       start_period: 30s
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     # Development: Expose port for direct Redis access
     # Development: do NOT expose Redis to host by default (use docker exec to access)
     # ports: - "127.0.0.1:6379:6379"
@@ -175,7 +175,7 @@ services:
 
   worker:
     build: ./backend
-    command: sh -c "rq worker default --url 'redis://:${REDIS_PASSWORD}@redis:6379/0'"
+    command: ["rq", "worker", "default", "--url", "redis://:${REDIS_PASSWORD}@redis:6379/0"]
     networks:
       - app-network
     environment:

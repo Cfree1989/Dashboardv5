@@ -25,6 +25,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=production
@@ -45,8 +52,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       # Production: Only mount data directories, not source code
-      - ./storage:/app/storage
-      - ./scripts:/app/scripts
+      - storage_data:/app/storage
+      - ./scripts:/app/scripts:ro
     depends_on:
       - db
       - redis
@@ -71,6 +78,13 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
       - NODE_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
     depends_on:
       - backend
     restart: unless-stopped
@@ -101,6 +115,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
     # Production: No exposed ports - internal access only
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
   redis:
     image: redis:7-alpine
@@ -122,15 +143,22 @@ services:
       start_period: 30s
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     # Production: No exposed ports - internal access only
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
-    command: rq worker --url redis://:${REDIS_PASSWORD}@redis:6379
+    command: ["rq", "worker", "default", "--url", "redis://:${REDIS_PASSWORD}@redis:6379/0"]
     networks:
       - app-network
     deploy:
@@ -143,14 +171,23 @@ services:
           cpus: '0.25'
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
     volumes:
       # Production: Only mount data directories, not source code
-      - ./storage:/app/storage
-      - ./scripts:/app/scripts
+      - storage_data:/app/storage
+      - ./scripts:/app/scripts:ro
     depends_on:
       - db
       - redis
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
 volumes:
   postgres_data:
+  storage_data:
