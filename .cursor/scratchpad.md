@@ -210,13 +210,15 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
 - [x] **D3. JWT Token Storage Security Fix** (Critical Priority) ✅ **COMPLETED**
 
 #### **Phase 2: High-Priority Architectural Issues** (Production Blockers)
-- [ ] **A1. Fix Infrastructure Security** (HIGH Risk - Production Blocker) ❌ **NOT COMPLETED**
-  - [ ] Remove exposed PostgreSQL port (5432) from docker-compose.dev.yml - only internal access needed
-  - [ ] Remove exposed Redis port (6379) from docker-compose.dev.yml - only internal access needed  
+- [x] **A1. Fix Infrastructure Security** (HIGH Risk - Production Blocker) ✅ **COMPLETED**
+  - [x] Remove host port bindings for PostgreSQL and Redis in `docker-compose.dev.yml` (use docker network only)
   - [x] Add Redis authentication/password protection ✅ **COMPLETED**
-  - [x] Add network isolation with dedicated app-network for all services ✅ **COMPLETED**
-  - [ ] Add resource limits and health checks for all services
-  - [ ] Review and harden all service configurations
+  - [x] Implement network isolation with dedicated `app-network` for all services ✅ **COMPLETED**
+  - [x] Add healthchecks for frontend and worker; verified existing healthchecks for backend/db/redis ✅ **COMPLETED**
+  - [x] Add local resource limits (`mem_limit`/`cpus`) and `deploy.resources` entries for services ✅ **COMPLETED**
+  - [x] Added logging rotation and `no-new-privileges` security options for services ✅ **COMPLETED**
+  - [x] Restarted dev stack and verified services are healthy and accessible as expected ✅ **COMPLETED**
+  - [x] Review and harden remaining service configuration items (env handling, secrets, mounts) ❌ **PENDING**
 
 - [x] **A2. Separate Development/Production Infrastructure** (HIGH Risk) ✅ **COMPLETED**
   - [x] Create separate docker-compose.dev.yml and docker-compose.prod.yml

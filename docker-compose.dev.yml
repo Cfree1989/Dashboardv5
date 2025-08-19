@@ -25,6 +25,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
@@ -82,6 +89,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
     depends_on:
       - backend
     restart: unless-stopped
@@ -116,6 +130,13 @@ services:
           memory: 256M
           cpus: '0.25'
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
   redis:
     image: redis:7-alpine
@@ -144,6 +165,13 @@ services:
           memory: 128M
           cpus: '0.1'
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
   worker:
     build: ./backend
@@ -178,6 +206,13 @@ services:
         reservations:
           memory: 256M
           cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
 
 
 volumes:
