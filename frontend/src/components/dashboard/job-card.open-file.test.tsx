@@ -64,9 +64,9 @@ describe('JobCard – Open File modal', () => {
     await waitFor(() => fireEvent.click(copyBtn));
 
     // POST was made
-    const calls = (global.fetch as jest.Mock).mock.calls;
+    const calls = (global.fetch as jest.Mock).mock.calls.map(c => String(c[0]));
     expect(calls.length).toBeGreaterThanOrEqual(1);
-    expect(String(calls[0][0])).toMatch(/\/api\/v1\/jobs\/job123\/log-file-open$/);
+    expect(calls.some(u => /\/api\/v1\/jobs\/job123\/log-file-open$/.test(u))).toBe(true);
     // Clipboard received the path
     // Clipboard write may be blocked in jsdom; assert button exists and POST was called
     expect(screen.getByRole('button', { name: /Copy File Path/i })).toBeInTheDocument();

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
+import { ErrorBoundary } from '../error-boundary';
 
 export interface JobListFilters {
   status?: string;
@@ -312,32 +313,34 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
 
       {/* Job Cards */}
-      {sortedJobList.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <p>No jobs found</p>
-          {filters?.search && (
-            <p className="text-sm mt-2">Try adjusting your search terms</p>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedJobList.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              currentStatus={filters?.status || 'UPLOADED'}
-              onApprove={handleJobApprove}
-              onReject={handleJobReject}
-              onMarkReviewed={handleJobMarkReviewed}
-              onUpdate={handleJobUpdate}
-              onDelete={handleJobDelete}
-              onModalOpenChange={onModalOpenChange}
-              expandSignal={expandSignal}
-              collapseSignal={collapseSignal}
-            />
-          ))}
-        </div>
-      )}
+      <ErrorBoundary title="Job list error">
+        {sortedJobList.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>No jobs found</p>
+            {filters?.search && (
+              <p className="text-sm mt-2">Try adjusting your search terms</p>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedJobList.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                currentStatus={filters?.status || 'UPLOADED'}
+                onApprove={handleJobApprove}
+                onReject={handleJobReject}
+                onMarkReviewed={handleJobMarkReviewed}
+                onUpdate={handleJobUpdate}
+                onDelete={handleJobDelete}
+                onModalOpenChange={onModalOpenChange}
+                expandSignal={expandSignal}
+                collapseSignal={collapseSignal}
+              />
+            ))}
+          </div>
+        )}
+      </ErrorBoundary>
     </div>
   );
 }

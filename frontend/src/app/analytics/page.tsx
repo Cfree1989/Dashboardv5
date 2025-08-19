@@ -16,6 +16,7 @@ import { StaffPerformanceDetail } from '../../components/staff-analytics/staff-p
 import { StaffAnalyticsFilters as StaffAnalyticsFiltersComponent } from '../../components/staff-analytics/staff-analytics-filters';
 import { StudentAnalyticsFilters as StudentAnalyticsFiltersComponent } from '../../components/student-analytics/student-analytics-filters';
 import { useReducedMotion } from '../../lib/use-reduced-motion';
+import { ErrorBoundary } from '../../components/error-boundary';
 
 type AnalyticsSection = "operations" | "finance" | "staff" | "student";
 
@@ -430,7 +431,11 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">{renderSection()}</div>
+          <div className="flex-1">
+            <ErrorBoundary title="Analytics section error">
+              {renderSection()}
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
     </div>

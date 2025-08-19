@@ -8,6 +8,7 @@ import { apiRequest, getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ErrorBoundary } from '../../components/error-boundary';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -192,28 +193,29 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <StatusTabs
-          currentStatus={status}
-          stats={counts}
-          onStatusChange={updateStatus}
-          matchCounts={matchCounts}
-          searchActive={!!debouncedSearch}
-        />
-
-        <JobList 
-            filters={{ status, search: debouncedSearch }} 
-            onJobsMutated={fetchCounts}
-            refreshToken={refreshTick}
-            onModalOpenChange={setPauseRefresh}
-            searchValue={searchValue}
-            onSearchInput={setSearchValue}
-            setIsJobOperation={setIsJobOperation}
-            expandSignal={expandSignal}
-            collapseSignal={collapseSignal}
-            onToggleExpandCollapse={toggleExpandCollapse}
+      <ErrorBoundary title="Dashboard section error">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <StatusTabs
+            currentStatus={status}
+            stats={counts}
+            onStatusChange={updateStatus}
+            matchCounts={matchCounts}
+            searchActive={!!debouncedSearch}
           />
 
-      </div>
+          <JobList 
+              filters={{ status, search: debouncedSearch }} 
+              onJobsMutated={fetchCounts}
+              refreshToken={refreshTick}
+              onModalOpenChange={setPauseRefresh}
+              searchValue={searchValue}
+              onSearchInput={setSearchValue}
+              setIsJobOperation={setIsJobOperation}
+              expandSignal={expandSignal}
+              collapseSignal={collapseSignal}
+              onToggleExpandCollapse={toggleExpandCollapse}
+            />
+        </div>
+      </ErrorBoundary>
   );
 }

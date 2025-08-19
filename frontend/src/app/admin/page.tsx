@@ -10,6 +10,7 @@ import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
 import { DataManagementPanel } from "../../components/admin/data-management";
 import { EmailToolsPanel } from "../../components/admin/email-tools";
 import { checkAuthStatus } from "../../lib/auth";
+import { ErrorBoundary } from "../../components/error-boundary";
 
 type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email";
 
@@ -98,7 +99,11 @@ export default function AdminPage() {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">{renderSection()}</div>
+          <div className="flex-1">
+            <ErrorBoundary title="Admin section error">
+              {renderSection()}
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
     </div>

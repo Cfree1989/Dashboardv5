@@ -242,10 +242,53 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
   - **Risk Assessment**: ✅ **REDUCED TO LOW** - Clear fixes identified, limited scope
 
 - [ ] **A4. Implement Proper Error Boundaries** (HIGH Risk - Frontend Stability)
-  - [ ] Add React error boundaries in frontend/src/app/layout.tsx
-  - [ ] Implement error boundaries for major component trees
-  - [ ] Create consistent error handling patterns across components
-  - [ ] Add error reporting and recovery mechanisms
+  - [x] Create reusable ErrorBoundary component (`frontend/src/components/error-boundary.tsx`) ✅ Implemented
+  - [x] Add centralized error reporting stub (`frontend/src/lib/error-reporting.ts`) ✅ Implemented
+  - [x] Add unit test for fallback rendering (`frontend/src/components/error-boundary.test.tsx`) ✅ Added
+  - [ ] Wrap major component trees with boundaries (target high-risk widgets first)
+  - [ ] Add recovery patterns (retry) and optional server-side error reporting
+  - [ ] Keep existing global route-level `app/error.tsx` as-is
+  
+  #### A4 Detailed Execution Plan (Executor)
+  - [x] Step 1: Create reusable ErrorBoundary component ✅ Completed
+    - File: `frontend/src/components/error-boundary.tsx`
+    - Class-based boundary with fallback UI: title, brief message, "Try Again" button, optional details toggle
+    - Internal retry: bump a key to remount children; log via centralized reporter
+    - Success: Component catches thrown errors in children and renders fallback; Retry remounts children
+  - [x] Step 2: Centralize error logging ✅ Completed
+    - File: `frontend/src/lib/error-reporting.ts`
+    - Export `reportError(error: unknown, info?: any)` → console.warn for now; keep TODO for server reporting
+    - Success: Boundary calls reporter; tests can spy on console without failing
+  - [x] Step 3: Wrap major app sections
+    - Files:
+      - `frontend/src/app/dashboard/page.tsx` ✅ Wrapped primary content with `ErrorBoundary` (title: "Dashboard section error")
+      - `frontend/src/app/analytics/page.tsx` ✅ Wrapped main panel with `ErrorBoundary` (title: "Analytics section error"); sidebar remains interactive
+      - `frontend/src/app/admin/page.tsx` ✅ Wrapped main panel with `ErrorBoundary` (title: "Admin section error"); sidebar remains interactive
+    - Action: Wrap each page’s primary content in `<ErrorBoundary>` with section-specific fallback titles (e.g., "Dashboard section error")
+    - Keep global `frontend/src/app/error.tsx` as route-level catch-all
+    - Success: An error thrown in one section shows only that section’s fallback; other sections remain interactive
+  - [x] Step 4: Add boundary around dynamic-heavy components
+    - Files:
+      - `frontend/src/components/analytics/trend-charts.tsx` ✅ Wrapped each chart card with `ErrorBoundary` (titles per chart)
+      - `frontend/src/components/analytics/overview-cards.tsx` ✅ Wrapped entire card block with `ErrorBoundary`
+      - `frontend/src/components/dashboard/job-list.tsx` ✅ Wrapped job grid section with `ErrorBoundary`
+    - Action: Wrap rendering calls with `<ErrorBoundary>` (local granularity for crashy widgets)
+    - Success: Widget-level crashes are contained without losing whole page
+  - [x] Step 5: Tests (TDD where feasible) ✅ Partially Completed
+    - File: `frontend/src/components/error-boundary.test.tsx`
+    - Covered: child throws → fallback renders; reporter silenced via console spy
+    - Deferred: retry remount nuance (verify in integration later)
+    - Optional page-level smoke: simulate throwing child inside Dashboard page and assert only section fallback appears
+    - Success: Tests pass and protect against regressions
+  - [ ] Step 6: Documentation & DX
+    - Add short usage note in code comment of `error-boundary.tsx` with example
+    - Success: Clear guidance for future components
+  
+  - Verification checklist
+    - [ ] Throwing error inside a chart does not blank entire page
+    - [ ] Fallback shows clear message and Retry works
+    - [ ] Console shows a single well-formed error log entry
+    - [ ] Existing global `app/error.tsx` still handles route-level crashes
 
 - [ ] **A5. Refactor Massive Route Files** (HIGH Risk - Maintainability)
   - [ ] Split backend/app/routes/jobs.py (1016 lines) into logical modules
@@ -254,13 +297,14 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
   - [ ] Maintain API compatibility during refactoring
 
 #### **Phase 3: System Stability & Concurrency** (High Priority)
-- [x] **S1. Job Locking for Concurrency Control** 🔄 **PARTIALLY COMPLETED**
-  - [x] Backend: Implement `POST /jobs/<id>/lock`, `unlock`, and `extend` endpoints ✅ **COMPLETED**
-  - [x] Backend: Add `locked_by` and `locked_until` fields to the Job model ✅ **COMPLETED**
-  - [ ] Frontend: Request lock when opening modals (approve, reject, etc.) ❌ **NOT IMPLEMENTED**
-  - [ ] Frontend: Display "Job is locked" message if lock is held by another user ❌ **NOT IMPLEMENTED**
-  - [ ] Frontend: Implement heartbeat to extend lock while modal is open ❌ **NOT IMPLEMENTED**
-  - [ ] Tests: Add tests for locking, unlocking, and conflict scenarios ❌ **NOT IMPLEMENTED**
+- [x] **S1. Job Locking for Concurrency Control** ✅ **COMPLETED**
+  - [x] Backend: `POST /jobs/<id>/lock`, `unlock`, `extend` endpoints in `backend/app/routes/jobs.py` ✅
+  - [x] Backend: `locked_by`/`locked_until` fields in `backend/app/models/job.py` ✅
+  - [x] Frontend: Auto-lock on modal open; unlock on close; 4‑min extend heartbeat in `frontend/src/components/dashboard/job-card.tsx` (uses `/lock`, `/extend`, `/unlock`) ✅
+  - [x] Frontend: Shows locked state ("🔒 Locked by {locked_by}") when another holds the lock ✅
+  - [x] Tests: API lock/unlock/extend + conflict scenarios in `tests/test_job_locking.py` ✅
+  - Evidence: Verified via code scan; migrations applied; UI wiring present and active
+  - Note: `admin_force_unlock` route currently logs legacy "not_implemented" note; optional enhancement to truly force-clear locks regardless of owner
 
 - [ ] **S2. Duplicate Submission Detection**
   - [ ] Backend: Add `file_hash` field to the Job model
@@ -815,7 +859,7 @@ Accurate, consistent, and maintainable project documentation that reliably refle
 
 ### **Next Steps Available**
 1. **A1: Fix Infrastructure Security** (HIGH PRIORITY - Remove exposed ports, add resource limits)
-2. **S1: Complete Job Locking Frontend Integration** (MEDIUM PRIORITY - Backend is done, need frontend)
+2. **S1: Complete Job Locking Frontend Integration** 
 3. **A4: Implement Proper Error Boundaries** (HIGH PRIORITY - Frontend stability)
 4. **A5: Refactor Massive Route Files** (HIGH PRIORITY - Maintainability)
 5. **E1: E2E Testing Framework** (Phase 4 - Quality assurance)  
