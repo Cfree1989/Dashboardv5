@@ -7,7 +7,7 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
 from app.services.event_service import log_event
-from app.services.file_service import move_authoritative
+from app.services.file_service import move_authoritative, STATUS_TO_DIR
 from app.services.email_service import send_approval_email, send_rejection_email, send_completion_email
 from app.services.token_service import generate_confirmation_token
 from pathlib import Path
