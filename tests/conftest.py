@@ -25,7 +25,7 @@ def client(app):
 def token(client):
     # Login to obtain JWT
     resp = client.post(
-        '/api/v1/auth/login', json={'workstation_id': 'front-desk', 'password': 'password123'}
+        '/api/v1/auth/login', json={'workstation_id': 'Development', 'password': 'password123'}
     )
     data = resp.get_json()
     return data['token']

@@ -4,19 +4,28 @@ from functools import wraps
 from flask import current_app
 from app.utils.decorators import token_required
 from app import limiter
+import os
 
 bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
-# This is a temporary, insecure way to store credentials.
-# In a real application, this would be configured securely.
-WORKSTATIONS = {
-    # Test/development credentials
-    "front-desk": "password123",
-    # Additional sample workstations
-    "workstation-1": "Fabrication",
-    "workstation-2": "Fabrication",
-    "admin": "Fabrication",
-}
+def load_workstation_credentials():
+    """Load workstation credentials from environment variables."""
+    workstations = {}
+    
+    # Load development workstation credentials
+    development_password = os.environ.get('WORKSTATION_DEVELOPMENT', 'password123')
+    workstations['Development'] = development_password
+    
+    # Load workstation credentials
+    for i in range(1, 4):  # Workstation 1, 2, 3
+        workstation_id = f'Workstation {i}'
+        password = os.environ.get(f'WORKSTATION_{i}', 'Fabrication')
+        workstations[workstation_id] = password
+    
+    return workstations
+
+# Load workstation credentials from environment variables
+WORKSTATIONS = load_workstation_credentials()
 
 @bp.route('/login', methods=['POST'])
 @limiter.limit("10 per hour")

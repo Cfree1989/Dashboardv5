@@ -1,10 +1,20 @@
-version: '3.8'
+networks:
+  app-network:
+    driver: bridge
 
 services:
   backend:
     build: ./backend
     ports:
       - "5000:5000"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     environment:
       - FLASK_APP=run.py
       - FLASK_ENV=development
@@ -18,7 +28,13 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - MAIL_DEFAULT_SENDER=${MAIL_DEFAULT_SENDER}
       - FRONTEND_PUBLIC_URL=${FRONTEND_PUBLIC_URL}
+      - WORKSTATION_DEVELOPMENT=${WORKSTATION_DEVELOPMENT}
+      - WORKSTATION_1=${WORKSTATION_1}
+      - WORKSTATION_2=${WORKSTATION_2}
+      - WORKSTATION_3=${WORKSTATION_3}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
+      # Development: Mount source code for hot reloading
       - ./backend:/app
       - ./storage:/app/storage
       - ./scripts:/app/scripts
@@ -31,37 +47,67 @@ services:
     build: ./frontend
     ports:
       - "3000:3000"
+    networks:
+      - app-network
     volumes:
+      # Development: Mount source code for hot reloading
       - ./frontend:/app
       - /app/node_modules
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      - NODE_ENV=development
     depends_on:
       - backend
     restart: unless-stopped
 
   db:
     image: postgres:15
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d 3d_print_system"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     environment:
       - POSTGRES_DB=3d_print_system
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Development: Expose port for direct database access
     ports:
       - "5432:5432"
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Development: Expose port for direct Redis access
     ports:
       - "6379:6379"
     restart: unless-stopped
 
   worker:
     build: ./backend
-    command: rq worker --url redis://redis:6379
+    command: rq worker --url redis://:${REDIS_PASSWORD}@redis:6379
+    networks:
+      - app-network
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
+      # Development: Mount source code for hot reloading
       - ./backend:/app
       - ./storage:/app/storage
       - ./scripts:/app/scripts
@@ -71,4 +117,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data: 
+  postgres_data:

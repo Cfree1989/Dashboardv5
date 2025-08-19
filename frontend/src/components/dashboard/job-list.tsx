@@ -268,9 +268,9 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           <button
             onClick={onToggleExpandCollapse}
             className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            title={expandSignal && expandSignal > collapseSignal ? 'Collapse All' : 'Expand All'}
+            title={expandSignal !== undefined && collapseSignal !== undefined && expandSignal > collapseSignal ? 'Collapse All' : 'Expand All'}
           >
-            {expandSignal && expandSignal > collapseSignal ? (
+            {expandSignal !== undefined && collapseSignal !== undefined && expandSignal > collapseSignal ? (
               <ChevronUp className="w-4 h-4" />
             ) : (
               <ChevronDown className="w-4 h-4" />

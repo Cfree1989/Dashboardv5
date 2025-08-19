@@ -5,6 +5,16 @@ import { useToast } from "../ui/toast";
 import { CatalogEditor } from "./catalog-editor";
 import { apiRequest } from "../../lib/auth";
 
+interface ArchiveResponse {
+  message: string;
+  jobs_archived: number;
+}
+
+interface PruneResponse {
+  message: string;
+  jobs_deleted: number;
+}
+
 export function DataManagementPanel() {
   const [archiveDays, setArchiveDays] = useState(45);
   const [pruneDays, setPruneDays] = useState(365);
@@ -34,7 +44,7 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const data = await apiRequest(`/api/v1/admin/archive`, {
+      const data = await apiRequest<ArchiveResponse>(`/api/v1/admin/archive`, {
         method: "POST",
         body: JSON.stringify({ retention_days: archiveDays, staff_name: staffName.trim() }),
       });
@@ -53,7 +63,7 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const data = await apiRequest(`/api/v1/admin/prune`, {
+      const data = await apiRequest<PruneResponse>(`/api/v1/admin/prune`, {
         method: "POST",
         body: JSON.stringify({ retention_days: pruneDays, staff_name: staffName.trim() }),
       });

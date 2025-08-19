@@ -30,19 +30,14 @@ def test_set_auth_cookie(app):
         
         response = set_auth_cookie(response, token, 'test-workstation')
         
-        # Check that both httpOnly and client cookies are set
+        # Check that httpOnly cookie is set
         cookies = response.headers.getlist('Set-Cookie')
-        assert len(cookies) == 2
+        assert len(cookies) == 1
         
         # Check httpOnly cookie
-        httponly_cookie = [c for c in cookies if 'auth_token=' in c and 'HttpOnly' in c][0]
+        httponly_cookie = cookies[0]
         assert 'auth_token=' in httponly_cookie
         assert 'HttpOnly' in httponly_cookie
-        
-        # Check client cookie
-        client_cookie = [c for c in cookies if 'auth_token_client=' in c][0]
-        assert 'auth_token_client=' in client_cookie
-        assert 'HttpOnly' not in client_cookie
 
 def test_clear_auth_cookies(app):
     """Test clearing JWT cookies."""
@@ -52,13 +47,14 @@ def test_clear_auth_cookies(app):
         
         response = clear_auth_cookies(response)
         
-        # Check that both cookies are cleared
+        # Check that cookie is cleared
         cookies = response.headers.getlist('Set-Cookie')
-        assert len(cookies) == 2
+        assert len(cookies) == 1
         
-        # Both should have Max-Age=0 (expired)
-        for cookie in cookies:
-            assert 'Max-Age=0' in cookie
+        # Should have Max-Age=0 (expired)
+        cookie = cookies[0]
+        assert 'Max-Age=0' in cookie
+        assert 'auth_token=' in cookie
 
 def test_get_token_from_request_cookie(app):
     """Test extracting token from cookie."""
@@ -91,24 +87,20 @@ def test_get_token_from_request_missing(app):
 def test_login_sets_cookies(client):
     """Test that login endpoint sets JWT cookies."""
     response = client.post('/api/v1/auth/login', 
-                          json={'workstation_id': 'front-desk', 'password': 'password123'})
+                          json={'workstation_id': 'Development', 'password': 'password123'})
     
     assert response.status_code == 200
     assert response.json['message'] == 'Login successful'
-    assert response.json['workstation_id'] == 'front-desk'
+    assert response.json['workstation_id'] == 'Development'
     
-    # Check that cookies are set
+    # Check that httpOnly cookie is set
     cookies = response.headers.getlist('Set-Cookie')
-    assert len(cookies) == 2
+    assert len(cookies) == 1
     
     # Check httpOnly cookie
-    httponly_cookie = [c for c in cookies if 'auth_token=' in c and 'HttpOnly' in c][0]
+    httponly_cookie = cookies[0]
     assert 'auth_token=' in httponly_cookie
     assert 'HttpOnly' in httponly_cookie
-    
-    # Check client cookie
-    client_cookie = [c for c in cookies if 'auth_token_client=' in c][0]
-    assert 'auth_token_client=' in client_cookie
 
 def test_logout_clears_cookies(client):
     """Test that logout endpoint clears JWT cookies."""
@@ -117,19 +109,20 @@ def test_logout_clears_cookies(client):
     assert response.status_code == 200
     assert response.json['message'] == 'Logout successful'
     
-    # Check that cookies are cleared
+    # Check that cookie is cleared
     cookies = response.headers.getlist('Set-Cookie')
-    assert len(cookies) == 2
+    assert len(cookies) == 1
     
-    # Both should have Max-Age=0 (expired)
-    for cookie in cookies:
-        assert 'Max-Age=0' in cookie
+    # Should have Max-Age=0 (expired)
+    cookie = cookies[0]
+    assert 'Max-Age=0' in cookie
+    assert 'auth_token=' in cookie
 
 def test_protected_endpoint_with_cookie(client):
     """Test accessing protected endpoint with JWT cookie."""
     # First login to get cookies
     login_response = client.post('/api/v1/auth/login', 
-                                json={'workstation_id': 'front-desk', 'password': 'password123'})
+                                json={'workstation_id': 'Development', 'password': 'password123'})
     assert login_response.status_code == 200
     
     # Extract cookies from login response
@@ -145,23 +138,23 @@ def test_protected_endpoint_with_cookie(client):
     
     assert response.status_code == 200
     assert response.json['message'] == 'Protected endpoint'
-    assert response.json['workstation_id'] == 'front-desk'
+    assert response.json['workstation_id'] == 'Development'
 
 def test_protected_endpoint_with_header_fallback(client):
     """Test accessing protected endpoint with Authorization header (fallback)."""
     # First login to get token
     login_response = client.post('/api/v1/auth/login', 
-                                json={'workstation_id': 'front-desk', 'password': 'password123'})
+                                json={'workstation_id': 'Development', 'password': 'password123'})
     assert login_response.status_code == 200
     
-    # Extract token from client cookie for header
+    # Extract token from httpOnly cookie for header testing
     cookies = {}
     for cookie in login_response.headers.getlist('Set-Cookie'):
-        if 'auth_token_client=' in cookie:
+        if 'auth_token=' in cookie and 'HttpOnly' in cookie:
             cookie_parts = cookie.split(';')[0].split('=')
             cookies[cookie_parts[0]] = cookie_parts[1]
     
-    token = cookies['auth_token_client']
+    token = cookies['auth_token']
     
     # Access protected endpoint with Authorization header
     response = client.get('/api/v1/auth/protected', 
@@ -169,7 +162,7 @@ def test_protected_endpoint_with_header_fallback(client):
     
     assert response.status_code == 200
     assert response.json['message'] == 'Protected endpoint'
-    assert response.json['workstation_id'] == 'front-desk'
+    assert response.json['workstation_id'] == 'Development'
 
 def test_protected_endpoint_no_token(client):
     """Test accessing protected endpoint without token."""

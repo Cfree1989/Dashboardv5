@@ -44,19 +44,6 @@ def set_auth_cookie(response, token, workstation_id):
         path=path
     )
     
-    # Also set a non-httpOnly cookie for client-side access during transition
-    # This will be removed in D3-S2 when frontend is updated
-    response.set_cookie(
-        f"{cookie_name}_client",
-        token,
-        max_age=max_age,
-        secure=secure,
-        httponly=False,  # Allow JavaScript access during transition
-        samesite=samesite,
-        domain=domain,
-        path=path
-    )
-    
     return response
 
 def clear_auth_cookies(response):
@@ -68,13 +55,6 @@ def clear_auth_cookies(response):
     # Clear httpOnly cookie
     response.delete_cookie(
         cookie_name,
-        domain=domain,
-        path=path
-    )
-    
-    # Clear client-side cookie
-    response.delete_cookie(
-        f"{cookie_name}_client",
         domain=domain,
         path=path
     )
