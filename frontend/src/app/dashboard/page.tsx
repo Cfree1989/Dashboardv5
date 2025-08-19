@@ -20,11 +20,21 @@ export default function DashboardPage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pauseRefresh, setPauseRefresh] = useState(false);
+  
+  // DIAGNOSTIC: Track pauseRefresh changes
+  useEffect(() => {
+    console.log(`[DASHBOARD] pauseRefresh changed to: ${pauseRefresh}`);
+  }, [pauseRefresh]);
   const [isJobOperation, setIsJobOperation] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [expandSignal, setExpandSignal] = useState(0);
   const [collapseSignal, setCollapseSignal] = useState(0);
+  
+  // DIAGNOSTIC: Track collapse signal changes
+  useEffect(() => {
+    console.log(`[DASHBOARD] collapseSignal changed to: ${collapseSignal}`);
+  }, [collapseSignal]);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   
   // Use ref to track previous counts for sound comparison

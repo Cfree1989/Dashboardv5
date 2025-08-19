@@ -85,7 +85,15 @@ function convertToWindowsPath(filePath: string): string {
 }
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
+  // DIAGNOSTIC: Track component re-renders
+  console.log(`[${job.id}] JobCard re-render - expandSignal: ${expandSignal}, collapseSignal: ${collapseSignal}`);
+  
   const [showMore, setShowMore] = useState(false);
+  
+  // DIAGNOSTIC: Track showMore state changes
+  useEffect(() => {
+    console.log(`[${job.id}] showMore changed to: ${showMore}`);
+  }, [showMore, job.id]);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -135,9 +143,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   useEffect(() => {
     if (typeof collapseSignal === 'number') {
       // Close details
+      console.log(`[${job.id}] Global collapse signal triggered: ${collapseSignal}, setting showMore=false`);
       setShowMore(false);
     }
-  }, [collapseSignal]);
+  }, [collapseSignal, job.id]);
 
 
 
@@ -237,11 +246,13 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const beginEditNotes = async () => {
+    console.log(`[${job.id}] beginEditNotes: showMore=${showMore}, about to call onModalOpenChange(true)`);
     setIsEditingNotes(true);
     setNotesDraft("");
     setSaveMessage("");
     setSaveError("");
     onModalOpenChange?.(true);
+    console.log(`[${job.id}] beginEditNotes: onModalOpenChange(true) called`);
     // Staff is already loaded on component mount
   };
 
@@ -389,7 +400,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <button
                 type="button"
                 onClick={() => {
+                  console.log(`[${job.id}] "Has notes" button clicked, current showMore: ${showMore}`);
                   setShowMore(true);
+                  console.log(`[${job.id}] setShowMore(true) called`);
                   beginEditNotes();
                   // Focus will move to textarea via effect
                 }}
@@ -438,8 +451,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   className="text-sm text-gray-500 italic mb-3 cursor-pointer focus-ring"
                   role="button"
                   tabIndex={0}
-                  onClick={beginEditNotes}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
+                  onClick={() => {
+                    console.log(`[${job.id}] "No notes yet" placeholder clicked, current showMore: ${showMore}`);
+                    beginEditNotes();
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); console.log(`[${job.id}] "No notes yet" keyboard activated`); beginEditNotes(); } }}
                   aria-label="Click to add a note"
                 >
                   No notes added yet — click to add
@@ -451,8 +467,11 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     className="bg-gray-50 p-2 rounded border cursor-pointer focus-ring"
                     role="button"
                     tabIndex={0}
-                    onClick={beginEditNotes}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
+                    onClick={() => {
+                      console.log(`[${job.id}] Existing notes area clicked, current showMore: ${showMore}`);
+                      beginEditNotes();
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); console.log(`[${job.id}] Existing notes keyboard activated`); beginEditNotes(); } }}
                     aria-label="Click to add or edit note"
                   >
                     <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
