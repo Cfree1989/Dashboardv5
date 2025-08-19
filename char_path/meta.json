@@ -1,0 +1,16 @@
+{
+  "authoritative_history": [
+    {
+      "ts": "2025-08-19T20:54:12.839028",
+      "by": "Char Staff",
+      "event": "StaffApproved",
+      "from": null,
+      "to": "char_test.stl"
+    }
+  ],
+  "authoritative_filename": "char_test.stl",
+  "status": "PENDING",
+  "display_name": "char_test.stl",
+  "file_path": "char_path/file.stl",
+  "updated_at": "2025-08-19T20:54:12.839035"
+}
