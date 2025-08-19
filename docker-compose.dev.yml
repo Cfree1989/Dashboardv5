@@ -101,7 +101,7 @@ services:
 
   worker:
     build: ./backend
-    command: rq worker --url redis://:${REDIS_PASSWORD}@redis:6379
+    command: rq worker default --url redis://:${REDIS_PASSWORD}@redis:6379
     networks:
       - app-network
     environment:

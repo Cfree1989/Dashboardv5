@@ -29,3 +29,9 @@ def token(client):
     )
     data = resp.get_json()
     return data['token']
+
+@pytest.fixture(autouse=True)
+def app_ctx(app):
+    """Automatically push an application context for tests"""
+    with app.app_context():
+        yield

@@ -14,7 +14,10 @@ import tempfile
 import json
 import shutil
 import time
-import psutil
+try:
+    import psutil
+except ImportError:
+    import pytest; pytest.skip("psutil not installed", allow_module_level=True)
 import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed

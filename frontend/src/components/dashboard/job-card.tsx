@@ -40,6 +40,8 @@ interface Job {
     paid_ts: string;
     paid_by_staff: string;
   };
+  locked_by?: string;
+  locked_until?: string;
 }
 
 interface JobCardProps {
@@ -87,6 +89,7 @@ function convertToWindowsPath(filePath: string): string {
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
   // DIAGNOSTIC: Track component re-renders vs mounts
   console.log(`[${job.id}] JobCard render - expandSignal: ${expandSignal}, collapseSignal: ${collapseSignal}`);
+  const isLocked = typeof job.locked_by === 'string' && job.locked_until !== undefined && new Date(job.locked_until) > new Date();
   
   const [showMore, setShowMore] = useState(false);
   
@@ -179,6 +182,47 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     };
     loadStaff();
   }, []);
+
+  // Auto-lock and extend lock while any modal is open
+  useEffect(() => {
+    const isModalOpen = Boolean(
+      showReviewModal !== null ||
+      showRejectModal ||
+      showApprovalModal ||
+      showStatusChangeModal !== null ||
+      showPaymentModal ||
+      showDeleteConfirm ||
+      showResendModal
+    );
+
+    let intervalId: NodeJS.Timeout;
+    const lockJob = async () => {
+      try {
+        await apiRequest(`/api/v1/jobs/${job.id}/lock`, { method: 'POST' });
+      } catch (err) {
+        console.error('Lock request failed', err);
+      }
+    };
+    const extendLock = async () => {
+      try {
+        await apiRequest(`/api/v1/jobs/${job.id}/extend`, { method: 'POST' });
+      } catch (err) {
+        console.error('Extend lock failed', err);
+      }
+    };
+
+    if (isModalOpen) {
+      lockJob();
+      intervalId = setInterval(extendLock, 4 * 60 * 1000);
+    } else {
+      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(console.error);
+    }
+
+    return () => {
+      clearInterval(intervalId);
+      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(console.error);
+    };
+  }, [showReviewModal, showRejectModal, showApprovalModal, showStatusChangeModal, showPaymentModal, showDeleteConfirm, showResendModal, job.id]);
 
   // Staff data is already loaded on component mount, no need for separate resend modal loading
   
@@ -347,9 +391,15 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
        className={`
        bg-white rounded-xl shadow-sm border transition-all card-hover
        ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
+       ${isLocked ? "opacity-50 pointer-events-none" : ""}
      `}
      >
        <div className="p-4">
+    {isLocked && (
+      <div className="mb-2 text-sm text-red-600 font-medium">
+        🔒 Locked by {job.locked_by}
+      </div>
+    )}
 		{currentStatus === 'UPLOADED' && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
 				<span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>

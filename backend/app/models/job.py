@@ -40,7 +40,11 @@ class Job(db.Model):
     staff_viewed_at = db.Column(db.DateTime, nullable=True)
     last_updated_by = db.Column(db.String(100), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    
+
+    # Locking fields
+    locked_by = db.Column(db.String(100), nullable=True)
+    locked_until = db.Column(db.DateTime, nullable=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -79,5 +83,7 @@ class Job(db.Model):
             'notes': self.notes,
             'created_at': self.created_at.replace(tzinfo=timezone.utc).isoformat(),
             'updated_at': self.updated_at.replace(tzinfo=timezone.utc).isoformat(),
+            'locked_by': self.locked_by,
+            'locked_until': self.locked_until.replace(tzinfo=timezone.utc).isoformat() if self.locked_until else None,
             'payment': self.payment.to_dict() if self.payment else None
         } 

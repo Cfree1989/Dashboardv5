@@ -43,7 +43,8 @@ def login():
         # Create response with success message
         response = make_response(jsonify({
             'message': 'Login successful',
-            'workstation_id': workstation_id
+            'workstation_id': workstation_id,
+            'token': token
         }))
         
         # Set JWT token as httpOnly cookie

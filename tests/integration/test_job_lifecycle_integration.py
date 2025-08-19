@@ -37,9 +37,9 @@ class TestJobLifecycleIntegration:
                 'student_email': 'integration@lsu.edu',
                 'discipline': 'Engineering',
                 'class_number': 'ME 2743',
-                'printer': 'Prusa MK3S',
+                'printer': 'Prusa MK4S',
                 'material': 'PLA',
-                'color': 'Black',
+                'color': 'True Black',
                 'notes': 'Integration test for atomic file operations'
             }
             

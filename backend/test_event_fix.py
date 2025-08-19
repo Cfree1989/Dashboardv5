@@ -8,6 +8,9 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
+import pytest
+pytest.skip("Skipping manual event logging script in pytest", allow_module_level=True)
+
 from app import create_app
 from app.services.event_service import log_event, JOB_SPECIFIC_EVENTS, SYSTEM_EVENTS
 

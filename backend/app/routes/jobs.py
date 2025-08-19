@@ -10,7 +10,7 @@ from app.services.email_service import send_approval_email
 from app.services.email_service import send_rejection_email, send_completion_email
 from app.services.event_service import log_event
 from app.models.staff import Staff
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 from pathlib import Path
@@ -1084,4 +1084,43 @@ def revert_pickup(job_id):
     db.session.add(evt)
     db.session.commit()
     _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToCompleted')
+    return jsonify(job.to_dict()), 200
+
+@bp.route('/<job_id>/lock', methods=['POST'])
+@token_required
+def lock_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    now = datetime.utcnow()
+    if job.locked_by and job.locked_until and job.locked_until > now:
+        return jsonify(job.to_dict()), 409
+    job.locked_by = g.workstation_id
+    job.locked_until = now + timedelta(minutes=5)
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+@bp.route('/<job_id>/unlock', methods=['POST'])
+@token_required
+def unlock_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.locked_by != g.workstation_id:
+        return jsonify({'message': 'Not lock owner'}), 403
+    job.locked_by = None
+    job.locked_until = None
+    db.session.commit()
+    return jsonify(job.to_dict()), 200
+
+@bp.route('/<job_id>/extend', methods=['POST'])
+@token_required
+def extend_job_lock(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    if job.locked_by != g.workstation_id:
+        return jsonify({'message': 'Not lock owner'}), 403
+    job.locked_until = datetime.utcnow() + timedelta(minutes=5)
+    db.session.commit()
     return jsonify(job.to_dict()), 200

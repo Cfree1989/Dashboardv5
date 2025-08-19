@@ -57,6 +57,9 @@ class DatabaseTransactionService:
             transaction_context.rollback()
             raise
     
+    # Alias for compatibility: tests expect a 'transaction' method
+    transaction = atomic_transaction
+
     def with_atomic_transaction(self, operation_id: Optional[str] = None):
         """
         Decorator for functions that require atomic database and file operations.

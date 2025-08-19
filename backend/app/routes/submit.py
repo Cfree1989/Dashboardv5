@@ -60,15 +60,16 @@ def submit_job():
         file_bytes = file.read()
         file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-        # Duplicate detection in active statuses
+        # Duplicate detection in active statuses (only select id, avoid extra columns)
         active_statuses = ['UPLOADED', 'PENDING', 'READYTOPRINT']
-        existing = Job.query.filter(
+        existing_record = db.session.query(Job.id).filter(
             Job.file_hash == file_hash,
             Job.student_email == request.form.get('student_email'),
             Job.status.in_(active_statuses)
         ).first()
+        existing = existing_record[0] if existing_record else None
         if existing:
-            return jsonify({'message': 'duplicate active job exists', 'existing_job_id': existing.id}), 409
+            return jsonify({'message': 'duplicate active job exists', 'existing_job_id': existing}), 409
 
         # Prepare storage directory
         # Use STORAGE_PATH root and ensure status subdir
@@ -81,7 +82,9 @@ def submit_job():
         # Generate a human-friendly short id (ensure uniqueness by retrying with more chars if needed)
         for length in (6, 7, 8, 9, 10, 11, 12):
             candidate_short = new_id[:length]
-            if not Job.query.filter_by(short_id=candidate_short).first():
+            # Check only id to avoid selecting newly-added lock columns
+            existing_short = db.session.query(Job.id).filter_by(short_id=candidate_short).first()
+            if not existing_short:
                 short_id = candidate_short
                 break
         else:
