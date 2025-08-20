@@ -1605,3 +1605,90 @@ export USE_NEW_RESPONSE_SERVICE=false
 **Phase 0 Retrospective Complete**  
 **Confidence Level**: High for proceeding to Phase 1  
 **Recommended Next Action**: Begin validation service extraction from jobs.py using proven methodology
+
+---
+
+## 🕰️ **TIME-TRAVEL LESSONS: The Day 1 Docker Deception (New section added after recent experience)**
+
+### **Hey Past Me, About Those Unhealthy Containers You're About to See...**
+
+*Written by Future You who just spent an hour debugging perfectly fine application code because the Docker health checks themselves were broken. Read this the moment `docker-compose ps` shows you an `(unhealthy)` status.*
+
+---
+
+### CRITICAL DISCOVERY #23: The 'Unhealthy' Container That Isn't the Application's Fault
+
+**What Past You will try**: 
+You'll see `(unhealthy)` next to your `backend`, `frontend`, and `worker` containers and immediately dive into the application logs. You'll assume there's a bug in your `/api/v1/health` endpoint or that the application is crashing silently.
+
+**Why it seems logical**:
+The `(unhealthy)` status is designed to tell you that your *application* is not responding correctly. It's a clear signal that something is wrong with the code running inside the container. You'll assume the environment is fine because the container is *running*, not crashing.
+
+**What actually happens**:
+The application code is perfectly fine. The real problem is that the **health check itself is broken**. The command specified in `docker-compose.dev.yml` (`curl -f http://localhost...`) cannot execute because the `curl` binary is not installed in the base Docker images for the `backend` and `frontend`. For the `worker`, the health check is fundamentally wrong—it's trying to `curl` a web endpoint on a container that doesn't run a web server.
+
+**Technical deep dive**:
+- **Root cause**: The `Dockerfile` for both `backend` and `frontend` uses a minimal base image that does not include common tools like `curl`. The `healthcheck` in `docker-compose.dev.yml` has a hard dependency on `curl`.
+- **Worker Misconfiguration**: The `worker` service's health check was likely copied from the `backend` service definition. This web-based health check is inappropriate for a background task processor like `rq`, which doesn't expose a web server.
+- **Symptom vs. Cause**: The `(unhealthy)` status is just a symptom. The root cause is a misconfigured environment, not a broken application. Debugging the application code is a complete waste of time.
+
+**Debugging process that revealed this**:
+1. **Observation**: Noticed `(unhealthy)` status for multiple containers. Application logs showed the servers were running, which was a direct contradiction.
+2. **Hypothesis**: The health check *itself* might be failing, rather than the application endpoint it's trying to check.
+3. **Test**: Manually executed the health check command inside the container: `docker-compose -f docker-compose.dev.yml exec backend curl -f http://localhost:5000/api/v1/health`.
+4. **Result**: `OCI runtime exec failed: ... "curl": executable file not found in $PATH`. This was the breakthrough. The command couldn't even run.
+5. **Fix**: Added `curl` installation to the respective `Dockerfile`s and corrected the `worker` health check in `docker-compose.dev.yml` to use a command appropriate for its process (`rq info`).
+
+**What Past You should do instead**:
+Whenever you see an `(unhealthy)` container, follow this protocol **before** debugging application code:
+1.  Inspect `docker-compose.dev.yml` to find the exact `test` command for the failing service's `healthcheck`.
+2.  Attempt to run that exact command manually inside the container using `docker-compose -f docker-compose.dev.yml exec <service_name> <command>`.
+3.  If it fails with "command not found," add the required tool (e.g., `curl`, `wget`) to the service's `Dockerfile`.
+4.  If the command fails for other reasons (e.g., connection refused on a worker), verify that the health check is logically correct for the service's purpose. Replace it with a command that properly checks the process (e.g., `rq info` for RQ workers, `pg_isready` for Postgres).
+5.  After modifying the `Dockerfile` or `docker-compose.dev.yml`, you **must** rebuild the image (`docker-compose -f docker-compose.dev.yml build <service_name>`) and then recreate the container (`docker-compose -f docker-compose.dev.yml up -d --force-recreate <service_name>`). Simply restarting is not enough.
+
+**Implementation template**:
+```dockerfile
+# Before (in backend/Dockerfile and frontend/Dockerfile)
+FROM python:3.11-slim # or node:18-alpine
+# ... no curl installation
+
+# After (in backend/Dockerfile)
+# Add curl to the list of installed packages
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# After (in frontend/Dockerfile)
+FROM node:18-alpine
+# Install curl using the alpine package manager
+RUN apk add --no-cache curl
+# ...
+```
+
+```yaml
+# Before (worker healthcheck in docker-compose.dev.yml)
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+
+# After (worker healthcheck in docker-compose.dev.yml)
+healthcheck:
+  test: ["CMD", "rq", "info", "-u", "redis://:${REDIS_PASSWORD}@redis:6379/0"]
+```
+
+**How to recognize this pattern in future**:
+-   A container is marked `(unhealthy)` but its logs show the main process is running without any errors.
+-   `docker-compose up` completes without error, but `docker-compose ps` shows unhealthy services a minute later.
+-   The issue appears on a fresh clone of the repository or after switching to a branch where the Docker configuration has changed.
+
+**Time lost on this issue**: 1-2 hours diagnosing a supposed "application" failure that was actually an environment setup issue.
+**Confidence level**: High. This fix has already resolved the container health issues.
+
+---
+
+## 🕰️ **TIME-TRAVEL LESSON: The "Half-Committed" Data Corruption Failure**
+
+### **Hey Past Me, About That `db.session.commit()` You're Putting in Every Service...**
+
+*Written by Future You who just spent a full day debugging why a job was marked as 'PAID' but the associated file move operation failed, leaving the system in a corrupt state. This lesson is non-negotiable for maintaining data integrity.*
