@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from datetime import timedelta
 import shutil
 from app.services.error_handling_service import get_error_handling_service
+from app.services.validation_service import ValidationService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,10 @@ def delete_orphaned_file():
     staff_name = (data.get('staff_name') or '').strip()
     if not file_path or not staff_name:
         return jsonify({'message': 'file_path and staff_name are required'}), 400
+    # Validate staff
+    staff_res = ValidationService.validate_staff(staff_name)
+    if not staff_res.is_valid:
+        return jsonify({'message': staff_res.error_message}), 400
     # Security: restrict deletions to STORAGE_PATH
     root = _storage_root().resolve()
     target = Path(file_path).resolve()
@@ -184,6 +189,10 @@ def delete_stale_file():
     staff_name = (data.get('staff_name') or '').strip()
     if not file_path or not staff_name:
         return jsonify({'message': 'file_path and staff_name are required'}), 400
+    # Validate staff
+    staff_res = ValidationService.validate_staff(staff_name)
+    if not staff_res.is_valid:
+        return jsonify({'message': staff_res.error_message}), 400
     root = _storage_root().resolve()
     target = Path(file_path).resolve()
     if not str(target).startswith(str(root)):
