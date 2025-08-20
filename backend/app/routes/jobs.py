@@ -22,12 +22,22 @@ from app.services.catalog_service import CatalogService
 from app.services.error_handling_service import get_error_handling_service
 import logging
 from sqlalchemy import or_
+from app.services.validation_service import ValidationService
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
 # TODO: Implement job management routes 
+
+@bp.route('/<job_id>/validate', methods=['GET'])
+@token_required
+def validate_job(job_id):
+    """Test endpoint to verify ValidationService works"""
+    result = ValidationService.validate_job_exists(job_id)
+    if not result.is_valid:
+        return jsonify({'message': result.error_message}), 404
+    return jsonify({'message': 'Job is valid', 'job_id': job_id}), 200
 
 @bp.route('', methods=['GET'])
 @token_required
