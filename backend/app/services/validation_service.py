@@ -27,7 +27,11 @@ class ValidationService:
     def validate_job_exists(job_id: str) -> ValidationResult:
         """Validates job exists and is accessible"""
         from app.models.job import Job
-        job = Job.query.get(job_id)
+        try:
+            job = Job.query.get(job_id)
+        except RuntimeError:
+            # Outside Flask context: treat as not found
+            return ValidationResult(False, 'Job not found')
         if not job:
             return ValidationResult(False, 'Job not found')
         return ValidationResult(True, data=job)
