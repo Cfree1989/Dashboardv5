@@ -105,13 +105,13 @@ This document maps all interfaces from the old monolithic `JobLifecycleService` 
 
 ## Import Path Changes
 
-### Old Import Pattern
+### Old Import Pattern (DEPRECATED)
 ```python
 from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
 lifecycle_service = JobLifecycleService()
 ```
 
-### New Import Pattern
+### New Import Pattern (CURRENT)
 ```python
 from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from app.business_logic.job_lifecycle.job_approval_service import JobApprovalData
@@ -122,12 +122,12 @@ orchestration_service = JobOrchestrationService()
 
 ### Example 1: Job Approval Route
 ```python
-# OLD
-from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
-lifecycle_service = JobLifecycleService()
-result = lifecycle_service.approve_job(job_id, approval_data)
+# OLD (DEPRECATED - REMOVED)
+# from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
+# lifecycle_service = JobLifecycleService()
+# result = lifecycle_service.approve_job(job_id, approval_data)
 
-# NEW
+# NEW (CURRENT)
 from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from app.business_logic.job_lifecycle.job_approval_service import JobApprovalData
 orchestration_service = JobOrchestrationService()
@@ -136,12 +136,12 @@ result = orchestration_service.approve_job(job_id, approval_data)
 
 ### Example 2: Job Status Route
 ```python
-# OLD
-from app.services.job_lifecycle_service import JobLifecycleService, JobStatusTransitionData
-lifecycle_service = JobLifecycleService()
-result = lifecycle_service.mark_printing(job_id, transition_data)
+# OLD (DEPRECATED - REMOVED)
+# from app.services.job_lifecycle_service import JobLifecycleService, JobStatusTransitionData
+# lifecycle_service = JobLifecycleService()
+# result = lifecycle_service.mark_printing(job_id, transition_data)
 
-# NEW
+# NEW (CURRENT)
 from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from app.business_logic.job_lifecycle.job_status_service import JobStatusTransitionData
 orchestration_service = JobOrchestrationService()
@@ -158,12 +158,14 @@ result = orchestration_service.mark_printing(job_id, transition_data)
 
 ## Migration Checklist
 
-- [ ] Update route imports to use new service locations
-- [ ] Replace `JobLifecycleService` instantiation with `JobOrchestrationService`
-- [ ] Update data class imports to new locations
-- [ ] Test each route individually before enabling in app
-- [ ] Verify all method calls work with new service
-- [ ] Test end-to-end functionality
+- [x] Update route imports to use new service locations
+- [x] Replace `JobLifecycleService` instantiation with `JobOrchestrationService`
+- [x] Update data class imports to new locations
+- [x] Test each route individually before enabling in app
+- [x] Verify all method calls work with new service
+- [x] Test end-to-end functionality
+- [x] Update test files to use orchestration service
+- [x] Update documentation references
 
 ## Notes
 
