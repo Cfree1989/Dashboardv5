@@ -24,7 +24,7 @@ import logging
 from sqlalchemy import or_
 from app.services.validation_service import ValidationService
 from app.services.response_service import ResponseService
-from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
+from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobUpdateNotesData, JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData, JobLockData
 from app.services.payment_service import PaymentService
 from app.services.interfaces.payment_service_interface import PaymentData
 
@@ -306,43 +306,21 @@ def log_file_open(job_id):
 @bp.route('/<job_id>/notes', methods=['PATCH'])
 @token_required
 def update_notes(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
     data = request.get_json(silent=True) or {}
-    staff_name = data.get('staff_name')
-    if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
-    if 'notes' not in data:
-        return jsonify({'message': 'notes field is required'}), 400
-    notes_val = data.get('notes')
-    if not isinstance(notes_val, str):
-        return jsonify({'message': 'notes must be a string'}), 400
-    if len(notes_val) > 5000:
-        return jsonify({'message': 'notes must be at most 5000 characters'}), 400
-
-    job.notes = notes_val
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
-
-    # Log event with length only (avoid storing full notes in event log)
-    evt = Event(
-        job_id=job.id,
-        event_type='NotesUpdated',
-        details={'notes_len': len(notes_val)},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
-    )
-    db.session.add(evt)
-    db.session.commit()
-
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        # Create update notes data object
+        notes_data = JobUpdateNotesData(
+            staff_name=data.get('staff_name'),
+            notes=data.get('notes')
+        )
+        
+        # Use JobLifecycleService to update notes
+        job = lifecycle_service.update_notes(job_id, notes_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
@@ -700,38 +678,47 @@ def revert_pickup(job_id):
 @bp.route('/<job_id>/lock', methods=['POST'])
 @token_required
 def lock_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    now = datetime.utcnow()
-    if job.locked_by and job.locked_until and job.locked_until > now:
-        return jsonify(job.to_dict()), 409
-    job.locked_by = g.workstation_id
-    job.locked_until = now + timedelta(minutes=5)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        # Create lock data object
+        lock_data = JobLockData(
+            workstation_id=getattr(g, 'workstation_id', 'unknown')
+        )
+        
+        # Use JobLifecycleService to lock job
+        job = lifecycle_service.lock_job(job_id, lock_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e), status=409 if 'already locked' in str(e) else 400)
 
 @bp.route('/<job_id>/unlock', methods=['POST'])
 @token_required
 def unlock_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.locked_by != g.workstation_id:
-        return jsonify({'message': 'Not lock owner'}), 403
-    job.locked_by = None
-    job.locked_until = None
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        # Create lock data object
+        lock_data = JobLockData(
+            workstation_id=getattr(g, 'workstation_id', 'unknown')
+        )
+        
+        # Use JobLifecycleService to unlock job
+        job = lifecycle_service.unlock_job(job_id, lock_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e), status=403 if 'Not lock owner' in str(e) else 400)
 
 @bp.route('/<job_id>/extend', methods=['POST'])
 @token_required
 def extend_job_lock(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.locked_by != g.workstation_id:
-        return jsonify({'message': 'Not lock owner'}), 403
-    job.locked_until = datetime.utcnow() + timedelta(minutes=5)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        # Create lock data object
+        lock_data = JobLockData(
+            workstation_id=getattr(g, 'workstation_id', 'unknown')
+        )
+        
+        # Use JobLifecycleService to extend job lock
+        job = lifecycle_service.extend_job_lock(job_id, lock_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e), status=403 if 'Not lock owner' in str(e) else 400)

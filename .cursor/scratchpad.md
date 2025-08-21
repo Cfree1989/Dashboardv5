@@ -146,6 +146,26 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
    - **After**: Delegates to `JobLifecycleService.force_unlock_job()` with `JobForceUnlockData`
    - **Result**: Clean admin unlock workflow with audit logging
 
+9. **`update_notes` function** - Simplified from 35+ lines to 15 lines
+   - **Before**: Inline validation, database operations, event logging
+   - **After**: Delegates to `JobLifecycleService.update_notes()` with `JobUpdateNotesData`
+   - **Result**: Clean notes update workflow with validation
+
+10. **`lock_job` function** - Simplified from 15+ lines to 15 lines
+    - **Before**: Inline validation, database operations, business logic
+    - **After**: Delegates to `JobLifecycleService.lock_job()` with `JobLockData`
+    - **Result**: Centralized lock management with proper error handling
+
+11. **`unlock_job` function** - Simplified from 15+ lines to 15 lines
+    - **Before**: Inline validation, database operations, business logic
+    - **After**: Delegates to `JobLifecycleService.unlock_job()` with `JobLockData`
+    - **Result**: Centralized lock management with proper error handling
+
+12. **`extend_job_lock` function** - Simplified from 15+ lines to 15 lines
+    - **Before**: Inline validation, database operations, business logic
+    - **After**: Delegates to `JobLifecycleService.extend_job_lock()` with `JobLockData`
+    - **Result**: Centralized lock management with proper error handling
+
 ### **New Service Methods Added** ✅:
 - `JobLifecycleService.review_job()` - Complete review workflow with validation
 - `JobLifecycleService.append_note()` - Note management with length validation
@@ -154,6 +174,10 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
 - `JobLifecycleService.hard_delete_job()` - Hard delete with file cleanup and event logging
 - `JobLifecycleService.resend_approval_email()` - Email resend workflow with token generation
 - `JobLifecycleService.force_unlock_job()` - Admin force unlock with audit logging
+- `JobLifecycleService.update_notes()` - Notes update workflow with validation
+- `JobLifecycleService.lock_job()` - Job locking with validation
+- `JobLifecycleService.unlock_job()` - Job unlocking with validation
+- `JobLifecycleService.extend_job_lock()` - Job lock extension with validation
 
 ### **New Data Classes Added** ✅:
 - `JobReviewData` - Encapsulates review parameters
@@ -162,6 +186,8 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
 - `JobDeleteData` - Encapsulates deletion parameters
 - `JobResendEmailData` - Encapsulates email resend parameters
 - `JobForceUnlockData` - Encapsulates force unlock parameters
+- `JobUpdateNotesData` - Encapsulates notes update parameters
+- `JobLockData` - Encapsulates lock management parameters
 
 ### **Testing Status** ✅:
 - **Unit Tests**: All 25 job lifecycle service tests passing

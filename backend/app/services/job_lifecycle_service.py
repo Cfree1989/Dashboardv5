@@ -48,6 +48,12 @@ class JobNoteData:
         self.staff_name = staff_name
         self.text = text
 
+class JobUpdateNotesData:
+    """Data class for updating notes parameters"""
+    def __init__(self, staff_name: str, notes: str):
+        self.staff_name = staff_name
+        self.notes = notes
+
 class JobAdminStatusChangeData:
     """Data class for admin status change parameters"""
     def __init__(self, staff_name: str, new_status: str, reason: str):
@@ -70,6 +76,12 @@ class JobForceUnlockData:
     def __init__(self, staff_name: str, reason: str):
         self.staff_name = staff_name
         self.reason = reason
+
+class JobLockData:
+    """Data class for job lock parameters"""
+    def __init__(self, workstation_id: str, lock_duration_minutes: int = 5):
+        self.workstation_id = workstation_id
+        self.lock_duration_minutes = lock_duration_minutes
 
 class JobStatusTransitionData:
     """Data class for job status transition parameters"""
@@ -304,6 +316,46 @@ class JobLifecycleService:
             event_type='NoteAdded',
             details={'text_len': len(text)},
             triggered_by=note_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        return job
+    
+    def update_notes(self, job_id: str, notes_data: JobUpdateNotesData, workstation_id: str = None) -> Job:
+        """Update job notes with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        staff_result = self.validation.validate_staff(notes_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Validate notes
+        if not isinstance(notes_data.notes, str):
+            raise ValueError('notes must be a string')
+        
+        if len(notes_data.notes) > 5000:
+            raise ValueError('notes must be at most 5000 characters')
+        
+        job = job_result.data
+        
+        # Update job
+        job.notes = notes_data.notes
+        job.last_updated_by = notes_data.staff_name
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event with length only (avoid storing full notes in event log)
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job.id,
+            event_type='NotesUpdated',
+            details={'notes_len': len(notes_data.notes)},
+            triggered_by=notes_data.staff_name,
             workstation_id=workstation_id,
         )
         db.session.add(evt)
@@ -561,6 +613,72 @@ class JobLifecycleService:
             'message': 'unlock processed',
             'lock_support': 'not_implemented'
         }
+    
+    def lock_job(self, job_id: str, lock_data: JobLockData) -> Job:
+        """Lock a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Check if job is already locked
+        now = datetime.utcnow()
+        if job.locked_by and job.locked_until and job.locked_until > now:
+            raise ValueError('Job is already locked')
+        
+        # Lock the job
+        job.locked_by = lock_data.workstation_id
+        job.locked_until = now + timedelta(minutes=lock_data.lock_duration_minutes)
+        
+        db.session.add(job)
+        db.session.commit()
+        
+        return job
+    
+    def unlock_job(self, job_id: str, lock_data: JobLockData) -> Job:
+        """Unlock a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Check if current workstation owns the lock
+        if job.locked_by != lock_data.workstation_id:
+            raise ValueError('Not lock owner')
+        
+        # Unlock the job
+        job.locked_by = None
+        job.locked_until = None
+        
+        db.session.add(job)
+        db.session.commit()
+        
+        return job
+    
+    def extend_job_lock(self, job_id: str, lock_data: JobLockData) -> Job:
+        """Extend a job lock with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Check if current workstation owns the lock
+        if job.locked_by != lock_data.workstation_id:
+            raise ValueError('Not lock owner')
+        
+        # Extend the lock
+        job.locked_until = datetime.utcnow() + timedelta(minutes=lock_data.lock_duration_minutes)
+        
+        db.session.add(job)
+        db.session.commit()
+        
+        return job
 
     # --- Status Transition Methods ---
     
