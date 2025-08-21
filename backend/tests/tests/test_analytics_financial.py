@@ -144,7 +144,7 @@ def test_financial_estimated_vs_actual_revenue(client, token, app):
             file_path='path2',
             metadata_path='meta2',
             printer='Formlabs',
-            color='Black',
+            color='True Black',
             material='Resin',
             status='UPLOADED',
             cost_usd=8.00,

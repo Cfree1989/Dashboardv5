@@ -344,7 +344,7 @@ class TestCatalogService:
                     'method': 'Filament',
                     'name': 'Material 1',
                     'unit_cost_per_g_cents': 10,
-                    'colors': ['Black'],
+                    'colors': ['True Black'],
                     'is_active': True
                 }
             ]
@@ -755,7 +755,7 @@ class TestCatalogAPIEndpoints:
                         'method': 'Filament',
                         'name': 'Test Material',
                         'unit_cost_per_g_cents': 10,
-                        'colors': ['Black'],
+                        'colors': ['True Black'],
                         'is_active': True
                     }
                 ]
@@ -817,7 +817,7 @@ class TestCatalogIntegration:
             'method': 'Filament',
             'material': 'InvalidMaterial',  # Not in catalog
             'color': 'True Black',
-            printer='Prusa MK4S',
+            'printer': 'Prusa MK4S',
             'weight_grams': 50,
             'notes': 'Test job'
         }
@@ -839,7 +839,7 @@ class TestCatalogIntegration:
             'method': 'Filament',
             'material': 'PLA',
             'color': 'True Black',
-            printer='Prusa MK4S',
+            'printer': 'Prusa MK4S',
             'weight_grams': 50,
             'notes': 'Test job'
         }

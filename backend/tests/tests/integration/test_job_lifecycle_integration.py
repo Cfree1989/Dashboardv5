@@ -78,7 +78,7 @@ class TestJobLifecycleIntegration:
                 'printer': 'Invalid Printer',  # Invalid printer
                 
                 'material': 'Invalid Material',  # Invalid material
-                'color': 'Black',
+                'color': 'True Black',
                 'notes': 'Test with invalid catalog values'
             }
             
