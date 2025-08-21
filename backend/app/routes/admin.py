@@ -9,7 +9,7 @@ from app.models.staff import Staff
 from app.business_logic.shared_services import event_service
 from app.services.infrastructure import file_service
 from app.business_logic.shared_services import email_service
-from app.services.token_service import generate_confirmation_token
+from app.business_logic.shared_services import token_service
 from pathlib import Path
 import os
 import json
