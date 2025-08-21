@@ -25,13 +25,16 @@ from sqlalchemy import or_
 from app.services.validation_service import ValidationService
 from app.services.response_service import ResponseService
 from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
+from app.services.payment_service import PaymentService
+from app.services.interfaces.payment_service_interface import PaymentData
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
-# Create service instance
+# Create service instances
 lifecycle_service = JobLifecycleService()
+payment_service = PaymentService()
 
 # TODO: Implement job management routes 
 
@@ -702,56 +705,36 @@ def mark_picked_up(job_id):
 @bp.route('/<job_id>/payment', methods=['POST'])
 @token_required
 def record_payment(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to record payment'}), 400
-
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-
+    
     try:
-        grams = float(data.get('grams'))
-    except (TypeError, ValueError):
-        return jsonify({'message': 'grams must be a number'}), 400
-    txn_no = (data.get('txn_no') or '').strip()
-    picked_up_by = (data.get('picked_up_by') or '').strip()
-    if grams <= 0 or not txn_no or not picked_up_by:
-        return jsonify({'message': 'grams > 0, txn_no and picked_up_by are required'}), 400
-
-    # Compute final price from actual pickup weight (grams) with material-specific rate and $3 minimum
-    # Note: job.cost_usd is the estimate from approval; actual price is calculated from pickup weight
-    material_rate = 0.20 if (job.material or '').lower() == 'resin' else 0.10
-    raw_cost = grams * material_rate
-    final_cost = max(3.0, raw_cost)  # $3.00 minimum charge
-    price_cents = int(Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
-
-    payment = Payment(
-        job_id=job.id,
-        grams=grams,
-        price_cents=price_cents,
-        txn_no=txn_no,
-        picked_up_by=picked_up_by,
-        paid_by_staff=staff_name,
-    )
-    db.session.add(payment)
-
-    # Transition to PAIDPICKEDUP
-    job.status = 'PAIDPICKEDUP'
-    job.last_updated_by = staff_name
-    # Move file/metadata to PaidPickedUp
-    move_authoritative(job, 'PAIDPICKEDUP')
-    db.session.add(job)
-    db.session.commit()
-
-    evt = Event(job_id=job.id, event_type='PaymentRecorded', details={'price_cents': price_cents}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'PaymentRecorded')
-    return jsonify(job.to_dict()), 200
+        # Parse and validate input data
+        try:
+            grams = float(data.get('grams'))
+        except (TypeError, ValueError):
+            return ResponseService.error('grams must be a number')
+        
+        txn_no = (data.get('txn_no') or '').strip()
+        picked_up_by = (data.get('picked_up_by') or '').strip()
+        
+        # Create PaymentData object
+        payment_data = PaymentData(
+            grams=grams,
+            txn_no=txn_no,
+            picked_up_by=picked_up_by,
+            staff_name=data.get('staff_name')
+        )
+        
+        # Use PaymentService to record payment
+        payment = payment_service.record_payment(job_id, payment_data)
+        
+        # Get the updated job data
+        from app.models.job import Job
+        job = Job.query.get(job_id)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/review', methods=['POST'])
