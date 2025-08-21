@@ -1,0 +1,3 @@
+# Import alias for backward compatibility
+# Tests expect this module to exist
+from ..business_logic.shared_services.db_transaction_service import *

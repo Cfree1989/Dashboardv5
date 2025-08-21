@@ -180,7 +180,7 @@ def submit_job():
         db.session.commit()
 
         # Event logging
-        log_event('JobCreated', {'original_filename': job.original_filename}, job_id=job.id)
+        event_service.log_event('JobCreated', {'original_filename': job.original_filename}, job_id=job.id)
 
         # Fire-and-forget best-effort submission confirmation email
         try:
@@ -237,7 +237,7 @@ def confirm_job(token: str):
         logger.warning(f"Failed to sync metadata during job confirmation for job {job.id}: {e}")
         # Non-fatal: do not block confirmation on metadata issues
     
-    log_event('StudentConfirmed', {'status': job.status}, job_id=job.id)
+    event_service.log_event('StudentConfirmed', {'status': job.status}, job_id=job.id)
     return jsonify(job.to_dict()), 200
 
 
@@ -288,8 +288,8 @@ def resend_confirmation():
         sent = False
 
     # Log events
-    log_event('ResendConfirmationRequested', {'via': 'token' if token else 'job_id'}, job_id=job.id)
-    log_event('ApprovalEmailResent', {'confirmation_url': confirmation_url, 'sent': bool(sent)}, job_id=job.id)
+    event_service.log_event('ResendConfirmationRequested', {'via': 'token' if token else 'job_id'}, job_id=job.id)
+    event_service.log_event('ApprovalEmailResent', {'confirmation_url': confirmation_url, 'sent': bool(sent)}, job_id=job.id)
 
     # Update last sent timestamp
     try:

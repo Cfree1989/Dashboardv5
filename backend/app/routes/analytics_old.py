@@ -6,8 +6,9 @@ from app.models.payment import Payment
 from app.models.staff import Staff
 from app.utils.decorators import token_required
 from app.utils.date_utils import DateUtils
-from app.services.analytics_service import AnalyticsService
-from app.services.interfaces.analytics_service_interface import DateRange, AnalyticsFilters
+from app.services import AnalyticsService, interfaces
+DateRange = interfaces.DateRange
+AnalyticsFilters = interfaces.AnalyticsFilters
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
 from time import time

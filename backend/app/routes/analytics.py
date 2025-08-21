@@ -2,8 +2,9 @@ from flask import Blueprint
 from flask import jsonify, request
 from app.utils.decorators import token_required
 from app.utils.date_utils import DateUtils
-from app.services.analytics_service import AnalyticsService
-from app.services.interfaces.analytics_service_interface import DateRange, AnalyticsFilters
+from app.services import AnalyticsService, interfaces
+DateRange = interfaces.DateRange
+AnalyticsFilters = interfaces.AnalyticsFilters
 
 bp = Blueprint('analytics', __name__, url_prefix='/api/v1/analytics')
 
