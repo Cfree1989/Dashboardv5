@@ -24,7 +24,7 @@ import logging
 from sqlalchemy import or_
 from app.services.validation_service import ValidationService
 from app.services.response_service import ResponseService
-from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
+from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobAdminStatusChangeData, JobDeleteData
 from app.services.payment_service import PaymentService
 from app.services.interfaces.payment_service_interface import PaymentData
 
@@ -347,52 +347,32 @@ def update_notes(job_id):
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
 def delete_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    # Allow soft-delete primarily for early statuses; keep guard as-is for now
-    if job.status not in ('UPLOADED', 'PENDING'):
-        return jsonify({'message': 'Job cannot be deleted in its current status'}), 403
-    before = job.status
-    job.status = 'ARCHIVED'
-    # Move file/metadata to Archived and sync metadata
-    move_authoritative(job, 'ARCHIVED')
-    db.session.add(job)
-    db.session.commit()
-    # Log event
-    evt = Event(job_id=job.id, event_type='JobArchived', details={'from': before, 'to': 'ARCHIVED'}, triggered_by=getattr(g, 'workstation_id', 'system'), workstation_id=getattr(g, 'workstation_id', 'system'))
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'JobArchived')
-    return jsonify(job.to_dict()), 200
+    try:
+        # Use JobLifecycleService to delete job
+        job = lifecycle_service.delete_job(job_id)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e), status=403)
 
 
 @bp.route('/<job_id>/hard-delete', methods=['POST'])
 @token_required
 def hard_delete_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name = (data.get('staff_name') or '').strip()
-    if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-    # Best-effort remove files
+    
     try:
-        p = Path(job.file_path)
-        if p.exists():
-            p.unlink(missing_ok=True)
-        mp = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
-        if mp and mp.exists():
-            mp.unlink(missing_ok=True)
-    except Exception:
-        pass
-    db.session.delete(job)
-    db.session.commit()
-    evt = Event(job_id=job_id, event_type='JobHardDeleted', details={}, triggered_by=staff_name, workstation_id=getattr(g, 'workstation_id', 'system'))
-    db.session.add(evt)
-    db.session.commit()
-    return jsonify({'message': 'deleted'}), 200
+        # Create delete data object
+        delete_data = JobDeleteData(
+            staff_name=data.get('staff_name')
+        )
+        
+        # Use JobLifecycleService to hard delete job
+        result = lifecycle_service.hard_delete_job(job_id, delete_data)
+        return ResponseService.success(result)
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/approve', methods=['POST'])
@@ -419,55 +399,21 @@ def approve_job(job_id):
 @bp.route('/<job_id>/notes', methods=['POST'])
 @token_required
 def append_note(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
     data = request.get_json(silent=True) or {}
-    staff_name = (data.get('staff_name') or '').strip()
-    if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
-    text = data.get('text')
-    if not isinstance(text, str):
-        return jsonify({'message': 'text must be a string'}), 400
-    text = text.strip()
-    if not text:
-        return jsonify({'message': 'text is required'}), 400
-
-    per_entry_limit = 1000
-    total_limit = 5000
-    if len(text) > per_entry_limit:
-        return jsonify({'message': f'text must be at most {per_entry_limit} characters'}), 400
-
-    # Build the new line to append
-    new_line = f"{staff_name} - {text}"
-    current = job.notes or ''
-    # Compute resulting total length with newline if needed
-    separator = ('\n' if current else '')
-    proposed = current + separator + new_line
-    if len(proposed) > total_limit:
-        return jsonify({'message': 'total notes length exceeded'}), 400
-
-    job.notes = proposed
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
-
-    evt = Event(
-        job_id=job.id,
-        event_type='NoteAdded',
-        details={'text_len': len(text)},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
-    )
-    db.session.add(evt)
-    db.session.commit()
-
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        # Create note data object
+        note_data = JobNoteData(
+            staff_name=data.get('staff_name'),
+            text=data.get('text')
+        )
+        
+        # Use JobLifecycleService to append note
+        job = lifecycle_service.append_note(job_id, note_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 def _validate_staff_and_body(data):
     staff_name = data.get('staff_name')
@@ -557,38 +503,22 @@ def admin_force_confirm(job_id):
 @bp.route('/<job_id>/admin/change-status', methods=['POST'])
 @token_required
 def admin_change_status(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-    reason, err_resp, err_code = _validate_reason(data)
-    if err_resp:
-        return err_resp, err_code
-    new_status = (data.get('new_status') or '').strip().upper()
-    if not new_status:
-        return jsonify({'message': 'new_status is required'}), 400
-    allowed_statuses = set(list(STATUS_TO_DIR.keys()) + ['REJECTED'])
-    if new_status not in allowed_statuses:
-        return jsonify({'message': 'Invalid new_status'}), 400
-    before = job.status
-    job.status = new_status
-    job.last_updated_by = staff_name
-    # Move files only if mapping exists for the target status
-    if new_status in STATUS_TO_DIR:
-        move_authoritative(job, new_status)
-    db.session.add(job)
-    db.session.commit()
-    # Log events
-    evt = Event(job_id=job.id, event_type='AdminStatusChanged', details={'from': before, 'to': new_status, 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'change_status', 'from': before, 'to': new_status, 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt2)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        # Create status change data object
+        status_change_data = JobAdminStatusChangeData(
+            staff_name=data.get('staff_name'),
+            new_status=data.get('new_status'),
+            reason=data.get('reason')
+        )
+        
+        # Use JobLifecycleService to change status
+        job = lifecycle_service.admin_change_status(job_id, status_change_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/admin/resend-email', methods=['POST'])
@@ -740,111 +670,42 @@ def record_payment(job_id):
 @bp.route('/<job_id>/review', methods=['POST'])
 @token_required
 def review_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
-    # Only allow review state on UPLOADED jobs
-    if job.status != 'UPLOADED':
-        return jsonify({'message': 'Job review state can only be changed in UPLOADED status'}), 400
-
     data = request.get_json(silent=True) or {}
-    staff_name = data.get('staff_name')
-    reviewed = data.get('reviewed')
-
-    if staff_name is None:
-        return jsonify({'message': 'staff_name is required'}), 400
-
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
-    if not isinstance(reviewed, bool):
-        return jsonify({'message': 'reviewed must be a boolean'}), 400
-
-    # Apply state change
-    if reviewed:
-        job.staff_viewed_at = datetime.utcnow()
-        event_type = 'JobReviewed'
-    else:
-        job.staff_viewed_at = None
-        event_type = 'JobReviewCleared'
-
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
-
-    # Log event with attribution
-    evt = Event(
-        job_id=job.id,
-        event_type=event_type,
-        details={},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt)
-    db.session.commit()
-
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        # Create review data object
+        review_data = JobReviewData(
+            staff_name=data.get('staff_name'),
+            reviewed=data.get('reviewed')
+        )
+        
+        # Use JobLifecycleService to review job
+        job = lifecycle_service.review_job(job_id, review_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/reject', methods=['POST'])
 @token_required
 def reject_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
-    if job.status != 'UPLOADED':
-        return jsonify({'message': 'Job cannot be rejected in its current status'}), 400
-
     data = request.get_json(silent=True) or {}
-    staff_name = data.get('staff_name')
-    reasons = data.get('reasons') or []
-    custom_reason = (data.get('custom_reason') or '').strip()
-
-    if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
-    # Normalize reasons
-    if not isinstance(reasons, list):
-        return jsonify({'message': 'reasons must be an array of strings'}), 400
-    reasons = [str(r) for r in reasons if str(r).strip()]
-    if custom_reason:
-        reasons.append(custom_reason)
-    if not reasons:
-        return jsonify({'message': 'At least one reason or a custom_reason is required'}), 400
-
-    # Update job
-    job.status = 'REJECTED'
-    job.reject_reasons = reasons
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
-
-    # Log event
-    evt = Event(
-        job_id=job.id,
-        event_type='StaffRejected',
-        details={'reasons': reasons},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt)
-    db.session.commit()
-    # Attempt rejection email (best-effort)
+    
     try:
-        send_rejection_email(job)
-        email_evt = Event(job_id=job.id, event_type='RejectionEmailSent', details={'reasons': reasons}, triggered_by=staff_name, workstation_id=g.workstation_id)
-        db.session.add(email_evt)
-        db.session.commit()
-    except Exception:
-        pass
-
-    return jsonify(job.to_dict()), 200
+        # Create rejection data object
+        rejection_data = JobRejectionData(
+            staff_name=data.get('staff_name'),
+            reasons=data.get('reasons') or [],
+            custom_reason=data.get('custom_reason')
+        )
+        
+        # Use JobLifecycleService to reject job
+        job = lifecycle_service.reject_job(job_id, rejection_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/revert-completion', methods=['POST'])

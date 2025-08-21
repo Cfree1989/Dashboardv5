@@ -36,6 +36,30 @@ class JobRejectionData:
         self.reasons = reasons
         self.custom_reason = custom_reason
 
+class JobReviewData:
+    """Data class for job review parameters"""
+    def __init__(self, staff_name: str, reviewed: bool):
+        self.staff_name = staff_name
+        self.reviewed = reviewed
+
+class JobNoteData:
+    """Data class for job note parameters"""
+    def __init__(self, staff_name: str, text: str):
+        self.staff_name = staff_name
+        self.text = text
+
+class JobAdminStatusChangeData:
+    """Data class for admin status change parameters"""
+    def __init__(self, staff_name: str, new_status: str, reason: str):
+        self.staff_name = staff_name
+        self.new_status = new_status
+        self.reason = reason
+
+class JobDeleteData:
+    """Data class for job deletion parameters"""
+    def __init__(self, staff_name: str = None):
+        self.staff_name = staff_name
+
 class JobStatusTransitionData:
     """Data class for job status transition parameters"""
     def __init__(self, staff_name: str, workstation_id: Optional[str] = None, **kwargs):
@@ -178,6 +202,239 @@ class JobLifecycleService:
             pass  # Best-effort email sending
         
         return job
+    
+    def review_job(self, job_id: str, review_data: JobReviewData, workstation_id: str = None) -> Job:
+        """Review a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        if job.status != 'UPLOADED':
+            raise ValueError('Job review state can only be changed in UPLOADED status')
+        
+        staff_result = self.validation.validate_staff(review_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Apply state change
+        if review_data.reviewed:
+            job.staff_viewed_at = datetime.utcnow()
+            event_type = 'JobReviewed'
+        else:
+            job.staff_viewed_at = None
+            event_type = 'JobReviewCleared'
+        
+        job.last_updated_by = review_data.staff_name
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event with attribution
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job.id,
+            event_type=event_type,
+            details={},
+            triggered_by=review_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        return job
+    
+    def append_note(self, job_id: str, note_data: JobNoteData, workstation_id: str = None) -> Job:
+        """Append a note to a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        staff_result = self.validation.validate_staff(note_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Validate text
+        if not isinstance(note_data.text, str):
+            raise ValueError('text must be a string')
+        
+        text = note_data.text.strip()
+        if not text:
+            raise ValueError('text is required')
+        
+        # Validate length limits
+        per_entry_limit = 1000
+        total_limit = 5000
+        if len(text) > per_entry_limit:
+            raise ValueError(f'text must be at most {per_entry_limit} characters')
+        
+        job = job_result.data
+        
+        # Build the new line to append
+        new_line = f"{note_data.staff_name} - {text}"
+        current = job.notes or ''
+        # Compute resulting total length with newline if needed
+        separator = ('\n' if current else '')
+        proposed = current + separator + new_line
+        if len(proposed) > total_limit:
+            raise ValueError('total notes length exceeded')
+        
+        # Update job
+        job.notes = proposed
+        job.last_updated_by = note_data.staff_name
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job.id,
+            event_type='NoteAdded',
+            details={'text_len': len(text)},
+            triggered_by=note_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        return job
+    
+    def admin_change_status(self, job_id: str, status_change_data: JobAdminStatusChangeData, workstation_id: str = None) -> Job:
+        """Admin change job status with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        staff_result = self.validation.validate_staff(status_change_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Validate new status
+        new_status = status_change_data.new_status.strip().upper()
+        if not new_status:
+            raise ValueError('new_status is required')
+        
+        allowed_statuses = set(list(STATUS_TO_DIR.keys()) + ['REJECTED'])
+        if new_status not in allowed_statuses:
+            raise ValueError('Invalid new_status')
+        
+        job = job_result.data
+        before = job.status
+        
+        # Update job
+        job.status = new_status
+        job.last_updated_by = status_change_data.staff_name
+        
+        # Move files only if mapping exists for the target status
+        if new_status in STATUS_TO_DIR:
+            move_authoritative(job, new_status)
+        
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log events
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job.id, 
+            event_type='AdminStatusChanged', 
+            details={'from': before, 'to': new_status, 'reason': status_change_data.reason}, 
+            triggered_by=status_change_data.staff_name, 
+            workstation_id=workstation_id
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        evt2 = Event(
+            job_id=job.id, 
+            event_type='AdminAction', 
+            details={'action': 'change_status', 'from': before, 'to': new_status, 'reason': status_change_data.reason}, 
+            triggered_by=status_change_data.staff_name, 
+            workstation_id=workstation_id
+        )
+        db.session.add(evt2)
+        db.session.commit()
+        
+        return job
+    
+    def delete_job(self, job_id: str, delete_data: JobDeleteData = None, workstation_id: str = None) -> Job:
+        """Soft delete a job (archive) with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Allow soft-delete primarily for early statuses
+        if job.status not in ('UPLOADED', 'PENDING'):
+            raise ValueError('Job cannot be deleted in its current status')
+        
+        before = job.status
+        job.status = 'ARCHIVED'
+        
+        # Move file/metadata to Archived and sync metadata
+        move_authoritative(job, 'ARCHIVED')
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job.id, 
+            event_type='JobArchived', 
+            details={'from': before, 'to': 'ARCHIVED'}, 
+            triggered_by=workstation_id or 'system', 
+            workstation_id=workstation_id or 'system'
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        # Sync metadata
+        self._sync_authoritative_metadata(job, Path(job.file_path).name, None, 'JobArchived')
+        
+        return job
+    
+    def hard_delete_job(self, job_id: str, delete_data: JobDeleteData, workstation_id: str = None) -> dict:
+        """Hard delete a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        if not delete_data.staff_name:
+            raise ValueError('staff_name is required')
+        
+        job = job_result.data
+        
+        # Best-effort remove files
+        try:
+            p = Path(job.file_path)
+            if p.exists():
+                p.unlink(missing_ok=True)
+            mp = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
+            if mp and mp.exists():
+                mp.unlink(missing_ok=True)
+        except Exception:
+            pass  # Best-effort file removal
+        
+        db.session.delete(job)
+        db.session.commit()
+        
+        # Log event
+        workstation_id = workstation_id or self._get_workstation_id()
+        evt = Event(
+            job_id=job_id, 
+            event_type='JobHardDeleted', 
+            details={}, 
+            triggered_by=delete_data.staff_name, 
+            workstation_id=workstation_id or 'system'
+        )
+        db.session.add(evt)
+        db.session.commit()
+        
+        return {'message': 'deleted'}
 
     # --- Status Transition Methods ---
     
