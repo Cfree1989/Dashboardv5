@@ -8,18 +8,16 @@ from app.models.payment import Payment
 from app.business_logic.shared_services import token_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import event_service
-from app.models.staff import Staff
+# Staff model queries replaced with ValidationService
 from datetime import datetime, timedelta
 import json
-import os
-from pathlib import Path
-import shutil
+from pathlib import Path  # Still used in metadata helpers
 from decimal import Decimal, ROUND_HALF_UP
 from app.services.infrastructure import file_service
 from app.business_logic.shared_services.catalog_service import CatalogService
 from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 import logging
-from sqlalchemy import or_
+# sqlalchemy.or_ moved to JobQueryService
 from app.business_logic.shared_services.validation_service import ValidationService
 from app.business_logic.shared_services.response_service import ResponseService
 from app.services.orchestration.job_orchestration_service import JobOrchestrationService
@@ -29,6 +27,8 @@ from app.business_logic.admin_operations.job_admin_service import JobAdminStatus
 from app.business_logic.shared_services.job_locking_service import JobLockData
 from app.services.infrastructure.payment_service import PaymentService
 from app.services.infrastructure.payment_service_interface import PaymentData
+from app.services.infrastructure.file_discovery_service import FileDiscoveryService
+from app.services.infrastructure.job_query_service import JobQueryService, JobFilters
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,8 @@ bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 # Create service instances
 orchestration_service = JobOrchestrationService()
 payment_service = PaymentService()
+file_discovery_service = FileDiscoveryService()
+job_query_service = JobQueryService()
 
 # TODO: Implement job management routes 
 
@@ -52,47 +54,31 @@ def validate_job(job_id):
 @bp.route('', methods=['GET'])
 @token_required
 def list_jobs():
-    status = request.args.get('status')
-    search = request.args.get('search')
-    printer = request.args.get('printer')
-    discipline = request.args.get('discipline')
-    query = Job.query
-    if status:
-        query = query.filter_by(status=status)
-    if printer:
-        query = query.filter_by(printer=printer)
-    if discipline:
-        query = query.filter_by(discipline=discipline)
-    jobs = query.all()
-    if search:
-        jobs = [job for job in jobs if search.lower() in job.student_name.lower() or search.lower() in job.student_email.lower()]
-    return jsonify([job.to_dict() for job in jobs]), 200
+    """Get filtered list of jobs - simplified via JobQueryService"""
+    # Build filters from query parameters
+    filters = JobFilters(
+        status=request.args.get('status'),
+        search=request.args.get('search'),
+        printer=request.args.get('printer'),
+        discipline=request.args.get('discipline')
+    )
+    
+    # Use JobQueryService to get filtered jobs
+    jobs = job_query_service.list_jobs(filters)
+    return ResponseService.success([job.to_dict() for job in jobs])
 
 
 @bp.route('/counts', methods=['GET'])
 @token_required
 def get_job_counts():
-    """Get job counts by status for dashboard tabs."""
+    """Get job counts by status for dashboard tabs - simplified via JobQueryService"""
     try:
-        from sqlalchemy import func
         search = request.args.get('search')
-        
-        query = Job.query
-        if search:
-            # Filter jobs by search term
-            query = query.filter(
-                or_(
-                    Job.student_name.ilike(f'%{search}%'),
-                    Job.student_email.ilike(f'%{search}%')
-                )
-            )
-        
-        rows = query.with_entities(Job.status, func.count()).group_by(Job.status).all()
-        counts = {status: int(count) for status, count in rows}
-        return jsonify(counts), 200
+        counts = job_query_service.get_job_counts(search)
+        return ResponseService.success(counts)
     except Exception as e:
         logger.error(f"Failed to get job counts: {e}")
-        return jsonify({'error': 'Failed to get job counts'}), 500
+        return ResponseService.error('Failed to get job counts', status=500)
 
 
 
@@ -211,70 +197,19 @@ def get_job_events(job_id):
 @bp.route('/<job_id>/candidate-files', methods=['GET'])
 @token_required
 def candidate_files(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
+    """Get candidate files for a job - simplified via FileDiscoveryService"""
+    # Validate job exists
+    job_result = ValidationService.validate_job_exists(job_id)
+    if not job_result.is_valid:
+        return ResponseService.not_found('Job')
+    
+    # Use FileDiscoveryService to discover candidate files
     try:
-        file_path = Path(job.file_path)
-        directory = file_path.parent
-        # Allow configurable extensions via env (e.g., ".stl,.obj,.3mf,.form,.idea")
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
-        allowed_exts = {
-            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
-            for ext in exts_env.split(',') if ext.strip()
-        }
-        # Extension priority ranking (lower is better) via env, default prefers slicer project files
-        priority_env = os.environ.get('AUTHORITATIVE_EXT_PRIORITY', '.3mf,.form,.idea,.stl,.obj')
-        prio_list = [e if e.strip().startswith('.') else f'.{e.strip()}' for e in priority_env.split(',') if e.strip()]
-        ext_rank = {ext.lower(): idx for idx, ext in enumerate(prio_list)}
-        candidates = []
-        # Build relevance tokens to restrict to this job only
-        tokens = set()
-        if getattr(job, 'short_id', None):
-            tokens.add(str(job.short_id).lower())
-        if getattr(job, 'id', None):
-            tokens.add(str(job.id)[:8].lower())
-        if getattr(job, 'display_name', None):
-            tokens.add(Path(str(job.display_name)).stem.lower())
-
-        if directory.exists() and directory.is_dir():
-            for entry in directory.iterdir():
-                if not (entry.is_file() and entry.suffix.lower() in allowed_exts):
-                    continue
-                name_lower = entry.name.lower()
-                # Keep only files that look related to this job
-                related = any(tok and tok in name_lower for tok in tokens)
-                if not related:
-                    # Always allow exact original filename if present
-                    if job.original_filename and entry.name == job.original_filename:
-                        related = True
-                if not related:
-                    continue
-                try:
-                    stat = entry.stat()
-                    candidates.append({'name': entry.name, 'mtime': int(stat.st_mtime)})
-                except OSError:
-                    continue
-        # Ensure original filename is included (even if not present on disk)
-        if job.original_filename and not any(c['name'] == job.original_filename for c in candidates):
-            candidates.append({'name': job.original_filename, 'mtime': 0})
-        # Sort by (rank asc if known, else large), then mtime desc
-        def _rank(name: str) -> int:
-            return ext_rank.get(Path(name).suffix.lower(), len(ext_rank) + 1)
-        candidates.sort(key=lambda x: (_rank(x['name']), -x['mtime'], x['name'].lower()))
-        # Backward-compatible shape: 'files' is list of strings for legacy callers/tests
-        files_strings = [c['name'] for c in candidates]
-        return jsonify({ 'files': files_strings, 'files_detailed': candidates, 'recommended': files_strings[0] if files_strings else None }), 200
+        result = file_discovery_service.discover_candidate_files(job_result.data)
+        return ResponseService.success(result.to_dict())
     except Exception as e:
-        # On error, return legacy-compatible minimal payload
-        fallback_name = job.original_filename if job and job.original_filename else None
-        payload = { 'files': ([fallback_name] if fallback_name else []) }
-        if fallback_name:
-            payload['files_detailed'] = [{ 'name': fallback_name, 'mtime': 0 }]
-        else:
-            payload['files_detailed'] = []
-        return jsonify(payload), 200
+        logger.error(f"Failed to discover candidate files for job {job_id}: {e}")
+        return ResponseService.error('Failed to discover candidate files', status=500)
 
 
 @bp.route('/<job_id>/log-file-open', methods=['POST'])
@@ -395,14 +330,7 @@ def append_note(job_id):
     except ValueError as e:
         return ResponseService.error(str(e))
 
-def _validate_staff_and_body(data):
-    staff_name = data.get('staff_name')
-    if not staff_name:
-        return None, jsonify({'message': 'staff_name is required'}), 400
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return None, jsonify({'message': 'Invalid or inactive staff_name'}), 400
-    return staff_name, None, None
+# Removed _validate_staff_and_body - replaced with ValidationService.validate_staff
 
 
 # Duplicate update_notes route removed (consolidated above)
@@ -412,13 +340,15 @@ def _validate_staff_and_body(data):
 @token_required
 def mark_printing(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -427,11 +357,7 @@ def mark_printing(job_id):
 
 # --- Admin Overrides ---
 
-def _validate_reason(data):
-    reason = (data.get('reason') or '').strip()
-    if not reason:
-        return None, jsonify({'message': 'reason is required'}), 400
-    return reason, None, None
+# Removed _validate_reason - replaced with inline validation using ResponseService
 
 
 @bp.route('/<job_id>/admin/force-unlock', methods=['POST'])
@@ -458,16 +384,20 @@ def admin_force_unlock(job_id):
 @token_required
 def admin_force_confirm(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-    reason, err_resp, err_code = _validate_reason(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
+    
+    # Validate reason is provided
+    reason = (data.get('reason') or '').strip()
+    if not reason:
+        return ResponseService.error('reason is required')
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name, reason=reason)
         job = orchestration_service.admin_force_confirm(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -518,16 +448,20 @@ def admin_resend_email(job_id):
 @token_required
 def admin_mark_failed(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-    reason, err_resp, err_code = _validate_reason(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
+    
+    # Validate reason is provided
+    reason = (data.get('reason') or '').strip()
+    if not reason:
+        return ResponseService.error('reason is required')
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name, reason=reason)
         job = orchestration_service.mark_failed(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -538,13 +472,15 @@ def admin_mark_failed(job_id):
 @token_required
 def mark_complete(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_complete(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -555,13 +491,15 @@ def mark_complete(job_id):
 @token_required
 def mark_picked_up(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_picked_up(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -648,13 +586,15 @@ def reject_job(job_id):
 @token_required
 def revert_completion(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
@@ -665,13 +605,15 @@ def revert_completion(job_id):
 @token_required
 def revert_pickup(job_id):
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
+    
+    # Validate staff using ValidationService
+    staff_result = ValidationService.validate_staff(data.get('staff_name'))
+    if not staff_result.is_valid:
+        return ResponseService.error(staff_result.error_message)
     
     try:
         from app.services.job_orchestration_service import JobStatusTransitionData
-        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_completed(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
