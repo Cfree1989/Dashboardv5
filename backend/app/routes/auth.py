@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g, make_response
-from app.services.auth_service import generate_token, set_auth_cookie, clear_auth_cookies
+from app.business_logic.shared_services import auth_service
 from functools import wraps
 from flask import current_app
 from app.utils.decorators import token_required
@@ -38,7 +38,7 @@ def login():
     password = data.get('password')
 
     if workstation_id in WORKSTATIONS and WORKSTATIONS[workstation_id] == password:
-        token = generate_token(workstation_id)
+        token = auth_service.generate_token(workstation_id)
         
         # Create response with success message
         response = make_response(jsonify({
@@ -48,7 +48,7 @@ def login():
         }))
         
         # Set JWT token as httpOnly cookie
-        response = set_auth_cookie(response, token, workstation_id)
+        response = auth_service.set_auth_cookie(response, token, workstation_id)
         
         return response
 
@@ -58,7 +58,7 @@ def login():
 def logout():
     """Logout by clearing JWT cookies."""
     response = make_response(jsonify({'message': 'Logout successful'}))
-    response = clear_auth_cookies(response)
+    response = auth_service.clear_auth_cookies(response)
     return response
 
 @bp.route('/protected', methods=['GET'])

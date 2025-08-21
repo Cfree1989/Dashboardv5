@@ -5,10 +5,9 @@ from app.models.job import Job
 from app.utils.decorators import token_required
 from app.models.event import Event
 from app.models.payment import Payment
-from app.services.token_service import generate_confirmation_token
-from app.services.email_service import send_approval_email
-from app.services.email_service import send_rejection_email, send_completion_email
-from app.services.event_service import log_event
+from app.business_logic.shared_services import token_service
+from app.business_logic.shared_services import email_service
+from app.business_logic.shared_services import event_service
 from app.models.staff import Staff
 from datetime import datetime, timedelta
 import json
@@ -16,10 +15,9 @@ import os
 from pathlib import Path
 import shutil
 from decimal import Decimal, ROUND_HALF_UP
-from app.services.file_service import move_authoritative
-from app.services.file_service import STATUS_TO_DIR
-from app.services.catalog_service import CatalogService
-from app.services.error_handling_service import get_error_handling_service
+from app.services.infrastructure import file_service
+from app.business_logic.shared_services.catalog_service import CatalogService
+from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 import logging
 from sqlalchemy import or_
 from .job_utils import _validate_staff_and_body, _validate_reason, _sync_authoritative_metadata

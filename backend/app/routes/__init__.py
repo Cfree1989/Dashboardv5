@@ -1,2 +1,3 @@
 # Routes package: expose submodules for easier imports
-from . import auth, jobs, submit, payment, analytics, staff, export  # noqa: F401
+from . import auth  # Keep working route only
+# from . import jobs, submit, payment, analytics, staff, export  # Temporarily disabled

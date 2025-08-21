@@ -5,10 +5,9 @@ from app.models.job import Job
 from app.utils.decorators import token_required
 from app.models.event import Event
 from app.models.payment import Payment
-from app.services.token_service import generate_confirmation_token
-from app.services.email_service import send_approval_email
-from app.services.email_service import send_rejection_email, send_completion_email
-from app.services.event_service import log_event
+from app.business_logic.shared_services import token_service
+from app.business_logic.shared_services import email_service
+from app.business_logic.shared_services import event_service
 from app.models.staff import Staff
 from datetime import datetime, timedelta
 import json
@@ -16,24 +15,27 @@ import os
 from pathlib import Path
 import shutil
 from decimal import Decimal, ROUND_HALF_UP
-from app.services.file_service import move_authoritative
-from app.services.file_service import STATUS_TO_DIR
-from app.services.catalog_service import CatalogService
-from app.services.error_handling_service import get_error_handling_service
+from app.services.infrastructure import file_service
+from app.business_logic.shared_services.catalog_service import CatalogService
+from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 import logging
 from sqlalchemy import or_
 from app.business_logic.shared_services.validation_service import ValidationService
-from app.services.response_service import ResponseService
-from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobUpdateNotesData, JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData, JobLockData
-from app.services.payment_service import PaymentService
-from app.services.interfaces.payment_service_interface import PaymentData
+from app.business_logic.shared_services.response_service import ResponseService
+from app.services.orchestration.job_orchestration_service import JobOrchestrationService
+from app.business_logic.job_lifecycle.job_approval_service import JobApprovalData, JobRejectionData, JobReviewData
+from app.business_logic.admin_operations.job_notes_service import JobNoteData, JobUpdateNotesData
+from app.business_logic.admin_operations.job_admin_service import JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
+from app.business_logic.shared_services.job_locking_service import JobLockData
+from app.services.infrastructure.payment_service import PaymentService
+from app.services.infrastructure.payment_service_interface import PaymentData
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
 # Create service instances
-lifecycle_service = JobLifecycleService()
+orchestration_service = JobOrchestrationService()
 payment_service = PaymentService()
 
 # TODO: Implement job management routes 
@@ -316,7 +318,7 @@ def update_notes(job_id):
         )
         
         # Use JobLifecycleService to update notes
-        job = lifecycle_service.update_notes(job_id, notes_data)
+        job = orchestration_service.update_notes(job_id, notes_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -327,7 +329,7 @@ def update_notes(job_id):
 def delete_job(job_id):
     try:
         # Use JobLifecycleService to delete job
-        job = lifecycle_service.delete_job(job_id)
+        job = orchestration_service.delete_job(job_id)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -346,7 +348,7 @@ def hard_delete_job(job_id):
         )
         
         # Use JobLifecycleService to hard delete job
-        result = lifecycle_service.hard_delete_job(job_id, delete_data)
+        result = orchestration_service.hard_delete_job(job_id, delete_data)
         return ResponseService.success(result)
         
     except ValueError as e:
@@ -367,7 +369,7 @@ def approve_job(job_id):
             printer_override=data.get('printer')
         )
         
-        job = lifecycle_service.approve_job(job_id, approval_data)
+        job = orchestration_service.approve_job(job_id, approval_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -387,7 +389,7 @@ def append_note(job_id):
         )
         
         # Use JobLifecycleService to append note
-        job = lifecycle_service.append_note(job_id, note_data)
+        job = orchestration_service.append_note(job_id, note_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -415,9 +417,9 @@ def mark_printing(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name)
-        job = lifecycle_service.mark_printing(job_id, transition_data)
+        job = orchestration_service.mark_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -445,7 +447,7 @@ def admin_force_unlock(job_id):
         )
         
         # Use JobLifecycleService to force unlock
-        result = lifecycle_service.force_unlock_job(job_id, unlock_data)
+        result = orchestration_service.force_unlock_job(job_id, unlock_data)
         return ResponseService.success(result)
         
     except ValueError as e:
@@ -464,9 +466,9 @@ def admin_force_confirm(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
-        job = lifecycle_service.admin_force_confirm(job_id, transition_data)
+        job = orchestration_service.admin_force_confirm(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -486,7 +488,7 @@ def admin_change_status(job_id):
         )
         
         # Use JobLifecycleService to change status
-        job = lifecycle_service.admin_change_status(job_id, status_change_data)
+        job = orchestration_service.admin_change_status(job_id, status_change_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -506,7 +508,7 @@ def admin_resend_email(job_id):
         )
         
         # Use JobLifecycleService to resend email
-        result = lifecycle_service.resend_approval_email(job_id, resend_data)
+        result = orchestration_service.resend_approval_email(job_id, resend_data)
         return ResponseService.success(result)
         
     except ValueError as e:
@@ -524,9 +526,9 @@ def admin_mark_failed(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
-        job = lifecycle_service.mark_failed(job_id, transition_data)
+        job = orchestration_service.mark_failed(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -541,9 +543,9 @@ def mark_complete(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name)
-        job = lifecycle_service.mark_complete(job_id, transition_data)
+        job = orchestration_service.mark_complete(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -558,9 +560,9 @@ def mark_picked_up(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name)
-        job = lifecycle_service.mark_picked_up(job_id, transition_data)
+        job = orchestration_service.mark_picked_up(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -614,7 +616,7 @@ def review_job(job_id):
         )
         
         # Use JobLifecycleService to review job
-        job = lifecycle_service.review_job(job_id, review_data)
+        job = orchestration_service.review_job(job_id, review_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -635,7 +637,7 @@ def reject_job(job_id):
         )
         
         # Use JobLifecycleService to reject job
-        job = lifecycle_service.reject_job(job_id, rejection_data)
+        job = orchestration_service.reject_job(job_id, rejection_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -651,9 +653,9 @@ def revert_completion(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name)
-        job = lifecycle_service.revert_to_printing(job_id, transition_data)
+        job = orchestration_service.revert_to_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -668,9 +670,9 @@ def revert_pickup(job_id):
         return err_resp, err_code
     
     try:
-        from app.services.job_lifecycle_service import JobStatusTransitionData
+        from app.services.job_orchestration_service import JobStatusTransitionData
         transition_data = JobStatusTransitionData(staff_name=staff_name)
-        job = lifecycle_service.revert_to_completed(job_id, transition_data)
+        job = orchestration_service.revert_to_completed(job_id, transition_data)
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -685,7 +687,7 @@ def lock_job(job_id):
         )
         
         # Use JobLifecycleService to lock job
-        job = lifecycle_service.lock_job(job_id, lock_data)
+        job = orchestration_service.lock_job(job_id, lock_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -701,7 +703,7 @@ def unlock_job(job_id):
         )
         
         # Use JobLifecycleService to unlock job
-        job = lifecycle_service.unlock_job(job_id, lock_data)
+        job = orchestration_service.unlock_job(job_id, lock_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -717,7 +719,7 @@ def extend_job_lock(job_id):
         )
         
         # Use JobLifecycleService to extend job lock
-        job = lifecycle_service.extend_job_lock(job_id, lock_data)
+        job = orchestration_service.extend_job_lock(job_id, lock_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:

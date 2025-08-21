@@ -5,13 +5,13 @@ import os, hashlib, json
 from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
-from app.services.event_service import log_event
-from app.services.email_service import send_submission_confirmation_email, send_approval_email
-from app.services.token_service import generate_confirmation_token, verify_confirmation_token, _serializer
-from app.services.file_service import move_authoritative
+from app.business_logic.shared_services import event_service
+from app.business_logic.shared_services import email_service
+from app.business_logic.shared_services import token_service
+from app.services.infrastructure import file_service
 from app.routes.jobs import _sync_authoritative_metadata
-from app.services.catalog_service import CatalogService
-from app.services.error_handling_service import get_error_handling_service
+from app.business_logic.shared_services.catalog_service import CatalogService
+from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 import logging
 
 logger = logging.getLogger(__name__)

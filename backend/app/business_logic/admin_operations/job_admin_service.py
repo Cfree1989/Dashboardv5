@@ -11,7 +11,7 @@ from app.models.job import Job
 from app.models.event import Event
 from app.business_logic.shared_services.token_service import generate_confirmation_token
 from app.business_logic.shared_services.email_service import send_approval_email
-from app.services.infrastructure.file_service import move_authoritative
+# Import moved to method level to avoid circular imports
 from app import db
 
 # Status to directory mapping for file operations
@@ -94,6 +94,7 @@ class JobAdminService:
         
         # Move files only if mapping exists for the target status
         if new_status in STATUS_TO_DIR:
+            from app.services.infrastructure.file_service import move_authoritative
             move_authoritative(job, new_status)
         
         db.session.add(job)
@@ -140,6 +141,7 @@ class JobAdminService:
         job.status = 'ARCHIVED'
         
         # Move file/metadata to Archived and sync metadata
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'ARCHIVED')
         db.session.add(job)
         db.session.commit()

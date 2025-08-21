@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from app.models.job import Job
 from sqlalchemy import func
-from app.services.email_service import _is_email_configured, send_email
+from app.business_logic.shared_services import email_service
 
 bp = Blueprint('diag', __name__, url_prefix='/api/v1/_diag')
 

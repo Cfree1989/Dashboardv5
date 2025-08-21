@@ -10,7 +10,7 @@ from app.business_logic.shared_services.response_service import ResponseService
 from app.models.job import Job
 from app.models.event import Event
 from app.business_logic.shared_services.email_service import send_completion_email
-from app.services.infrastructure.file_service import move_authoritative
+# Import moved to method level to avoid circular imports
 from app import db
 
 class JobStatusTransitionData:
@@ -56,6 +56,7 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to Printing
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'PRINTING')
         db.session.add(job)
         db.session.commit()
@@ -96,6 +97,7 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to Completed
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'COMPLETED')
         db.session.add(job)
         db.session.commit()
@@ -151,6 +153,7 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to PaidPickedUp
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'PAIDPICKEDUP')
         db.session.add(job)
         db.session.commit()
@@ -193,6 +196,7 @@ class JobStatusService:
         # Move back to READYTOPRINT
         job.status = 'READYTOPRINT'
         job.last_updated_by = transition_data.staff_name
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'READYTOPRINT')
         db.session.add(job)
         db.session.commit()
@@ -242,6 +246,7 @@ class JobStatusService:
         # Transition to READYTOPRINT and move files
         job.status = 'READYTOPRINT'
         job.last_updated_by = transition_data.staff_name
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'READYTOPRINT')
         db.session.add(job)
         db.session.commit()
@@ -290,6 +295,7 @@ class JobStatusService:
         # Update job
         job.status = 'PRINTING'
         job.last_updated_by = transition_data.staff_name
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'PRINTING')
         db.session.add(job)
         db.session.commit()
@@ -331,6 +337,7 @@ class JobStatusService:
         # Update job
         job.status = 'COMPLETED'
         job.last_updated_by = transition_data.staff_name
+        from app.services.infrastructure.file_service import move_authoritative
         move_authoritative(job, 'COMPLETED')
         db.session.add(job)
         db.session.commit()

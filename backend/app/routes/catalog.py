@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request, g
-from app.services.catalog_service import CatalogService
+from app.business_logic.shared_services.catalog_service import CatalogService
 from app.schemas.catalog import CatalogUpdateRequest, CatalogData
 from app.utils.decorators import token_required
 from app import limiter

@@ -6,9 +6,9 @@ from app.models.job import Job
 from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
-from app.services.event_service import log_event
-from app.services.file_service import move_authoritative, STATUS_TO_DIR
-from app.services.email_service import send_approval_email, send_rejection_email, send_completion_email
+from app.business_logic.shared_services import event_service
+from app.services.infrastructure import file_service
+from app.business_logic.shared_services import email_service
 from app.services.token_service import generate_confirmation_token
 from pathlib import Path
 import os
@@ -16,7 +16,7 @@ import json
 from datetime import datetime, timezone
 from datetime import timedelta
 import shutil
-from app.services.error_handling_service import get_error_handling_service
+from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 from app.business_logic.shared_services.validation_service import ValidationService
 import logging
 
@@ -414,7 +414,7 @@ def archive_jobs():
             pass
         # Move to Archived and update status
         try:
-            from app.services.file_service import move_authoritative
+            from app.services.infrastructure import file_service
             move_authoritative(job, 'ARCHIVED')
         except Exception:
             pass
