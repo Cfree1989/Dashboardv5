@@ -136,18 +136,32 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
    - **After**: Delegates to `JobLifecycleService.hard_delete_job()` with `JobDeleteData`
    - **Result**: Centralized hard-delete logic with proper file cleanup
 
+7. **`admin_resend_email` function** - Simplified from 50+ lines to 15 lines
+   - **Before**: Inline validation, email generation, database operations, event logging
+   - **After**: Delegates to `JobLifecycleService.resend_approval_email()` with `JobResendEmailData`
+   - **Result**: Clean email resend workflow with comprehensive error handling
+
+8. **`admin_force_unlock` function** - Simplified from 25+ lines to 15 lines
+   - **Before**: Inline validation, database operations, event logging
+   - **After**: Delegates to `JobLifecycleService.force_unlock_job()` with `JobForceUnlockData`
+   - **Result**: Clean admin unlock workflow with audit logging
+
 ### **New Service Methods Added** ✅:
 - `JobLifecycleService.review_job()` - Complete review workflow with validation
 - `JobLifecycleService.append_note()` - Note management with length validation
 - `JobLifecycleService.admin_change_status()` - Admin status changes with file operations
 - `JobLifecycleService.delete_job()` - Soft delete (archive) workflow with file operations
 - `JobLifecycleService.hard_delete_job()` - Hard delete with file cleanup and event logging
+- `JobLifecycleService.resend_approval_email()` - Email resend workflow with token generation
+- `JobLifecycleService.force_unlock_job()` - Admin force unlock with audit logging
 
 ### **New Data Classes Added** ✅:
 - `JobReviewData` - Encapsulates review parameters
 - `JobNoteData` - Encapsulates note parameters  
 - `JobAdminStatusChangeData` - Encapsulates admin status change parameters
 - `JobDeleteData` - Encapsulates deletion parameters
+- `JobResendEmailData` - Encapsulates email resend parameters
+- `JobForceUnlockData` - Encapsulates force unlock parameters
 
 ### **Testing Status** ✅:
 - **Unit Tests**: All 25 job lifecycle service tests passing

@@ -60,6 +60,17 @@ class JobDeleteData:
     def __init__(self, staff_name: str = None):
         self.staff_name = staff_name
 
+class JobResendEmailData:
+    """Data class for resending email parameters"""
+    def __init__(self, staff_name: str):
+        self.staff_name = staff_name
+
+class JobForceUnlockData:
+    """Data class for force unlock parameters"""
+    def __init__(self, staff_name: str, reason: str):
+        self.staff_name = staff_name
+        self.reason = reason
+
 class JobStatusTransitionData:
     """Data class for job status transition parameters"""
     def __init__(self, staff_name: str, workstation_id: Optional[str] = None, **kwargs):
@@ -435,6 +446,121 @@ class JobLifecycleService:
         db.session.commit()
         
         return {'message': 'deleted'}
+    
+    def resend_approval_email(self, job_id: str, resend_data: JobResendEmailData, workstation_id: str = None) -> dict:
+        """Resend approval email with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Validate staff
+        staff_result = self.validation.validate_staff(resend_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Check if job is already confirmed
+        if job.student_confirmed:
+            raise ValueError('Job already confirmed')
+        
+        # Get workstation ID safely
+        workstation_id = workstation_id or self._get_workstation_id()
+        
+        # Generate fresh token and send approval email
+        from app.services.token_service import generate_confirmation_token
+        from app.services.email_service import send_approval_email
+        import os
+        
+        token = generate_confirmation_token(job.id)
+        frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
+        confirmation_url = f"{frontend_url}/confirm/{token}"
+        
+        # Send email with error handling
+        sent = False
+        try:
+            send_approval_email(job, confirmation_url)
+            sent = True
+        except Exception:
+            sent = False
+        
+        # Update last sent timestamp
+        from datetime import datetime
+        try:
+            job.confirmation_last_sent_at = datetime.utcnow()
+            from app import db
+            db.session.add(job)
+            db.session.commit()
+        except Exception:
+            pass
+        
+        # Log events with staff attribution
+        from app.models.event import Event
+        evt1 = Event(
+            job_id=job.id,
+            event_type='ApprovalEmailResentByStaff',
+            details={'confirmation_url': confirmation_url, 'sent': bool(sent)},
+            triggered_by=resend_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        db.session.add(evt1)
+        
+        # Also record a generic admin action for audit grouping
+        evt2 = Event(
+            job_id=job.id,
+            event_type='AdminAction',
+            details={'action': 'resend_email'},
+            triggered_by=resend_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        db.session.add(evt2)
+        db.session.commit()
+        
+        return {
+            'message': 'Confirmation email resent',
+            'job_id': job.id,
+            'sent': sent
+        }
+    
+    def force_unlock_job(self, job_id: str, unlock_data: JobForceUnlockData, workstation_id: str = None) -> dict:
+        """Force unlock a job with comprehensive validation and business logic"""
+        # Use ValidationService for all validation
+        job_result = self.validation.validate_job_exists(job_id)
+        if not job_result.is_valid:
+            raise ValueError(job_result.error_message)
+        
+        job = job_result.data
+        
+        # Validate staff
+        staff_result = self.validation.validate_staff(unlock_data.staff_name)
+        if not staff_result.is_valid:
+            raise ValueError(staff_result.error_message)
+        
+        # Validate reason
+        if not unlock_data.reason or not unlock_data.reason.strip():
+            raise ValueError('reason is required')
+        
+        # Get workstation ID safely
+        workstation_id = workstation_id or self._get_workstation_id()
+        
+        # No lock fields yet; log action for audit
+        from app.models.event import Event
+        evt = Event(
+            job_id=job.id,
+            event_type='AdminAction',
+            details={'action': 'force_unlock', 'reason': unlock_data.reason, 'note': 'No server-side lock fields present'},
+            triggered_by=unlock_data.staff_name,
+            workstation_id=workstation_id,
+        )
+        from app import db
+        db.session.add(evt)
+        db.session.commit()
+        
+        return {
+            'message': 'unlock processed',
+            'lock_support': 'not_implemented'
+        }
 
     # --- Status Transition Methods ---
     

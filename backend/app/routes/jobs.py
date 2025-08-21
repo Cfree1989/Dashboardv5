@@ -24,7 +24,7 @@ import logging
 from sqlalchemy import or_
 from app.services.validation_service import ValidationService
 from app.services.response_service import ResponseService
-from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobAdminStatusChangeData, JobDeleteData
+from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
 from app.services.payment_service import PaymentService
 from app.services.interfaces.payment_service_interface import PaymentData
 
@@ -457,27 +457,21 @@ def _validate_reason(data):
 @bp.route('/<job_id>/admin/force-unlock', methods=['POST'])
 @token_required
 def admin_force_unlock(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-    reason, err_resp, err_code = _validate_reason(data)
-    if err_resp:
-        return err_resp, err_code
-    # No lock fields yet; log action for audit
-    evt = Event(
-        job_id=job.id,
-        event_type='AdminAction',
-        details={'action': 'force_unlock', 'reason': reason, 'note': 'No server-side lock fields present'},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt)
-    db.session.commit()
-    return jsonify({'message': 'unlock processed', 'lock_support': 'not_implemented'}), 200
+    
+    try:
+        # Create force unlock data object
+        unlock_data = JobForceUnlockData(
+            staff_name=data.get('staff_name'),
+            reason=data.get('reason')
+        )
+        
+        # Use JobLifecycleService to force unlock
+        result = lifecycle_service.force_unlock_job(job_id, unlock_data)
+        return ResponseService.success(result)
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/admin/force-confirm', methods=['POST'])
@@ -525,58 +519,20 @@ def admin_change_status(job_id):
 @token_required
 @limiter.limit("1 per hour")
 def admin_resend_email(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
-    if err_resp:
-        return err_resp, err_code
-    if job.student_confirmed:
-        return jsonify({'message': 'Job already confirmed'}), 400
-
-    # Generate fresh token and send approval email
-    token = generate_confirmation_token(job.id)
-    frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
-    confirmation_url = f"{frontend_url}/confirm/{token}"
-    sent = False
+    
     try:
-        send_approval_email(job, confirmation_url)
-        sent = True
-    except Exception:
-        sent = False
-
-    # Update last sent timestamp
-    try:
-        job.confirmation_last_sent_at = datetime.utcnow()
-        db.session.add(job)
-        db.session.commit()
-    except Exception:
-        pass
-
-    # Log events with staff attribution
-    evt1 = Event(
-        job_id=job.id,
-        event_type='ApprovalEmailResentByStaff',
-        details={'confirmation_url': confirmation_url, 'sent': bool(sent)},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
-    )
-    db.session.add(evt1)
-    db.session.commit()
-
-    # Also record a generic admin action for audit grouping
-    evt2 = Event(
-        job_id=job.id,
-        event_type='AdminAction',
-        details={'action': 'resend_email'},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
-    )
-    db.session.add(evt2)
-    db.session.commit()
-
-    return jsonify({'message': 'Confirmation email resent', 'job_id': job.id}), 200
+        # Create resend email data object
+        resend_data = JobResendEmailData(
+            staff_name=data.get('staff_name')
+        )
+        
+        # Use JobLifecycleService to resend email
+        result = lifecycle_service.resend_approval_email(job_id, resend_data)
+        return ResponseService.success(result)
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 @bp.route('/<job_id>/admin/mark-failed', methods=['POST'])
 @token_required
