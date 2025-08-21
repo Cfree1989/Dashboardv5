@@ -24,10 +24,14 @@ import logging
 from sqlalchemy import or_
 from app.services.validation_service import ValidationService
 from app.services.response_service import ResponseService
+from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
+
+# Create service instance
+lifecycle_service = JobLifecycleService()
 
 # TODO: Implement job management routes 
 
@@ -391,156 +395,22 @@ def hard_delete_job(job_id):
 @bp.route('/<job_id>/approve', methods=['POST'])
 @token_required
 def approve_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
-    if job.status != 'UPLOADED':
-        return jsonify({'message': 'Job cannot be approved in its current status'}), 400
-
-    # Parse and validate payload
     data = request.get_json(silent=True) or {}
-    staff_name = data.get('staff_name')
-    weight_g = data.get('weight_g')
-    time_hours = data.get('time_hours')
-    authoritative_filename = (data.get('authoritative_filename') or '').strip()
-    # Optional staff-side printer override
-    printer_override = (data.get('printer') or '').strip()
-
-    if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
-    # Validate numeric inputs
+    
     try:
-        weight_val = float(weight_g)
-        time_val = float(time_hours)
-    except (TypeError, ValueError):
-        return jsonify({'message': 'weight_g and time_hours must be numbers'}), 400
-    if weight_val <= 0 or time_val <= 0:
-        return jsonify({'message': 'weight_g and time_hours must be greater than 0'}), 400
-
-    # Determine material rate
-    material = (job.material or '').strip().lower()
-    if material == 'filament':
-        rate = 0.10
-    elif material == 'resin':
-        rate = 0.20
-    else:
-        # Default to filament pricing if unknown, to avoid blocking
-        rate = 0.10
-
-    # Compute cost with minimum $3.00
-    raw_cost = weight_val * rate
-    min_cost = 3.00
-    final_cost = max(raw_cost, min_cost)
-    # Round to 2 decimals using bankers rounding to HALF_UP
-    final_cost_decimal = Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-
-    # Update job fields
-    job.weight_g = weight_val
-    job.time_hours = time_val
-    job.cost_usd = final_cost_decimal
-    job.last_updated_by = staff_name
-    # Mark as reviewed to clear "NEW" indicator across statuses
-    job.staff_viewed_at = datetime.utcnow()
-    # Optional: validate and apply printer override if provided
-    if printer_override:
-        # Determine method from material for validation
-        # This is a fallback since jobs might not have method stored separately
-        method_for_validation = "Filament" if (job.material or '').lower() in ["pla", "abs"] else "Resin" if (job.material or '').lower() in ["resin", "standard resin"] else "Filament"
-        
-        # Validate printer override against catalog
-        is_valid, validation_errors = CatalogService.validate_job_configuration(
-            method=method_for_validation,
-            material=job.material,
-            color=job.color,
-            printer=printer_override
+        approval_data = JobApprovalData(
+            staff_name=data.get('staff_name'),
+            weight_g=float(data.get('weight_g', 0)),
+            time_hours=float(data.get('time_hours', 0)),
+            authoritative_filename=data.get('authoritative_filename'),
+            printer_override=data.get('printer')
         )
         
-        if not is_valid:
-            return jsonify({
-                'message': 'Invalid printer override',
-                'details': validation_errors
-            }), 400
-            
-        previous_printer = job.printer
-        if printer_override and printer_override != previous_printer:
-            job.printer = printer_override
-    # Optionally set authoritative file within same directory
-    if authoritative_filename:
-        current_dir = Path(job.file_path).parent
-        candidate_path = (current_dir / authoritative_filename)
-        # Allowed extensions are driven by env
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
-        allowed_exts = {
-            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
-            for ext in exts_env.split(',') if ext.strip()
-        }
-        # Validate parent dir, extension, and existence
-        if candidate_path.parent != current_dir:
-            return jsonify({'message': 'authoritative_filename must be in the same directory as the current file'}), 400
-        if candidate_path.suffix.lower() not in allowed_exts:
-            return jsonify({'message': f'authoritative_filename has unsupported extension'}), 400
-        if not candidate_path.exists():
-            return jsonify({'message': f'authoritative file not found: {authoritative_filename}'}), 400
-        # Accept switch
-        job.file_path = str(candidate_path.resolve())
-        job.display_name = authoritative_filename
-    job.status = 'PENDING'
-    # Do not physically move files on approval; keep them in Uploaded until student confirms.
-    db.session.add(job)
-    db.session.commit()
-
-    # Generate confirmation token and send email
-    token = generate_confirmation_token(job.id)
-    # Use frontend URL for confirmation link, fallback to host_url if not set
-    frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
-    confirmation_url = f"{frontend_url}/confirm/{token}"
-    send_approval_email(job, confirmation_url)
-
-    # Log events with proper attribution (staff_name + workstation_id)
-    evt_details = {
-            'confirmation_url': confirmation_url,
-            'weight_g': weight_val,
-            'time_hours': time_val,
-            'cost_usd': float(final_cost_decimal),
-            'authoritative_filename': authoritative_filename or job.display_name,
-        }
-    # If printer changed, include before/after in event details
-    try:
-        if printer_override:
-            evt_details['printer_before'] = previous_printer if 'previous_printer' in locals() else job.printer
-            evt_details['printer_after'] = job.printer
-    except Exception:
-        pass
-
-    evt1 = Event(
-        job_id=job.id,
-        event_type='StaffApproved',
-        details=evt_details,
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt1)
-    db.session.commit()
-    evt2 = Event(
-        job_id=job.id,
-        event_type='ApprovalEmailSent',
-        details={},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt2)
-    db.session.commit()
-
-    # Sync metadata with chosen authoritative file
-    _sync_authoritative_metadata(job, authoritative_filename or job.display_name, staff_name, 'StaffApproved')
-
-    return jsonify(job.to_dict()), 200
+        job = lifecycle_service.approve_job(job_id, approval_data)
+        return ResponseService.success(job.to_dict())
+        
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/notes', methods=['POST'])
