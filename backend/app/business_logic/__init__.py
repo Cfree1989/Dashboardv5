@@ -1,14 +1,17 @@
 # Business Logic Services Package
-# Emergency Service Decomposition - Proper Structure
+# Emergency Service Decomposition - Clean Architecture
 
-# Import from job-lifecycle services
+# Import from job_lifecycle services
 from .job_lifecycle import JobApprovalService, JobStatusService, JobTransitionService
 
-# Import from admin-operations services  
+# Import from admin_operations services  
 from .admin_operations import JobAdminService, JobNotesService
 
-# Import from shared-services
+# Import from shared_services
 from .shared_services import JobLockingService, JobEventService
+
+# Import from analytics
+from .analytics import AnalyticsService, CachingService
 
 __all__ = [
     # Job Lifecycle Services
@@ -22,5 +25,9 @@ __all__ = [
     
     # Shared Services
     'JobLockingService',
-    'JobEventService'
+    'JobEventService',
+    
+    # Analytics Services
+    'AnalyticsService',
+    'CachingService'
 ]

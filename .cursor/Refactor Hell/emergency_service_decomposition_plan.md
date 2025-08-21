@@ -31,6 +31,36 @@ JobLifecycleService responsibilities:
 └── Database transaction management
 ```
 
+## Pragmatic Architecture (REVISED)
+
+### Simplified Domain Organization
+
+```
+backend/app/
+├── business_logic/              # Python-compatible naming (underscores)
+│   ├── job_lifecycle/          # Core job domain - state management, approvals, rejections
+│   ├── admin_operations/       # Admin-specific operations and overrides
+│   ├── shared_services/        # Foundation services (validation, auth, email, etc.)
+│   └── analytics/              # Simple analytics (not over-engineered "engine")
+├── services/
+│   ├── orchestration/          # Coordination services (job orchestration)
+│   └── infrastructure/         # Database, file operations, external integrations
+├── routes/                     # Keep consolidated but clean (NOT fragmented)
+│   ├── jobs.py                # Clean, well-organized (300-400 lines)
+│   ├── admin.py               # Clean, well-organized (200-300 lines)
+│   ├── analytics.py           # Clean, well-organized (400-500 lines)
+│   └── [other routes unchanged]
+├── models/                     # Unchanged
+├── utils/                      # Unchanged
+└── schemas/                    # Unchanged
+```
+
+**Key Philosophy**: 
+- **Domain boundaries that make sense** for a 3D print management system
+- **Python-compatible naming** (underscores, not hyphens)
+- **Consolidated but clean routes** (not over-fragmented)
+- **Pragmatic service organization** (not architecture astronautics)
+
 ## Required Immediate Action
 
 ### STOP: Do Not Continue Phase 3 With This Architecture
@@ -41,9 +71,9 @@ This service needs to be **immediately decomposed** before any route reorganizat
 
 ### Day 1: Extract Core Business Logic Services
 
-#### Create: `backend/app/business-logic/job-lifecycle/`
+#### Create: `backend/app/business_logic/job_lifecycle/`
 ```
-job-lifecycle/
+job_lifecycle/
 ├── __init__.py
 ├── job_approval_service.py      # approve_job, reject_job, review_job
 ├── job_status_service.py        # mark_printing, mark_complete, mark_picked_up
@@ -76,20 +106,29 @@ job-lifecycle/
 
 ### Day 2: Extract Admin and Supporting Services
 
-#### Create: `backend/app/business-logic/admin-operations/`
+#### Create: `backend/app/business_logic/admin_operations/`
 ```
-admin-operations/
+admin_operations/
 ├── __init__.py
 ├── job_admin_service.py         # Admin overrides, force actions
 └── job_notes_service.py         # Notes management
 ```
 
-#### Create: `backend/app/business-logic/shared-services/`
+#### Create: `backend/app/business_logic/shared_services/`
 ```
-shared-services/
+shared_services/
 ├── __init__.py
 ├── job_locking_service.py       # Lock/unlock operations
-└── job_event_service.py         # Event logging patterns
+├── job_event_service.py         # Event logging patterns
+├── validation_service.py        # Foundation validation service
+├── response_service.py          # Foundation response service
+├── error_handling_service.py    # Error handling patterns
+├── auth_service.py              # Authentication service
+├── token_service.py             # Token management
+├── email_service.py             # Email operations
+├── catalog_service.py           # Catalog management
+├── event_service.py             # System event logging
+└── db_transaction_service.py    # Database transaction patterns
 ```
 
 #### Extract Services:
@@ -117,9 +156,9 @@ shared-services/
 - Common event logging patterns
 - Event creation utilities
 
-### Day 3: Create Service Coordination Layer
+### Day 3: Create Service Coordination Layer & Pragmatic Route Organization
 
-#### Create: `backend/app/services/job_orchestration_service.py`
+#### Create: `backend/app/services/orchestration/job_orchestration_service.py`
 ```python
 # Thin coordination layer that composes the business logic services
 class JobOrchestrationService:
@@ -139,21 +178,46 @@ class JobOrchestrationService:
         return self.status.transition_status(job_id, new_status, staff_name)
 ```
 
-#### Update Routes to Use Orchestration:
+#### Pragmatic Route Organization (NOT Over-Fragmentation):
+Keep routes **consolidated but clean** rather than fragmenting them:
+
 ```python
-# In jobs.py - minimal change to existing routes
-from app.services.job_orchestration_service import JobOrchestrationService
+# In jobs.py - clean, well-organized route file (target: 300-400 lines)
+from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 
 job_service = JobOrchestrationService()
 
 @bp.route('/<job_id>/approve', methods=['POST'])
 @token_required
 def approve_job(job_id):
-    # Route logic unchanged, just delegates to orchestrator
+    # Clean, focused route logic - delegates to orchestrator
     result = job_service.approve_job(job_id, approval_data)
+    return result
 ```
 
-## Success Metrics for Fixed Architecture
+**Philosophy**: A well-structured 400-line jobs.py is better than 3 fragmented files that need coordination.
+
+## Why This Pragmatic Approach Is Better
+
+### Problems with Over-Fragmentation:
+- **Import complexity**: Multiple route files create circular dependencies
+- **Coordination overhead**: Related endpoints scattered across files
+- **Testing complexity**: Integration tests span multiple files
+- **Maintenance burden**: Simple changes require touching multiple files
+
+### Benefits of Consolidated-But-Clean Routes:
+- **Logical cohesion**: Related endpoints stay together
+- **Easier debugging**: Full request flow in one file
+- **Simpler testing**: Integration tests in one place
+- **Better developer experience**: Less file switching
+
+### Service Layer Benefits (Maintained):
+- **Business logic separation**: Clean domain boundaries
+- **Single responsibility**: Each service has clear purpose
+- **Testability**: Services can be unit tested independently
+- **Maintainability**: Business rules isolated from HTTP concerns
+
+## Success Metrics for Pragmatic Architecture
 
 ### Service Size Targets:
 - [ ] `job_approval_service.py`: 150-200 lines
@@ -167,8 +231,8 @@ def approve_job(job_id):
 
 ### Total Line Reduction:
 - **Before**: 1,166 lines in one file
-- **After**: ~1,000 lines across 8 focused services
-- **Benefit**: Single responsibility, clear boundaries, easier testing
+- **After**: ~1,000 lines across 7 focused services + orchestration
+- **Benefit**: Single responsibility, clear boundaries, easier testing, pragmatic organization
 
 ## Implementation Order
 
@@ -219,9 +283,21 @@ def approve_job(job_id):
 
 ## Recommendation
 
-**I strongly recommend Option A.** This monolithic service will make Phase 3 route reorganization much harder and defeats the purpose of the entire refactoring.
+**I strongly recommend the Pragmatic Emergency Decomposition approach.** 
 
-**We need to fix the foundation before building on it.**
+### What This Achieves:
+1. **Solves the real problem**: Breaks up the 1,166-line monolithic service
+2. **Maintains pragmatism**: Doesn't over-engineer the solution
+3. **Enables future improvements**: Creates clean foundation for further refactoring
+4. **Reduces risk**: Keeps routes consolidated but clean, avoiding fragmentation issues
+
+### What We Avoid:
+- **Architecture astronautics**: No unnecessary "engines" or over-complex domains
+- **Import hell**: Python-compatible naming conventions
+- **Coordination complexity**: Routes stay logically grouped
+- **Testing fragmentation**: Integration tests remain cohesive
+
+**We fix the foundation with pragmatic engineering, not theoretical perfection.**
 
 ---
 

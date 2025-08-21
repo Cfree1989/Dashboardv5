@@ -2,8 +2,8 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 # Import foundation services
-from app.services.validation_service import ValidationService
-from app.services.response_service import ResponseService
+from app.business_logic.shared_services.validation_service import ValidationService
+from app.business_logic.shared_services.response_service import ResponseService
 
 # Import models and services
 from app.models.job import Job

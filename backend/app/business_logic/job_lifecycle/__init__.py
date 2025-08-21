@@ -7,6 +7,6 @@ from .job_transition_service import JobTransitionService
 
 __all__ = [
     'JobApprovalService',
-    'JobStatusService', 
+    'JobStatusService',
     'JobTransitionService'
 ]

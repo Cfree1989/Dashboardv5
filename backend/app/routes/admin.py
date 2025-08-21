@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from datetime import timedelta
 import shutil
 from app.services.error_handling_service import get_error_handling_service
-from app.services.validation_service import ValidationService
+from app.business_logic.shared_services.validation_service import ValidationService
 import logging
 
 logger = logging.getLogger(__name__)

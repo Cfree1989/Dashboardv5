@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-from app.services.file_lock_service import get_file_lock_service
+from app.services.infrastructure.file_lock_service import get_file_lock_service
 
 logger = logging.getLogger(__name__)
 

@@ -4,9 +4,9 @@ from app import db
 from app.models.job import Job
 from app.models.payment import Payment
 from app.models.event import Event
-from app.services.validation_service import ValidationService
-from app.services.file_service import move_authoritative
-from app.services.interfaces.payment_service_interface import IPaymentService, PaymentData
+from app.business_logic.shared_services.validation_service import ValidationService
+from app.services.infrastructure.file_service import move_authoritative
+from app.services.infrastructure.payment_service_interface import IPaymentService, PaymentData
 
 class PaymentService(IPaymentService):
     def __init__(self, validation_service=None):

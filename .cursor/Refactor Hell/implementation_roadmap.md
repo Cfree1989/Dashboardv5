@@ -2,6 +2,25 @@
 
 ## Overview
 
+backend/app/
+├── business_logic/             # Underscores for Python imports
+│   ├── job_lifecycle/          # Core domain
+│   ├── admin_operations/       # Admin-specific logic
+│   ├── shared_services/        # Foundation services
+│   └── analytics/              # Simple analytics, not "engine"
+├── routes/
+│   ├── jobs.py                 # Keep consolidated but clean
+│   ├── admin.py                # Keep consolidated but clean  
+│   ├── analytics.py            # Keep consolidated but clean
+│   └── [other simple routes]
+├── services/
+│   ├── orchestration/          # Coordination services
+│   └── infrastructure/         # Database, email, file services
+├── models/                     # Unchanged
+├── utils/                      # Unchanged
+└── schemas/                    # Unchanged
+
+
 This document provides a detailed, step-by-step implementation plan for refactoring the 3D Print Management System's large route files. The roadmap follows a dependency-aware sequence that minimizes risk while maximizing early benefits.
 
 ## Implementation Philosophy
@@ -11,6 +30,7 @@ This document provides a detailed, step-by-step implementation plan for refactor
 - **Maintain full functionality** at each milestone
 - **Enable easy rollback** at any point in the process
 - **Deliver incremental value** with each completed phase
+
 
 ### **Dependency-Aware Sequencing** 
 - **Foundation first**: Establish shared services before extraction

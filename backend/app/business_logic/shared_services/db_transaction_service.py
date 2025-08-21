@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
 
 from app import db
-from app.services.atomic_file_service import get_atomic_file_service
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 
 logger = logging.getLogger(__name__)
 

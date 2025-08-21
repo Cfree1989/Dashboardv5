@@ -5,7 +5,7 @@ import shutil
 from typing import Optional
 import logging
 
-from app.services.error_handling_service import get_error_handling_service, FileOperationError
+from app.business_logic.shared_services.error_handling_service import get_error_handling_service, FileOperationError
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ from app.models.job import Job
 from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
-from app.services.interfaces.analytics_service_interface import IAnalyticsService, DateRange, AnalyticsFilters
-from app.services.caching_service import CachingService
+from .analytics_service_interface import IAnalyticsService, DateRange, AnalyticsFilters
+from app.business_logic.analytics.caching_service import CachingService
 from app.utils.date_utils import DateUtils
 
 class AnalyticsService(IAnalyticsService):

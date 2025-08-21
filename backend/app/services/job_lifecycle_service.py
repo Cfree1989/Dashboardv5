@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 # Import foundation services
-from app.services.validation_service import ValidationService
+from app.business_logic.shared_services.validation_service import ValidationService
 from app.services.response_service import ResponseService
 
 # Import models and services

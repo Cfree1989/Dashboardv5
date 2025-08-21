@@ -3,14 +3,14 @@ from datetime import datetime
 from pathlib import Path
 
 # Import foundation services
-from app.services.validation_service import ValidationService
-from app.services.response_service import ResponseService
+from app.business_logic.shared_services.validation_service import ValidationService
+from app.business_logic.shared_services.response_service import ResponseService
 
 # Import models and services
 from app.models.job import Job
 from app.models.event import Event
-from app.services.email_service import send_completion_email
-from app.services.file_service import move_authoritative
+from app.business_logic.shared_services.email_service import send_completion_email
+from app.services.infrastructure.file_service import move_authoritative
 from app import db
 
 class JobStatusTransitionData:
@@ -355,7 +355,7 @@ class JobStatusService:
     def _sync_authoritative_metadata(self, job: Job, filename: str, staff_name: str, event_type: str) -> None:
         """Sync metadata with authoritative file"""
         try:
-            from app.services.error_handling_service import get_error_handling_service
+            from app.business_logic.shared_services.error_handling_service import get_error_handling_service
             error_service = get_error_handling_service()
             
             # This is a placeholder for the metadata sync logic

@@ -22,7 +22,7 @@ from app.services.catalog_service import CatalogService
 from app.services.error_handling_service import get_error_handling_service
 import logging
 from sqlalchemy import or_
-from app.services.validation_service import ValidationService
+from app.business_logic.shared_services.validation_service import ValidationService
 from app.services.response_service import ResponseService
 from app.services.job_lifecycle_service import JobLifecycleService, JobApprovalData, JobRejectionData, JobReviewData, JobNoteData, JobUpdateNotesData, JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData, JobLockData
 from app.services.payment_service import PaymentService

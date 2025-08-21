@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from app import db
 from app.models.catalog import CatalogStore
 from app.schemas.catalog import CatalogData, CatalogUpdateRequest
-from app.services.event_service import log_event
+from app.business_logic.shared_services.event_service import log_event
 import json
 
 
