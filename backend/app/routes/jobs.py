@@ -23,6 +23,7 @@ from app.services.error_handling_service import get_error_handling_service
 import logging
 from sqlalchemy import or_
 from app.services.validation_service import ValidationService
+from app.services.response_service import ResponseService
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,11 @@ bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 @bp.route('/<job_id>/validate', methods=['GET'])
 @token_required
 def validate_job(job_id):
-    """Test endpoint to verify ValidationService works"""
+    """Test endpoint to verify ValidationService and ResponseService work together"""
     result = ValidationService.validate_job_exists(job_id)
     if not result.is_valid:
-        return jsonify({'message': result.error_message}), 404
-    return jsonify({'message': 'Job is valid', 'job_id': job_id}), 200
+        return ResponseService.not_found('Job')
+    return ResponseService.success({'message': 'Job is valid', 'job_id': job_id})
 
 @bp.route('', methods=['GET'])
 @token_required
