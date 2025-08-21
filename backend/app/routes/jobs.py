@@ -482,26 +482,18 @@ def _validate_staff_and_body(data):
 @bp.route('/<job_id>/mark-printing', methods=['POST'])
 @token_required
 def mark_printing(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'READYTOPRINT':
-        return jsonify({'message': 'Job must be in READYTOPRINT to mark printing'}), 400
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
         return err_resp, err_code
-    job.status = 'PRINTING'
-    job.last_updated_by = staff_name
-    # Move file/metadata to Printing
-    move_authoritative(job, 'PRINTING')
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPrinting')
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        job = lifecycle_service.mark_printing(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 # --- Admin Overrides ---
@@ -542,9 +534,6 @@ def admin_force_unlock(job_id):
 @bp.route('/<job_id>/admin/force-confirm', methods=['POST'])
 @token_required
 def admin_force_confirm(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
@@ -552,22 +541,14 @@ def admin_force_confirm(job_id):
     reason, err_resp, err_code = _validate_reason(data)
     if err_resp:
         return err_resp, err_code
-    if job.status != 'PENDING':
-        return jsonify({'message': 'Job must be in PENDING to force confirm'}), 400
-    # Transition to READYTOPRINT and move files
-    job.status = 'READYTOPRINT'
-    job.last_updated_by = staff_name
-    move_authoritative(job, 'READYTOPRINT')
-    db.session.add(job)
-    db.session.commit()
-    # Log specific and admin events
-    evt1 = Event(job_id=job.id, event_type='AdminForceConfirm', details={'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt1)
-    db.session.commit()
-    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'force_confirm', 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt2)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
+        job = lifecycle_service.admin_force_confirm(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/admin/change-status', methods=['POST'])
@@ -667,9 +648,6 @@ def admin_resend_email(job_id):
 @bp.route('/<job_id>/admin/mark-failed', methods=['POST'])
 @token_required
 def admin_mark_failed(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
@@ -677,80 +655,48 @@ def admin_mark_failed(job_id):
     reason, err_resp, err_code = _validate_reason(data)
     if err_resp:
         return err_resp, err_code
-    if job.status != 'PRINTING':
-        return jsonify({'message': 'Job must be in PRINTING to mark failed'}), 400
-    # Move back to READYTOPRINT
-    job.status = 'READYTOPRINT'
-    job.last_updated_by = staff_name
-    move_authoritative(job, 'READYTOPRINT')
-    db.session.add(job)
-    db.session.commit()
-    # Log failure and admin action
-    evt = Event(job_id=job.id, event_type='PrintFailed', details={'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    evt2 = Event(job_id=job.id, event_type='AdminAction', details={'action': 'mark_failed', 'reason': reason}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt2)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name, reason=reason)
+        job = lifecycle_service.mark_failed(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/mark-complete', methods=['POST'])
 @token_required
 def mark_complete(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'PRINTING':
-        return jsonify({'message': 'Job must be in PRINTING to mark complete'}), 400
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
         return err_resp, err_code
-    job.status = 'COMPLETED'
-    job.last_updated_by = staff_name
-    # Move file/metadata to Completed
-    move_authoritative(job, 'COMPLETED')
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    # Attempt completion email (best-effort)
+    
     try:
-        send_completion_email(job)
-        email_evt = Event(job_id=job.id, event_type='CompletionEmailSent', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-        db.session.add(email_evt)
-        db.session.commit()
-    except Exception:
-        pass
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedComplete')
-    return jsonify(job.to_dict()), 200
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        job = lifecycle_service.mark_complete(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/mark-picked-up', methods=['POST'])
 @token_required
 def mark_picked_up(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to mark picked up'}), 400
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
         return err_resp, err_code
-    job.status = 'PAIDPICKEDUP'
-    job.last_updated_by = staff_name
-    # Move file/metadata to PaidPickedUp
-    move_authoritative(job, 'PAIDPICKEDUP')
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPickedUp')
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        job = lifecycle_service.mark_picked_up(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/payment', methods=['POST'])
@@ -921,51 +867,35 @@ def reject_job(job_id):
 @bp.route('/<job_id>/revert-completion', methods=['POST'])
 @token_required
 def revert_completion(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to revert to PRINTING'}), 400
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
         return err_resp, err_code
-    before = job.status
-    job.status = 'PRINTING'
-    job.last_updated_by = staff_name
-    move_authoritative(job, 'PRINTING')
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobRevertedToPrinting', details={'from': before, 'to': 'PRINTING'}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToPrinting')
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        job = lifecycle_service.revert_to_printing(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 
 @bp.route('/<job_id>/revert-pickup', methods=['POST'])
 @token_required
 def revert_pickup(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'PAIDPICKEDUP':
-        return jsonify({'message': 'Job must be in PAIDPICKEDUP to revert to COMPLETED'}), 400
     data = request.get_json(silent=True) or {}
     staff_name, err_resp, err_code = _validate_staff_and_body(data)
     if err_resp:
         return err_resp, err_code
-    before = job.status
-    job.status = 'COMPLETED'
-    job.last_updated_by = staff_name
-    move_authoritative(job, 'COMPLETED')
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobRevertedToCompleted', details={'from': before, 'to': 'COMPLETED'}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToCompleted')
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        from app.services.job_lifecycle_service import JobStatusTransitionData
+        transition_data = JobStatusTransitionData(staff_name=staff_name)
+        job = lifecycle_service.revert_to_completed(job_id, transition_data)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.error(str(e))
 
 @bp.route('/<job_id>/lock', methods=['POST'])
 @token_required
