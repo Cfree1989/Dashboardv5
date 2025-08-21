@@ -5,6 +5,7 @@ from app.models.job import Job
 from app.models.payment import Payment
 from app.models.staff import Staff
 from app.utils.decorators import token_required
+from app.utils.date_utils import DateUtils
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
 from time import time
@@ -47,25 +48,8 @@ def _cache_set(key: tuple, data):
 
 
 def _parse_date_range():
-    """Parse date range from query parameters"""
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    
-    if start_date and end_date:
-        # Use custom date range
-        try:
-            start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
-            end = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
-            return start, end
-        except ValueError:
-            # Fall back to days parameter
-            pass
-    
-    # Use days parameter (default 7 days)
-    days = int(request.args.get('days', 7))
-    end = datetime.now(timezone.utc)
-    start = end - timedelta(days=days)
-    return start, end
+    """Parse date range from query parameters using DateUtils"""
+    return DateUtils.parse_date_range()
 
 
 @bp.route('/overview', methods=['GET'])
