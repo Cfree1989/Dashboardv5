@@ -20,8 +20,8 @@ def create_test_job(job_id, **kwargs):
         'display_name': 'Test Model',
         'file_path': '/test/path/test.stl',
         'metadata_path': '/test/path/test_metadata.json',
-        'printer': 'Prusa MK3S',
-        'color': 'Black',
+        'printer': 'Prusa MK4S',
+        'color': 'True Black',
         'material': 'Filament',
         'status': 'UPLOADED'
     }
@@ -226,8 +226,8 @@ class TestEventLoggingSystem:
             'student_email': 'integration@example.com',
             'discipline': 'Engineering',
             'class_number': '101',
-            'printer': 'Prusa MK3S',
-            'color': 'Black',
+            'printer': 'Prusa MK4S',
+            'color': 'True Black',
             'material': 'Filament',
             'file': (io.BytesIO(b'model data'), 'model.stl')
         }
@@ -274,8 +274,8 @@ class TestEventLoggingSystem:
             'student_email': 'audit@example.com',
             'discipline': 'Engineering',
             'class_number': '101',
-            'printer': 'Prusa MK3S',
-            'color': 'Black',
+            'printer': 'Prusa MK4S',
+            'color': 'True Black',
             'material': 'Filament',
             'file': (io.BytesIO(b'model data'), 'model.stl')
         }
@@ -529,8 +529,8 @@ class TestEventLoggingSystem:
             'student_email': 'api@example.com',
             'discipline': 'Engineering',
             'class_number': '101',
-            'printer': 'Prusa MK3S',
-            'color': 'Black',
+            'printer': 'Prusa MK4S',
+            'color': 'True Black',
             'material': 'Filament',
             'file': (io.BytesIO(b'model data'), 'model.stl')
         }

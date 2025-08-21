@@ -164,7 +164,7 @@ class CatalogService:
             method: The print method (e.g., "Filament", "Resin")
             material: The material name (e.g., "PLA", "ABS", "Standard Resin")
             color: The color name (e.g., "Black", "White")
-            printer: The printer name (e.g., "Prusa MK3S", "Formlabs Form 3")
+            printer: The printer name (e.g., "Prusa MK4S", "Formlabs Form 3")
             
         Returns:
             Tuple of (is_valid, list_of_errors)

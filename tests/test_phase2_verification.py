@@ -16,8 +16,8 @@ def test_analytics_events_list(client, token):
         'student_email': 'zoe@example.com',
         'discipline': 'Design',
         'class_number': '505',
-        'printer': 'Prusa',
-        'color': 'Black',
+        'printer': 'Prusa MK4S',
+        'color': 'True Black',
         'material': 'Filament',
         'file': (io.BytesIO(b'model content'), 'test.stl')
     }

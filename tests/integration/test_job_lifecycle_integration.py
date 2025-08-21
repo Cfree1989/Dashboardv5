@@ -104,9 +104,9 @@ class TestJobLifecycleIntegration:
                 'student_email': 'duplicate@lsu.edu',
                 'discipline': 'Engineering',
                 'class_number': 'ME 2743',
-                'printer': 'Prusa MK3S',
+                'printer': 'Prusa MK4S',
                 'material': 'PLA',
-                'color': 'Black',
+                'color': 'True Black',
                 'notes': 'First submission'
             }
             
@@ -122,9 +122,9 @@ class TestJobLifecycleIntegration:
                 'student_email': 'duplicate@lsu.edu',  # Same email
                 'discipline': 'Engineering',
                 'class_number': 'ME 2743',
-                'printer': 'Prusa MK3S',
+                'printer': 'Prusa MK4S',
                 'material': 'PLA',
-                'color': 'Black',
+                'color': 'True Black',
                 'notes': 'Duplicate submission'
             }
             

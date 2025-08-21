@@ -40,7 +40,7 @@ def create_test_job(job_id, **kwargs):
         'display_name': 'Test Model',
         'file_path': '/test/path/test.stl',
         'metadata_path': '/test/path/test_metadata.json',
-        'printer': 'Prusa MK3S',
+        'printer': 'Prusa MK4S',
         'color': 'Black',
         'material': 'Filament',
         'status': 'UPLOADED'

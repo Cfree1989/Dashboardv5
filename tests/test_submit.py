@@ -10,8 +10,8 @@ def test_submit_job_success(client):
         'discipline': 'Eng',
         'class_number': '303',
         'print_method': 'Filament',
-        'printer': 'Prusa MK3S',
-        'color': 'Black',
+        'printer': 'Prusa MK4S',
+        'color': 'True Black',
         'material': 'PLA',
         'file': (io.BytesIO(b'solid data'), 'model.stl')
     }
@@ -50,7 +50,7 @@ def test_submit_duplicate(client):
         'discipline': 'Art',
         'class_number': '404',
         'print_method': 'Filament',
-        'printer': 'Prusa MK3S',
+        'printer': 'Prusa MK4S',
         'color': 'Red',
         'material': 'PLA',
         'file': (io.BytesIO(b'dupe data'), 'dup.stl')

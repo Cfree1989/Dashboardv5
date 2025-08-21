@@ -30,9 +30,9 @@ def test_job_submission():
             'student_email': 'test@lsu.edu',
             'discipline': 'Engineering',
             'class_number': 'ME 2743',
-            'printer': 'Prusa MK3S',
+            'printer': 'Prusa MK4S',
             'material': 'PLA',
-            'color': 'Black',
+            'color': 'True Black',
             'notes': 'Test job for atomic file operations'
         }
         

@@ -264,7 +264,7 @@ class TestCatalogService:
         
         # Check specific default values
         printer_names = [p['name'] for p in default_catalog['printers']]
-        assert 'Prusa MK3S' in printer_names
+        assert 'Prusa MK4S' in printer_names
         assert 'Formlabs Form 3' in printer_names
         
         material_names = [m['name'] for m in default_catalog['materials']]
@@ -377,8 +377,8 @@ class TestJobConfigurationValidation:
             'methods': ['Filament', 'Resin'],
             'printers': [
                 {
-                    'id': 'prusa-mk3s',
-                    'name': 'Prusa MK3S',
+                    'id': 'prusa-mk4s',
+                    'name': 'Prusa MK4S',
                     'supported_methods': ['Filament'],
                     'is_active': True
                 },
@@ -401,7 +401,7 @@ class TestJobConfigurationValidation:
                     'method': 'Filament',
                     'name': 'PLA',
                     'unit_cost_per_g_cents': 10,
-                    'colors': ['Black', 'White', 'Orange'],
+                    'colors': ['True Black', 'White', 'Orange'],
                     'is_active': True
                 },
                 {
@@ -409,7 +409,7 @@ class TestJobConfigurationValidation:
                     'method': 'Filament',
                     'name': 'ABS',
                     'unit_cost_per_g_cents': 10,
-                    'colors': ['Black', 'Grey'],
+                    'colors': ['True Black', 'Grey'],
                     'is_active': True
                 },
                 {
@@ -441,8 +441,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='Filament',
             material='PLA',
-            color='Black',
-            printer='Prusa MK3S'
+            color='True Black',
+            printer='Prusa MK4S'
         )
         
         assert is_valid is True
@@ -458,8 +458,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='InvalidMethod',
             material='PLA',
-            color='Black',
-            printer='Prusa MK3S'
+            color='True Black',
+            printer='Prusa MK4S'
         )
         
         assert is_valid is False
@@ -476,8 +476,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='Filament',
             material='InvalidMaterial',
-            color='Black',
-            printer='Prusa MK3S'
+            color='True Black',
+            printer='Prusa MK4S'
         )
         
         assert is_valid is False
@@ -513,7 +513,7 @@ class TestJobConfigurationValidation:
             method='Filament',
             material='PLA',
             color='Purple',  # Purple not available for PLA
-            printer='Prusa MK3S'
+            printer='Prusa MK4S'
         )
         
         assert is_valid is False
@@ -530,7 +530,7 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='Filament',
             material='PLA',
-            color='Black',
+            color='True Black',
             printer='InvalidPrinter'
         )
         
@@ -549,7 +549,7 @@ class TestJobConfigurationValidation:
             method='Resin',
             material='Standard Resin',
             color='Grey',
-            printer='Prusa MK3S'  # Prusa MK3S only supports Filament
+            printer='Prusa MK4S'  # Prusa MK4S only supports Filament
         )
         
         assert is_valid is False
@@ -567,7 +567,7 @@ class TestJobConfigurationValidation:
             method='Filament',
             material='Inactive Material',  # This material is inactive
             color='Red',
-            printer='Prusa MK3S'
+            printer='Prusa MK4S'
         )
         
         assert is_valid is False
@@ -584,7 +584,7 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='Filament',
             material='PLA',
-            color='Black',
+            color='True Black',
             printer='Inactive Printer'  # This printer is inactive
         )
         
@@ -602,8 +602,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='filament',  # lowercase
             material='pla',     # lowercase
-            color='black',      # lowercase
-            printer='prusa mk3s'  # lowercase
+            color='true black',      # lowercase
+            printer='prusa mk4s'  # lowercase
         )
         
         assert is_valid is True
@@ -619,8 +619,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='  Filament  ',  # with whitespace
             material='  PLA  ',      # with whitespace
-            color='  Black  ',       # with whitespace
-            printer='  Prusa MK3S  '  # with whitespace
+            color='  True Black  ',       # with whitespace
+            printer='  Prusa MK4S  '  # with whitespace
         )
         
         assert is_valid is True
@@ -661,8 +661,8 @@ class TestJobConfigurationValidation:
         is_valid, errors = CatalogService.validate_job_configuration(
             method='Filament',
             material='PLA',
-            color='Black',
-            printer='Prusa MK3S'
+            color='True Black',
+            printer='Prusa MK4S'
         )
         
         mock_seed_catalog.assert_called_once()
@@ -785,8 +785,8 @@ class TestCatalogIntegration:
                 'methods': ['Filament', 'Resin'],
                 'printers': [
                     {
-                        'id': 'prusa-mk3s',
-                        'name': 'Prusa MK3S',
+                        'id': 'prusa-mk4s',
+                        'name': 'Prusa MK4S',
                         'supported_methods': ['Filament'],
                         'is_active': True
                     }
@@ -797,7 +797,7 @@ class TestCatalogIntegration:
                         'method': 'Filament',
                         'name': 'PLA',
                         'unit_cost_per_g_cents': 10,
-                        'colors': ['Black', 'White'],
+                        'colors': ['True Black', 'White'],
                         'is_active': True
                     }
                 ]
@@ -816,8 +816,8 @@ class TestCatalogIntegration:
             'class_name': 'Test Class',
             'method': 'Filament',
             'material': 'InvalidMaterial',  # Not in catalog
-            'color': 'Black',
-            'printer': 'Prusa MK3S',
+            'color': 'True Black',
+            printer='Prusa MK4S',
             'weight_grams': 50,
             'notes': 'Test job'
         }
@@ -838,8 +838,8 @@ class TestCatalogIntegration:
             'class_name': 'Test Class',
             'method': 'Filament',
             'material': 'PLA',
-            'color': 'Black',
-            'printer': 'Prusa MK3S',
+            'color': 'True Black',
+            printer='Prusa MK4S',
             'weight_grams': 50,
             'notes': 'Test job'
         }
@@ -855,8 +855,8 @@ class TestCatalogIntegration:
                 'methods': ['Filament', 'Resin'],
                 'printers': [
                     {
-                        'id': 'prusa-mk3s',
-                        'name': 'Prusa MK3S',
+                        'id': 'prusa-mk4s',
+                        'name': 'Prusa MK4S',
                         'supported_methods': ['Filament'],
                         'is_active': True
                     }
@@ -867,7 +867,7 @@ class TestCatalogIntegration:
                         'method': 'Filament',
                         'name': 'PLA',
                         'unit_cost_per_g_cents': 10,
-                        'colors': ['Black'],
+                        'colors': ['True Black'],
                         'is_active': True
                     }
                 ]
