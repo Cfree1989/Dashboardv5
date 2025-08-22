@@ -649,67 +649,72 @@ Database schema migration issue - Job model expects `locked_by`/`locked_until` c
 
 ## **High-level Task Breakdown**
 
-### **Current Phase: Task 7 - Implement Consistent Frontend Error Handling** (System Audit Task)
-**Objective**: Standardize error handling patterns across all frontend components for better user experience and maintainability  
+### **Current Phase: Task 9 - Optimize API Call Patterns** (System Audit Task)
+**Objective**: Improve API call efficiency with better caching and request optimization  
 **Priority**: Medium (System Audit Task)  
 **Estimated Duration**: 3-4 hours
 
-#### **Task 7.1: Create Standardized Error Handling Utilities** (1 hour)
-**Objective**: Create reusable error handling utilities and patterns  
+### **Completed Phase: Task 8 - Add Comprehensive File Validation** (System Audit Task) ✅ **COMPLETED**
+**Objective**: Enhance file validation in the file discovery service to prevent invalid file uploads and improve security  
+**Priority**: Medium (System Audit Task)  
+**Actual Duration**: 2.5 hours
+
+#### **Task 8.1: Add File Header Validation** (1 hour)
+**Objective**: Implement file header validation to detect file type spoofing  
 **Actions**:
-- Create standardized error handling utilities in `frontend/src/lib/error-handling.ts`
-- Implement consistent error display patterns and components
-- Create error boundary utilities for component-level error handling
-- Add user-friendly error message mapping
-**Success Criteria**: Standardized error handling utilities created and tested  
+- Add file header validation methods to FileConfigurationService
+- Implement magic number detection for common 3D file formats (STL, OBJ, 3MF)
+- Add file content validation to prevent extension spoofing
+- Create comprehensive test suite for file header validation
+**Success Criteria**: File header validation working correctly, spoofing attempts detected  
 **Estimated Time**: 1 hour  
 **Dependencies**: None  
-**Risk**: Low (new implementation, no breaking changes)
+**Risk**: Low (new validation layer, no breaking changes)
 
-#### **Task 7.2: Update Dashboard Components** (1.5 hours)
-**Objective**: Update all dashboard components to use consistent error patterns  
+#### **Task 8.2: Enhance File Size Validation** (30 minutes)
+**Objective**: Improve file size validation with better error messages and limits  
 **Actions**:
-- Update job-list.tsx to use standardized error handling
-- Update job-card.tsx to use consistent error display patterns
-- Update modals to handle errors uniformly
-- Implement proper error boundaries for dashboard sections
-**Success Criteria**: All dashboard components use consistent error handling patterns  
-**Estimated Time**: 1.5 hours  
-**Dependencies**: Task 7.1  
-**Risk**: Medium (updating existing components)
-
-#### **Task 7.3: Update Analytics and Admin Components** (1 hour)
-**Objective**: Update analytics and admin components to use consistent error patterns  
-**Actions**:
-- Update analytics components to use standardized error handling
-- Update admin components to use consistent error display patterns
-- Implement error boundaries for analytics and admin sections
-- Add user-friendly error messages for admin operations
-**Success Criteria**: All analytics and admin components use consistent error handling  
-**Estimated Time**: 1 hour  
-**Dependencies**: Task 7.2  
-**Risk**: Medium (updating existing components)
-
-#### **Task 7.4: Testing and Validation** (30 minutes)
-**Objective**: Comprehensive testing of error handling across all components  
-**Actions**:
-- Test error handling with various error scenarios
-- Validate error messages are user-friendly and consistent
-- Test error recovery patterns and retry mechanisms
-- Verify error boundaries work correctly
-**Success Criteria**: All error handling working correctly with improved user experience  
+- Add minimum file size validation to prevent empty files
+- Enhance file size error messages with specific limits
+- Add file size validation to file discovery service
+- Update submit route to use enhanced validation
+**Success Criteria**: Better file size validation with clear error messages  
 **Estimated Time**: 30 minutes  
-**Dependencies**: Task 7.3  
-**Risk**: Low (validation task)
+**Dependencies**: Task 8.1  
+**Risk**: Low (enhancement, no breaking changes)
 
-**Total Estimated Effort**: 4 hours  
-**Dependencies**: Task 6 (Standardize Error Response Formats)  
-**Risk**: Medium (updating existing components)
+#### **Task 8.3: Add Security Validation** (30 minutes)
+**Objective**: Add security-focused file validation to prevent malicious uploads  
+**Actions**:
+- Add filename sanitization to prevent path traversal attacks
+- Implement file content scanning for suspicious patterns
+- Add virus scanning integration placeholder (optional)
+- Create security validation test suite
+**Success Criteria**: Security validation working, malicious files rejected  
+**Estimated Time**: 30 minutes  
+**Dependencies**: Task 8.2  
+**Risk**: Low (security enhancement, no breaking changes)
 
-### **Next Steps After Task 7**:
-1. **Task 8**: Add Comprehensive File Validation (System Audit Task)
-2. **Task 9**: Optimize API Call Patterns (System Audit Task)
-3. **Task 10**: Complete TODO Items in Jobs Route (System Audit Task)
+#### **Task 8.4: Update File Discovery Service** (30 minutes)
+**Objective**: Integrate comprehensive validation into file discovery service  
+**Actions**:
+- Update FileDiscoveryService to use enhanced validation
+- Add validation error reporting to candidate file discovery
+- Update error messages for invalid files
+- Test file discovery with various file types
+**Success Criteria**: File discovery service uses comprehensive validation  
+**Estimated Time**: 30 minutes  
+**Dependencies**: Task 8.3  
+**Risk**: Low (integration task)
+
+**Total Estimated Effort**: 2.5 hours  
+**Dependencies**: Task 3 (Consolidate File Handling Configuration)  
+**Risk**: Low (enhancement tasks, no breaking changes)
+
+### **Next Steps After Task 8**:
+1. **Task 9**: Optimize API Call Patterns (System Audit Task)
+2. **Task 10**: Complete TODO Items in Jobs Route (System Audit Task)
+3. **Task 11**: Enhance Docker Health Checks (System Audit Task)
 
 ### **Previous Phase: Critical Security Fix** (Phase 1)
 **Objective**: Complete JWT token storage security implementation  
@@ -990,6 +995,15 @@ Accurate, consistent, and maintainable project documentation that reliably refle
 ### **Project Status Board** (Following markdown todo format)
 
 #### **Active Tasks** 
+- [x] **TASK 8: Add Comprehensive File Validation** (System Audit Task) ✅ **COMPLETED**
+  - [x] Task 8.1: Add File Header Validation (1 hour) ✅ **COMPLETED**
+  - [x] Task 8.2: Enhance File Size Validation (30 minutes) ✅ **COMPLETED**
+  - [x] Task 8.3: Add Security Validation (30 minutes) ✅ **COMPLETED**
+  - [x] Task 8.4: Update File Discovery Service (30 minutes) ✅ **COMPLETED**
+  - **Success Criteria**: Invalid files rejected before processing, clear error messages for file validation failures, better security against malicious uploads ✅ **ACHIEVED**
+  - **Actual Time**: 2.5 hours
+  - **Risk**: Low (enhancement tasks, no breaking changes)
+
 - [x] **TASK 7: Implement Consistent Frontend Error Handling** (System Audit Task) ✅ **COMPLETED**
   - [x] Task 7.1: Create Standardized Error Handling Utilities (1 hour) ✅ **COMPLETED**
   - [x] Task 7.2: Update Dashboard Components (1.5 hours) ✅ **COMPLETED**
@@ -1280,6 +1294,66 @@ Routes → JobOrchestrationService → Business Logic Services
 5. **Mock Migration Planning** - Prepare tools for updating mock paths during extraction
 
 ## 🔧 **Executor's Feedback or Assistance Requests**
+
+### **TASK 8 - ADD COMPREHENSIVE FILE VALIDATION: COMPLETE** ✅
+**Date**: Current session  
+**Duration**: 2.5 hours  
+**Scope**: Complete Task 8 from System Audit Tasks - Add Comprehensive File Validation
+
+**Key Achievements**:
+1. **File Header Validation**: ✅ Complete - Implemented magic number detection for STL, OBJ, 3MF, and ZIP-based formats
+   - **STL Validation**: ASCII format (starts with "solid") and binary format (80-byte header + triangle count)
+   - **OBJ Validation**: Text-based format with keyword detection (v, vt, vn, f, g, o)
+   - **3MF Validation**: ZIP-based format with 3MF-specific content detection
+   - **ZIP-based Validation**: Form and Idea files validated as ZIP archives
+   - **Executable Detection**: Rejects Windows (MZ), Linux (ELF), and Mach-O executables
+
+2. **Enhanced File Size Validation**: ✅ Complete - Added minimum file size validation and better error messages
+   - **Minimum Size**: Configurable via `MIN_FILE_SIZE_KB` environment variable (default: 1KB)
+   - **Maximum Size**: Enhanced error messages with specific size limits
+   - **Error Messages**: Clear, user-friendly error messages for size validation failures
+
+3. **Security Validation**: ✅ Complete - Added comprehensive security-focused file validation
+   - **Filename Sanitization**: Removes dangerous characters and path separators
+   - **Path Traversal Prevention**: Detects and rejects `../` and absolute path attempts
+   - **Dangerous Character Detection**: Rejects files with `*`, `?`, `"`, `<`, `>`, `|`, `:`, `\x00`
+   - **Reserved Name Detection**: Rejects Windows reserved names (CON, PRN, AUX, etc.)
+
+4. **File Discovery Service Integration**: ✅ Complete - Updated to use enhanced validation
+   - **Security Validation**: Files with security issues are skipped during discovery
+   - **Size Validation**: Files with invalid sizes are excluded from candidates
+   - **Header Validation**: Files with invalid content are filtered out
+   - **Error Handling**: Graceful handling of files that can't be read
+
+**Files Updated**:
+- ✅ `backend/app/services/infrastructure/file_configuration_service.py` - Enhanced with comprehensive validation methods
+- ✅ `backend/app/routes/submit.py` - Updated to use enhanced validation in file upload
+- ✅ `backend/app/services/infrastructure/file_discovery_service.py` - Updated to filter invalid files
+- ✅ `backend/tests/unit/services/test_file_configuration_service.py` - Comprehensive test suite (27 tests)
+- ✅ `backend/test_file_validation.py` - Integration test script (11 tests, 100% pass rate)
+
+**Test Results**:
+- ✅ **Unit Tests**: 27/27 tests passing (100% success rate)
+- ✅ **Integration Tests**: 11/11 tests passing (100% success rate)
+- ✅ **File Header Validation**: All supported formats (STL, OBJ, 3MF, ZIP) validated correctly
+- ✅ **Security Validation**: Path traversal, dangerous characters, and reserved names detected
+- ✅ **Size Validation**: Minimum and maximum size limits enforced with clear error messages
+
+**Benefits Achieved**:
+- **Security Enhancement**: Prevents malicious file uploads and path traversal attacks
+- **File Type Validation**: Detects file type spoofing through header validation
+- **Better Error Messages**: Clear, specific error messages for validation failures
+- **Comprehensive Coverage**: All file handling services now use enhanced validation
+- **Environment Configurable**: File size limits and validation rules configurable via environment variables
+
+**Success Criteria Met**:
+- [x] Invalid files rejected before processing
+- [x] Clear error messages for file validation failures
+- [x] Better security against malicious uploads
+- [x] File header validation for common 3D formats
+- [x] Filename security validation and sanitization
+
+**Task 8 Status**: ✅ **COMPLETE** - Comprehensive file validation successfully implemented and tested
 
 ### **TASK 5 - REMOVE DEBUG CODE FROM PRODUCTION: COMPLETE** ✅
 **Date**: Current session  

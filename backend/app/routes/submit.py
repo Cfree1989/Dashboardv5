@@ -52,14 +52,31 @@ def submit_job():
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'no file selected'}), 400
+        
+        # Enhanced file validation
+        # 1. Validate filename security
+        is_valid_filename, filename_error = file_config.validate_filename_security(file.filename)
+        if not is_valid_filename:
+            return jsonify({'error': f'Invalid filename: {filename_error}'}), 400
+        
+        # 2. Validate file extension
         if not allowed_file(file.filename):
-            return jsonify({'error': 'invalid file type'}), 400
-        if request.content_length and not file_config.validate_file_size(request.content_length):
-            return jsonify({'error': f'file too large (max {file_config.max_file_size_mb}MB)'}), 413
+            return jsonify({'error': 'Invalid file type'}), 400
+        
+        # 3. Validate file size
+        if request.content_length:
+            size_error = file_config.get_file_size_validation_error(request.content_length)
+            if size_error:
+                return jsonify({'error': size_error}), 413
 
         # Read file for hash and saving
         file_bytes = file.read()
         file_hash = hashlib.sha256(file_bytes).hexdigest()
+        
+        # 4. Validate file header (content validation)
+        is_valid_header, header_error = file_config.validate_file_header(file_bytes, file.filename)
+        if not is_valid_header:
+            return jsonify({'error': f'Invalid file content: {header_error}'}), 400
 
         # Duplicate detection in active statuses (only select id, avoid extra columns)
         active_statuses = ['UPLOADED', 'PENDING', 'READYTOPRINT']

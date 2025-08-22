@@ -91,11 +91,33 @@ class FileDiscoveryService:
             if not self._is_file_related_to_job(entry.name, tokens, job):
                 continue
             
+            # Enhanced file validation
             try:
+                # Validate filename security
+                is_valid_filename, filename_error = self.file_config.validate_filename_security(entry.name)
+                if not is_valid_filename:
+                    continue  # Skip files with security issues
+                
+                # Validate file size
                 stat = entry.stat()
+                if not self.file_config.validate_file_size(stat.st_size):
+                    continue  # Skip files with invalid size
+                
+                # Validate file header (content validation)
+                try:
+                    with open(entry, 'rb') as f:
+                        file_content = f.read(2048)  # Read first 2KB for header validation
+                    
+                    is_valid_header, header_error = self.file_config.validate_file_header(file_content, entry.name)
+                    if not is_valid_header:
+                        continue  # Skip files with invalid content
+                except (OSError, IOError):
+                    continue  # Skip files that can't be read
+                
                 candidates.append({
                     'name': entry.name, 
-                    'mtime': int(stat.st_mtime)
+                    'mtime': int(stat.st_mtime),
+                    'size': stat.st_size
                 })
             except OSError:
                 continue
