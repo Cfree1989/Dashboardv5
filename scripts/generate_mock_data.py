@@ -48,6 +48,7 @@ _ensure_backend_on_path()
 from app import create_app, db  # type: ignore  # noqa: E402
 from app.models.job import Job  # type: ignore  # noqa: E402
 from app.models.event import Event  # type: ignore  # noqa: E402
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service  # type: ignore  # noqa: E402
 
 
 def _create_placeholder_files(storage_root: Path, status_dir: str, filename: str) -> tuple[Path, Path]:
@@ -84,7 +85,10 @@ def create_jobs(counts: Dict[str, int], email: str) -> Dict[str, int]:
         for idx in range(requested):
             job_id = uuid.uuid4().hex
             short = job_id[:8]
-            filename = f"Mock_{short}.stl"
+            # Use centralized file configuration to get a valid extension
+            file_config = get_file_configuration_service()
+            extension = list(file_config.allowed_extensions)[0]  # Use first allowed extension
+            filename = f"Mock_{short}{extension}"
             status_dir = _status_to_dir(status)
             file_path, meta_path = _create_placeholder_files(storage_root, status_dir, filename)
 

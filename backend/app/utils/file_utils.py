@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 from typing import Optional, Tuple
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 
 class FileUtils:
     @staticmethod
@@ -33,6 +34,12 @@ class FileUtils:
         """Check if file has allowed extension"""
         extension = FileUtils.get_file_extension(file_path)
         return extension in [ext.lower() for ext in allowed_extensions]
+    
+    @staticmethod
+    def is_valid_file_type_configured(file_path: str) -> bool:
+        """Check if file has allowed extension using centralized configuration"""
+        file_config = get_file_configuration_service()
+        return file_config.is_allowed_extension(file_path)
     
     @staticmethod
     def get_safe_filename(filename: str) -> str:

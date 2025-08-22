@@ -7,7 +7,7 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
 from app.business_logic.shared_services import event_service
-from app.services.infrastructure import file_service
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service, STATUS_TO_DIR
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
 from pathlib import Path
@@ -265,7 +265,10 @@ def repair_location():
         return jsonify({'message': 'Job not found'}), 404
     try:
         # Move file/metadata into the directory that matches the current status
-        move_authoritative(job, job.status)
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, job.status)
+        if not success:
+            abort(500, description='Failed to repair location - file operation failed')
         db.session.add(job)
         db.session.commit()
         # Update metadata.json to reflect new location/status
@@ -414,10 +417,10 @@ def archive_jobs():
             pass
         # Move to Archived and update status
         try:
-            from app.services.infrastructure import file_service
-            move_authoritative(job, 'ARCHIVED')
+            atomic_service = get_atomic_file_service()
+            atomic_service.atomic_move_authoritative(job, 'ARCHIVED')
         except Exception:
-            pass
+            pass  # Continue processing even if file move fails
         job.status = 'ARCHIVED'
         db.session.add(job)
         db.session.commit()

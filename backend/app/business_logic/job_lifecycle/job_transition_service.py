@@ -8,6 +8,7 @@ from app.business_logic.shared_services.response_service import ResponseService
 # Import models and services
 from app.models.job import Job
 from app.models.event import Event
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 # Import moved to method level to avoid circular imports
 from app import db
 
@@ -56,8 +57,10 @@ class JobTransitionService:
         
         # Handle status-specific logic
         if new_status in ['PRINTING', 'COMPLETED', 'PAIDPICKEDUP']:
-            from app.services.infrastructure.file_service import move_authoritative
-            move_authoritative(job, new_status)
+            atomic_service = get_atomic_file_service()
+            success = atomic_service.atomic_move_authoritative(job, new_status)
+            if not success:
+                raise RuntimeError(f'File operation failed during status transition to {new_status}')
         
         # Save job changes
         db.session.add(job)

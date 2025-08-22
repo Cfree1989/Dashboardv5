@@ -10,6 +10,7 @@ from app.business_logic.shared_services.response_service import ResponseService
 from app.models.job import Job
 from app.models.event import Event
 from app.business_logic.shared_services.email_service import send_completion_email
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 # Import moved to method level to avoid circular imports
 from app import db
 
@@ -56,8 +57,10 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to Printing
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'PRINTING')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
+        if not success:
+            return ResponseService.error('File operation failed during printing status update')
         db.session.add(job)
         db.session.commit()
         
@@ -97,8 +100,10 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to Completed
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'COMPLETED')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
+        if not success:
+            return ResponseService.error('File operation failed during completion status update')
         db.session.add(job)
         db.session.commit()
         
@@ -153,8 +158,10 @@ class JobStatusService:
         job.last_updated_by = transition_data.staff_name
         
         # Move file/metadata to PaidPickedUp
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'PAIDPICKEDUP')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
+        if not success:
+            return ResponseService.error('File operation failed during pickup status update')
         db.session.add(job)
         db.session.commit()
         
@@ -196,8 +203,10 @@ class JobStatusService:
         # Move back to READYTOPRINT
         job.status = 'READYTOPRINT'
         job.last_updated_by = transition_data.staff_name
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'READYTOPRINT')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')
+        if not success:
+            return ResponseService.error('File operation failed during failure marking')
         db.session.add(job)
         db.session.commit()
         
@@ -246,8 +255,10 @@ class JobStatusService:
         # Transition to READYTOPRINT and move files
         job.status = 'READYTOPRINT'
         job.last_updated_by = transition_data.staff_name
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'READYTOPRINT')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')
+        if not success:
+            return ResponseService.error('File operation failed during admin force confirm')
         db.session.add(job)
         db.session.commit()
         
@@ -295,8 +306,10 @@ class JobStatusService:
         # Update job
         job.status = 'PRINTING'
         job.last_updated_by = transition_data.staff_name
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'PRINTING')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
+        if not success:
+            return ResponseService.error('File operation failed during revert to printing')
         db.session.add(job)
         db.session.commit()
         
@@ -337,8 +350,10 @@ class JobStatusService:
         # Update job
         job.status = 'COMPLETED'
         job.last_updated_by = transition_data.staff_name
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'COMPLETED')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
+        if not success:
+            return ResponseService.error('File operation failed during revert to completed')
         db.session.add(job)
         db.session.commit()
         

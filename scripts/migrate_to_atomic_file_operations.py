@@ -25,7 +25,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'backend'))
 
 from app import create_app
 from app.models.job import Job
-from app.services.atomic_file_service import get_atomic_file_service, STATUS_TO_DIR
+from app.services.atomic_file_service import get_atomic_file_service
+from app.services.infrastructure.atomic_file_service import STATUS_TO_DIR
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -87,8 +89,12 @@ class AtomicFileMigration:
                 for status_dir in STATUS_TO_DIR.values():
                     status_path = storage_path / status_dir
                     if status_path.exists():
+                        # Get allowed file extensions from centralized configuration
+                        file_config = get_file_configuration_service()
+                        allowed_extensions = list(file_config.allowed_extensions) + ['.json']  # Add metadata files
+                        
                         for file_path in status_path.rglob('*'):
-                            if file_path.is_file() and file_path.suffix in ['.stl', '.obj', '.gcode', '.json']:
+                            if file_path.is_file() and file_path.suffix in allowed_extensions:
                                 # Check if this file is referenced by any job
                                 found = False
                                 for job in jobs:

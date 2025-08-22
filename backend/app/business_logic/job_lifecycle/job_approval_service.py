@@ -7,6 +7,7 @@ import os
 # Import foundation services
 from app.business_logic.shared_services.validation_service import ValidationService
 from app.business_logic.shared_services.response_service import ResponseService
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 
 # Import models and services
 from app.models.job import Job
@@ -247,12 +248,9 @@ class JobApprovalService:
         current_dir = Path(job.file_path).parent
         candidate_path = (current_dir / authoritative_filename)
         
-        # Allowed extensions are driven by env
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
-        allowed_exts = {
-            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
-            for ext in exts_env.split(',') if ext.strip()
-        }
+        # Use centralized file configuration
+        file_config = get_file_configuration_service()
+        allowed_exts = file_config.allowed_extensions
         
         # Validate parent dir, extension, and existence
         if candidate_path.parent != current_dir:

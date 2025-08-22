@@ -237,7 +237,7 @@ class TransactionContext:
             raise ValueError("Missing required parameters for file move")
         
         success = self.atomic_file_service.atomic_move_authoritative(
-            job, to_status, self.operation_id
+            job, to_status
         )
         
         if not success:

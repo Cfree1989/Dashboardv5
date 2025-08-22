@@ -11,6 +11,7 @@ import pytest
 from unittest.mock import Mock, patch
 
 from app.services.infrastructure.file_discovery_service import FileDiscoveryService, CandidateFileResult
+from app.services.infrastructure import file_configuration_service
 
 
 class TestCandidateFileResult:
@@ -52,13 +53,17 @@ class TestFileDiscoveryService:
     def test_load_allowed_extensions_default(self):
         """Test loading default allowed extensions"""
         with patch.dict(os.environ, {}, clear=True):
+            # Reset the global singleton to pick up new environment variables
+            file_configuration_service._file_config_service = None
             service = FileDiscoveryService()
             expected = {'.stl', '.obj', '.3mf', '.form', '.idea'}
             assert service.allowed_extensions == expected
 
     def test_load_allowed_extensions_custom(self):
         """Test loading custom allowed extensions from environment"""
-        with patch.dict(os.environ, {'ALLOWED_MODEL_EXTS': '.stl,.gcode,.step'}, clear=True):
+        with patch.dict(os.environ, {'ALLOWED_FILE_EXTENSIONS': 'stl,gcode,step'}, clear=True):
+            # Reset the global singleton to pick up new environment variables
+            file_configuration_service._file_config_service = None
             service = FileDiscoveryService()
             expected = {'.stl', '.gcode', '.step'}
             assert service.allowed_extensions == expected
@@ -66,13 +71,17 @@ class TestFileDiscoveryService:
     def test_load_extension_priority_default(self):
         """Test loading default extension priority"""
         with patch.dict(os.environ, {}, clear=True):
+            # Reset the global singleton to pick up new environment variables
+            file_configuration_service._file_config_service = None
             service = FileDiscoveryService()
             expected = {'.3mf': 0, '.form': 1, '.idea': 2, '.stl': 3, '.obj': 4}
             assert service.extension_priority == expected
 
     def test_load_extension_priority_custom(self):
         """Test loading custom extension priority from environment"""
-        with patch.dict(os.environ, {'AUTHORITATIVE_EXT_PRIORITY': '.stl,.3mf,.obj'}, clear=True):
+        with patch.dict(os.environ, {'FILE_EXTENSION_PRIORITY': 'stl,3mf,obj'}, clear=True):
+            # Reset the global singleton to pick up new environment variables
+            file_configuration_service._file_config_service = None
             service = FileDiscoveryService()
             expected = {'.stl': 0, '.3mf': 1, '.obj': 2}
             assert service.extension_priority == expected
@@ -102,9 +111,12 @@ class TestFileDiscoveryService:
 
     def test_get_file_rank(self):
         """Test getting file extension priority rank"""
-        assert self.service._get_file_rank('test.3mf') == 0    # Highest priority
-        assert self.service._get_file_rank('test.stl') == 3    # Lower priority
-        assert self.service._get_file_rank('test.unknown') > 4  # Unknown extension
+        # Reset singleton to ensure clean state
+        file_configuration_service._file_config_service = None
+        service = FileDiscoveryService()
+        assert service._get_file_rank('test.3mf') == 0    # Highest priority
+        assert service._get_file_rank('test.stl') == 3    # Lower priority
+        assert service._get_file_rank('test.unknown') > 4  # Unknown extension
 
     def test_is_file_related_to_job_token_match(self):
         """Test file relatedness based on token matching"""
@@ -148,14 +160,18 @@ class TestFileDiscoveryService:
 
     def test_sort_candidates_by_priority(self):
         """Test sorting candidates by priority, then mtime, then name"""
+        # Reset singleton to ensure clean state
+        file_configuration_service._file_config_service = None
+        service = FileDiscoveryService()
+        
         candidates = [
             {'name': 'old.stl', 'mtime': 100},      # .stl priority 3, old
             {'name': 'new.3mf', 'mtime': 200},      # .3mf priority 0, new
             {'name': 'medium.stl', 'mtime': 150},   # .stl priority 3, medium
         ]
-        
-        sorted_candidates = self.service._sort_candidates_by_priority(candidates)
-        
+
+        sorted_candidates = service._sort_candidates_by_priority(candidates)
+
         # Should be sorted by priority first (.3mf before .stl), then mtime desc
         expected_names = ['new.3mf', 'medium.stl', 'old.stl']
         actual_names = [c['name'] for c in sorted_candidates]
@@ -163,26 +179,30 @@ class TestFileDiscoveryService:
 
     def test_discover_candidate_files_success(self):
         """Test successful file discovery"""
+        # Reset singleton to ensure clean state
+        file_configuration_service._file_config_service = None
+        service = FileDiscoveryService()
+        
         # Create temporary directory with test files
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            
+
             # Create test files
             (temp_path / 'TJ123_model.stl').touch()
             (temp_path / 'TJ123_model.3mf').touch()
             (temp_path / 'unrelated.stl').touch()  # Should be filtered out
-            
+
             # Update mock job file path
             self.mock_job.file_path = str(temp_path / 'TJ123_model.stl')
-            
-            result = self.service.discover_candidate_files(self.mock_job)
-            
+
+            result = service.discover_candidate_files(self.mock_job)
+
             # Should find related files plus original filename
             assert len(result.files) == 3  # 2 related files + original
             assert 'TJ123_model.stl' in result.files
             assert 'TJ123_model.3mf' in result.files
             assert 'original.stl' in result.files
-            
+    
             # Should recommend highest priority file (.3mf)
             assert result.recommended == 'TJ123_model.3mf'
 

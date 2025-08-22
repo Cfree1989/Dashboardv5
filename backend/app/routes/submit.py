@@ -8,22 +8,23 @@ from pathlib import Path
 from app.business_logic.shared_services import event_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
-from app.services.infrastructure import file_service
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 from app.routes.jobs import _sync_authoritative_metadata
 from app.business_logic.shared_services.catalog_service import CatalogService
 from app.business_logic.shared_services.error_handling_service import get_error_handling_service
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 import logging
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
-ALLOWED_EXTENSIONS = {'stl', 'obj', '3mf'}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+# Get file configuration service instance
+file_config = get_file_configuration_service()
 
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return file_config.is_allowed_extension(filename)
 
 
 def _normalize_name_for_filename(name: str) -> str:
@@ -53,8 +54,8 @@ def submit_job():
             return jsonify({'error': 'no file selected'}), 400
         if not allowed_file(file.filename):
             return jsonify({'error': 'invalid file type'}), 400
-        if request.content_length and request.content_length > MAX_FILE_SIZE:
-            return jsonify({'error': 'file too large'}), 413
+        if request.content_length and not file_config.validate_file_size(request.content_length):
+            return jsonify({'error': f'file too large (max {file_config.max_file_size_mb}MB)'}), 413
 
         # Read file for hash and saving
         file_bytes = file.read()
@@ -220,7 +221,13 @@ def confirm_job(token: str):
     # Transition to READYTOPRINT + move file/metadata
     job.student_confirmed = True
     job.status = 'READYTOPRINT'
-    move_authoritative(job, 'READYTOPRINT')
+    
+    # Use atomic file operations
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')
+    if not success:
+        return jsonify({'message': 'File operation failed during confirmation'}), 500
+    
     db.session.commit()
     
     # Sync metadata to reflect authoritative file and new status

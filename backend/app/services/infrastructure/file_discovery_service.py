@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
 from app.models.job import Job
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 
 
 class CandidateFileResult:
@@ -30,23 +31,18 @@ class FileDiscoveryService:
     """Service for discovering candidate files for jobs"""
     
     def __init__(self):
-        # Load configuration from environment
-        self.allowed_extensions = self._load_allowed_extensions()
-        self.extension_priority = self._load_extension_priority()
+        # Use centralized file configuration service
+        self.file_config = get_file_configuration_service()
     
-    def _load_allowed_extensions(self) -> Set[str]:
-        """Load allowed file extensions from environment configuration"""
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
-        return {
-            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
-            for ext in exts_env.split(',') if ext.strip()
-        }
+    @property
+    def allowed_extensions(self) -> Set[str]:
+        """Get allowed file extensions from centralized configuration"""
+        return self.file_config.allowed_extensions
     
-    def _load_extension_priority(self) -> Dict[str, int]:
-        """Load extension priority ranking from environment configuration"""
-        priority_env = os.environ.get('AUTHORITATIVE_EXT_PRIORITY', '.3mf,.form,.idea,.stl,.obj')
-        prio_list = [e if e.strip().startswith('.') else f'.{e.strip()}' for e in priority_env.split(',') if e.strip()]
-        return {ext.lower(): idx for idx, ext in enumerate(prio_list)}
+    @property
+    def extension_priority(self) -> Dict[str, int]:
+        """Get extension priority from centralized configuration"""
+        return self.file_config.extension_priority
     
     def _build_relevance_tokens(self, job: Job) -> Set[str]:
         """Build relevance tokens to identify files related to this specific job"""
@@ -65,7 +61,7 @@ class FileDiscoveryService:
     
     def _get_file_rank(self, filename: str) -> int:
         """Get priority rank for file extension (lower is better)"""
-        return self.extension_priority.get(Path(filename).suffix.lower(), len(self.extension_priority) + 1)
+        return self.file_config.get_extension_priority(filename)
     
     def _is_file_related_to_job(self, filename: str, tokens: Set[str], job: Job) -> bool:
         """Check if a file is related to the specific job"""

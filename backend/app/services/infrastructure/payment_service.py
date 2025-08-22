@@ -5,7 +5,7 @@ from app.models.job import Job
 from app.models.payment import Payment
 from app.models.event import Event
 from app.business_logic.shared_services.validation_service import ValidationService
-from app.services.infrastructure.file_service import move_authoritative
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 from app.services.infrastructure.payment_service_interface import IPaymentService, PaymentData
 
 class PaymentService(IPaymentService):
@@ -63,7 +63,10 @@ class PaymentService(IPaymentService):
         # Transition job to PAIDPICKEDUP
         job.status = 'PAIDPICKEDUP'
         job.last_updated_by = payment_data.staff_name
-        move_authoritative(job, 'PAIDPICKEDUP')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
+        if not success:
+            raise RuntimeError('File operation failed during payment recording')
         db.session.add(job)
         db.session.commit()
         
@@ -99,9 +102,6 @@ class PaymentService(IPaymentService):
     
     def _sync_authoritative_metadata(self, job: Job, filename: str, staff_name: str, event_type: str):
         """Sync authoritative metadata after payment"""
-        try:
-            from app.services.file_service import _sync_authoritative_metadata
-            _sync_authoritative_metadata(job, filename, staff_name, event_type)
-        except ImportError:
-            # Fallback if file service not available
-            pass
+        # Metadata sync is now handled by atomic file operations
+        # This method is kept for compatibility but no longer performs any action
+        pass

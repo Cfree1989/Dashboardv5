@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path  # Still used in metadata helpers
 from decimal import Decimal, ROUND_HALF_UP
-from app.services.infrastructure import file_service
+
 from app.business_logic.shared_services.catalog_service import CatalogService
 from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 import logging

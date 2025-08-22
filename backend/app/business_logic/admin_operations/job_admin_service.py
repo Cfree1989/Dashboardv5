@@ -11,6 +11,7 @@ from app.models.job import Job
 from app.models.event import Event
 from app.business_logic.shared_services.token_service import generate_confirmation_token
 from app.business_logic.shared_services.email_service import send_approval_email
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 # Import moved to method level to avoid circular imports
 from app import db
 
@@ -94,8 +95,10 @@ class JobAdminService:
         
         # Move files only if mapping exists for the target status
         if new_status in STATUS_TO_DIR:
-            from app.services.infrastructure.file_service import move_authoritative
-            move_authoritative(job, new_status)
+            atomic_service = get_atomic_file_service()
+            success = atomic_service.atomic_move_authoritative(job, new_status)
+            if not success:
+                raise RuntimeError(f'File operation failed during admin status change to {new_status}')
         
         db.session.add(job)
         db.session.commit()
@@ -141,8 +144,10 @@ class JobAdminService:
         job.status = 'ARCHIVED'
         
         # Move file/metadata to Archived and sync metadata
-        from app.services.infrastructure.file_service import move_authoritative
-        move_authoritative(job, 'ARCHIVED')
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'ARCHIVED')
+        if not success:
+            raise RuntimeError('File operation failed during job archival')
         db.session.add(job)
         db.session.commit()
         

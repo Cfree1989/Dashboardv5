@@ -25,7 +25,6 @@ from unittest.mock import patch, MagicMock
 import statistics
 
 from app.services.atomic_file_service import get_atomic_file_service
-from app.services.file_service import move_authoritative  # Old non-atomic method
 
 
 class TestAtomicFilePerformance:

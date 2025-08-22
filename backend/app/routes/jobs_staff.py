@@ -15,14 +15,31 @@ import os
 from pathlib import Path
 import shutil
 from decimal import Decimal, ROUND_HALF_UP
-from app.services.infrastructure import file_service
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 from app.business_logic.shared_services.catalog_service import CatalogService
 from app.business_logic.shared_services.error_handling_service import get_error_handling_service
+from app.services.infrastructure.file_discovery_service import FileDiscoveryService
+from app.business_logic.shared_services.validation_service import ValidationService
+from app.routes.jobs import _sync_authoritative_metadata
 import logging
 from sqlalchemy import or_
-from .job_utils import _validate_staff_and_body, _validate_reason, _sync_authoritative_metadata
 
 logger = logging.getLogger(__name__)
+
+def _validate_staff_and_body(data):
+    """Helper function to validate staff and request body"""
+    if not data:
+        return None, jsonify({'message': 'Request body required'}), 400
+    
+    staff_name = data.get('staff_name', '').strip()
+    if not staff_name:
+        return None, jsonify({'message': 'staff_name is required'}), 400
+    
+    staff_result = ValidationService.validate_staff(staff_name)
+    if not staff_result.is_valid:
+        return None, jsonify({'message': staff_result.message}), 400
+    
+    return staff_name, None, None
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
@@ -102,56 +119,10 @@ def candidate_files(job_id):
         abort(404, description='Job not found')
 
     try:
-        file_path = Path(job.file_path)
-        directory = file_path.parent
-        # Allow configurable extensions via env (e.g., ".stl,.obj,.3mf,.form,.idea")
-        exts_env = os.environ.get('ALLOWED_MODEL_EXTS', '.stl,.obj,.3mf,.form,.idea')
-        allowed_exts = {
-            (ext if ext.strip().startswith('.') else f'.{ext.strip()}').lower()
-            for ext in exts_env.split(',') if ext.strip()
-        }
-        # Extension priority ranking (lower is better) via env, default prefers slicer project files
-        priority_env = os.environ.get('AUTHORITATIVE_EXT_PRIORITY', '.3mf,.form,.idea,.stl,.obj')
-        prio_list = [e if e.strip().startswith('.') else f'.{e.strip()}' for e in priority_env.split(',') if e.strip()]
-        ext_rank = {ext.lower(): idx for idx, ext in enumerate(prio_list)}
-        candidates = []
-        # Build relevance tokens to restrict to this job only
-        tokens = set()
-        if getattr(job, 'short_id', None):
-            tokens.add(str(job.short_id).lower())
-        if getattr(job, 'id', None):
-            tokens.add(str(job.id)[:8].lower())
-        if getattr(job, 'display_name', None):
-            tokens.add(Path(str(job.display_name)).stem.lower())
-
-        if directory.exists() and directory.is_dir():
-            for entry in directory.iterdir():
-                if not (entry.is_file() and entry.suffix.lower() in allowed_exts):
-                    continue
-                name_lower = entry.name.lower()
-                # Keep only files that look related to this job
-                related = any(tok and tok in name_lower for tok in tokens)
-                if not related:
-                    # Always allow exact original filename if present
-                    if job.original_filename and entry.name == job.original_filename:
-                        related = True
-                if not related:
-                    continue
-                try:
-                    stat = entry.stat()
-                    candidates.append({'name': entry.name, 'mtime': int(stat.st_mtime)})
-                except OSError:
-                    continue
-        # Ensure original filename is included (even if not present on disk)
-        if job.original_filename and not any(c['name'] == job.original_filename for c in candidates):
-            candidates.append({'name': job.original_filename, 'mtime': 0})
-        # Sort by (rank asc if known, else large), then mtime desc
-        def _rank(name: str) -> int:
-            return ext_rank.get(Path(name).suffix.lower(), len(ext_rank) + 1)
-        candidates.sort(key=lambda x: (_rank(x['name']), -x['mtime'], x['name'].lower()))
-        # Backward-compatible shape: 'files' is list of strings for legacy callers/tests
-        files_strings = [c['name'] for c in candidates]
-        return jsonify({ 'files': files_strings, 'files_detailed': candidates, 'recommended': files_strings[0] if files_strings else None }), 200
+        # Use the centralized file discovery service
+        discovery_service = FileDiscoveryService()
+        result = discovery_service.discover_candidate_files(job)
+        return jsonify(result.to_dict()), 200
     except Exception as e:
         # On error, return legacy-compatible minimal payload
         fallback_name = job.original_filename if job and job.original_filename else None
@@ -247,7 +218,10 @@ def mark_printing(job_id):
     job.status = 'PRINTING'
     job.last_updated_by = staff_name
     # Move file/metadata to Printing
-    move_authoritative(job, 'PRINTING')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
+    if not success:
+        return jsonify({'message': 'File operation failed during printing status update'}), 500
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -272,7 +246,10 @@ def mark_complete(job_id):
     job.status = 'COMPLETED'
     job.last_updated_by = staff_name
     # Move file/metadata to Completed
-    move_authoritative(job, 'COMPLETED')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
+    if not success:
+        return jsonify({'message': 'File operation failed during completion status update'}), 500
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -305,7 +282,10 @@ def mark_picked_up(job_id):
     job.status = 'PAIDPICKEDUP'
     job.last_updated_by = staff_name
     # Move file/metadata to PaidPickedUp
-    move_authoritative(job, 'PAIDPICKEDUP')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
+    if not success:
+        return jsonify({'message': 'File operation failed during pickup status update'}), 500
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -359,7 +339,10 @@ def record_payment(job_id):
     job.status = 'PAIDPICKEDUP'
     job.last_updated_by = staff_name
     # Move file/metadata to PaidPickedUp
-    move_authoritative(job, 'PAIDPICKEDUP')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
+    if not success:
+        return jsonify({'message': 'File operation failed during payment recording'}), 500
     db.session.add(job)
     db.session.commit()
 
@@ -495,7 +478,10 @@ def revert_completion(job_id):
     before = job.status
     job.status = 'PRINTING'
     job.last_updated_by = staff_name
-    move_authoritative(job, 'PRINTING')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
+    if not success:
+        return jsonify({'message': 'File operation failed during revert to printing'}), 500
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobRevertedToPrinting', details={'from': before, 'to': 'PRINTING'}, triggered_by=staff_name, workstation_id=g.workstation_id)
@@ -520,7 +506,10 @@ def revert_pickup(job_id):
     before = job.status
     job.status = 'COMPLETED'
     job.last_updated_by = staff_name
-    move_authoritative(job, 'COMPLETED')
+    atomic_service = get_atomic_file_service()
+    success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
+    if not success:
+        return jsonify({'message': 'File operation failed during revert to completed'}), 500
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobRevertedToCompleted', details={'from': before, 'to': 'COMPLETED'}, triggered_by=staff_name, workstation_id=g.workstation_id)
