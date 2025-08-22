@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make health check script executable
+RUN chmod +x /app/health_check.sh
+
+# Make graceful shutdown script executable
+RUN chmod +x /app/graceful_shutdown.sh
+
 # Create storage directory
 RUN mkdir -p /app/storage
 

@@ -20,9 +20,9 @@ services:
           memory: 512M
           cpus: '0.5'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      test: ["CMD", "/app/health_check.sh"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 40s
     logging:
@@ -55,9 +55,12 @@ services:
       - storage_data:/app/storage
       - ./scripts:/app/scripts:ro
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 30s
 
   frontend:
     build:
@@ -75,6 +78,12 @@ services:
         reservations:
           memory: 256M
           cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
       - NODE_ENV=production
@@ -86,8 +95,10 @@ services:
     security_opt:
       - "no-new-privileges:true"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 20s
 
   db:
     image: postgres:15
@@ -169,6 +180,12 @@ services:
         reservations:
           memory: 256M
           cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "rq", "info", "-u", "redis://:${REDIS_PASSWORD}@redis:6379/0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
@@ -177,8 +194,10 @@ services:
       - storage_data:/app/storage
       - ./scripts:/app/scripts:ro
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: "json-file"

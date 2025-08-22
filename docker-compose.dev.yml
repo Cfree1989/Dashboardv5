@@ -20,9 +20,9 @@ services:
           memory: 512M
           cpus: '0.5'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      test: ["CMD", "/app/health_check.sh"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
       start_period: 40s
     logging:
@@ -97,8 +97,10 @@ services:
     security_opt:
       - "no-new-privileges:true"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 20s
 
   db:
     image: postgres:15
@@ -187,9 +189,12 @@ services:
       - ./storage:/app/storage
       - ./scripts:/app/scripts
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "rq", "info", "-u", "redis://:${REDIS_PASSWORD}@redis:6379/0"]
       interval: 30s
