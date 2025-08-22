@@ -3,9 +3,11 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
-import { handleApiError } from '../../lib/api-error-handling';
+import { handleApiError } from '../../lib/error-handling';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
+import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
+import { ErrorCard } from '../ui/error-display';
 
 export interface JobListFilters {
   status?: string;
@@ -24,7 +26,7 @@ interface JobListState {
     loading: boolean;
     isFetching: boolean;
   };
-  error: string;
+  error: ReturnType<typeof createErrorState>;
   sorting: {
     sortBy: string;
     sortDir: 'asc' | 'desc';
@@ -53,7 +55,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       loading: true,
       isFetching: false,
     },
-    error: '',
+    error: createErrorState(),
     sorting: {
       sortBy: 'created_at',
       sortDir: 'desc',
@@ -118,7 +120,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     } else {
       setState(prev => ({ ...prev, loading: { ...prev.loading, loading: true } }));
     }
-    setState(prev => ({ ...prev, error: '' }));
+    setState(prev => ({ ...prev, error: clearErrorState() }));
 
     try {
       // Build query string based on filters
@@ -138,18 +140,17 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           ...prev,
           data: { jobs: response, hasLoaded: true },
           loading: { loading: false, isFetching: false },
-          error: ''
+          error: clearErrorState()
         }));
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
-        handleApiError(err, (message) => {
-          setState(prev => ({
-            ...prev,
-            loading: { loading: false, isFetching: false },
-            error: message
-          }));
-        });
+        const newErrorState = updateErrorState(state.error, err);
+        setState(prev => ({
+          ...prev,
+          loading: { loading: false, isFetching: false },
+          error: newErrorState
+        }));
       }
     }
   }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, state.data.hasLoaded]);
@@ -317,6 +318,17 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             </button>
           </div>
         </div>
+
+        {/* Error Display */}
+        {state.error.hasError && (
+          <div className="mb-6">
+            <ErrorCard
+              error={state.error}
+              onRetry={fetchJobs}
+              onDismiss={() => setState(prev => ({ ...prev, error: clearErrorState() }))}
+            />
+          </div>
+        )}
 
         {/* Jobs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

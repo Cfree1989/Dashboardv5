@@ -17,13 +17,15 @@ import { StaffAnalyticsFilters as StaffAnalyticsFiltersComponent } from '../../c
 import { StudentAnalyticsFilters as StudentAnalyticsFiltersComponent } from '../../components/student-analytics/student-analytics-filters';
 import { useReducedMotion } from '../../lib/use-reduced-motion';
 import { ErrorBoundary } from '../../components/error-boundary';
+import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
+import { ErrorCard } from '../../components/ui/error-display';
 
 type AnalyticsSection = "operations" | "finance" | "staff" | "student";
 
 export default function AnalyticsPage() {
   // System Analytics State (for Operations tab)
   const [systemData, setSystemData] = useState<AnalyticsData | null>(null);
-  const [systemError, setSystemError] = useState<string>('');
+  const [systemError, setSystemError] = useState(createErrorState());
   const [systemLoading, setSystemLoading] = useState<boolean>(false);
   const [systemFilters, setSystemFilters] = useState<AnalyticsFilters>({ 
     period: 7, 
@@ -35,7 +37,7 @@ export default function AnalyticsPage() {
 
   // Staff Analytics State
   const [staffData, setStaffData] = useState<StaffAnalyticsData | null>(null);
-  const [staffError, setStaffError] = useState<string>('');
+  const [staffError, setStaffError] = useState(createErrorState());
   const [staffLoading, setStaffLoading] = useState<boolean>(false);
   const [staffFilters, setStaffFilters] = useState<StaffAnalyticsFilters>({ 
     period: 7,
@@ -46,7 +48,7 @@ export default function AnalyticsPage() {
 
   // Student Analytics State
   const [studentData, setStudentData] = useState<StudentAnalyticsData | null>(null);
-  const [studentError, setStudentError] = useState<string>('');
+  const [studentError, setStudentError] = useState(createErrorState());
   const [studentLoading, setStudentLoading] = useState<boolean>(false);
   const [studentFilters, setStudentFilters] = useState<StudentAnalyticsFilters>({ 
     period: 7,
@@ -65,13 +67,14 @@ export default function AnalyticsPage() {
   async function loadSystemData() {
     try {
       setSystemLoading(true);
+      setSystemError(clearErrorState());
       const d = await fetchAnalyticsData(systemFilters);
       setSystemData(d);
       const now = new Date();
       setRefreshedAt(now);
       try { localStorage.setItem('lastUpdated', now.toLocaleTimeString()); } catch {}
-    } catch {
-      setSystemError('Failed to load system analytics');
+    } catch (error) {
+      setSystemError(updateErrorState(systemError, error));
     } finally {
       setSystemLoading(false);
     }
@@ -81,13 +84,14 @@ export default function AnalyticsPage() {
   async function loadStaffData() {
     try {
       setStaffLoading(true);
+      setStaffError(clearErrorState());
       const d = await fetchStaffAnalyticsData(staffFilters);
       setStaffData(d);
       const now = new Date();
       setRefreshedAt(now);
       try { localStorage.setItem('lastUpdated', now.toLocaleTimeString()); } catch {}
-    } catch {
-      setStaffError('Failed to load staff analytics');
+    } catch (error) {
+      setStaffError(updateErrorState(staffError, error));
     } finally {
       setStaffLoading(false);
     }
@@ -97,13 +101,14 @@ export default function AnalyticsPage() {
   async function loadStudentData() {
     try {
       setStudentLoading(true);
+      setStudentError(clearErrorState());
       const d = await fetchStudentAnalyticsData(studentFilters);
       setStudentData(d);
       const now = new Date();
       setRefreshedAt(now);
       try { localStorage.setItem('lastUpdated', now.toLocaleTimeString()); } catch {}
-    } catch {
-      setStudentError('Failed to load student analytics');
+    } catch (error) {
+      setStudentError(updateErrorState(studentError, error));
     } finally {
       setStudentLoading(false);
     }
@@ -137,7 +142,15 @@ export default function AnalyticsPage() {
 
   const renderOperationsAnalytics = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {systemError && <div className="text-red-600 text-sm mb-4" role="alert">{systemError}</div>}
+      {systemError.hasError && (
+        <div className="mb-4">
+          <ErrorCard
+            error={systemError}
+            onRetry={loadSystemData}
+            onDismiss={() => setSystemError(clearErrorState())}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <AnalyticsFiltersComponent filters={systemFilters} onFiltersChange={setSystemFilters} />
@@ -181,7 +194,15 @@ export default function AnalyticsPage() {
 
   const renderFinanceAnalytics = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {systemError && <div className="text-red-600 text-sm mb-4" role="alert">{systemError}</div>}
+      {systemError.hasError && (
+        <div className="mb-4">
+          <ErrorCard
+            error={systemError}
+            onRetry={loadSystemData}
+            onDismiss={() => setSystemError(clearErrorState())}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <AnalyticsFiltersComponent filters={systemFilters} onFiltersChange={setSystemFilters} />
@@ -239,7 +260,15 @@ export default function AnalyticsPage() {
 
   const renderStaffAnalytics = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {staffError && <div className="text-red-600 text-sm mb-4" role="alert">{staffError}</div>}
+      {staffError.hasError && (
+        <div className="mb-4">
+          <ErrorCard
+            error={staffError}
+            onRetry={loadStaffData}
+            onDismiss={() => setStaffError(clearErrorState())}
+          />
+        </div>
+      )}
       
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
@@ -284,7 +313,15 @@ export default function AnalyticsPage() {
 
   const renderStudentAnalytics = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {studentError && <div className="text-red-600 text-sm mb-4" role="alert">{studentError}</div>}
+      {studentError.hasError && (
+        <div className="mb-4">
+          <ErrorCard
+            error={studentError}
+            onRetry={loadStudentData}
+            onDismiss={() => setStudentError(clearErrorState())}
+          />
+        </div>
+      )}
       
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">

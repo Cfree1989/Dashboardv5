@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, Trash2, ActivitySquare, Database, Mail } from "lucide-react";
 import { useToast } from "../ui/toast";
 import { apiRequest } from "../../lib/auth";
+import { createErrorState, updateErrorState, clearErrorState } from "../../lib/error-handling";
+import { InlineError } from "../ui/error-display";
 
 type ServerAuditReport = {
   report_generated_at: string;
@@ -16,7 +18,7 @@ export function SystemHealthPanel() {
   const [lastReport, setLastReport] = useState<ServerAuditReport | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState(createErrorState());
   const { show } = useToast();
   const [diag, setDiag] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
@@ -24,12 +26,12 @@ export function SystemHealthPanel() {
   async function fetchReport() {
     try {
       setLoadingReport(true);
-      setError("");
+      setError(clearErrorState());
       const data: ServerAuditReport = await apiRequest("/api/v1/admin/audit/report");
       setLastReport(data);
       setCurrentAudit(null);
     } catch (e) {
-      setError("Failed to load audit report");
+      setError(updateErrorState(error, e));
     } finally {
       setLoadingReport(false);
     }
@@ -51,7 +53,7 @@ export function SystemHealthPanel() {
 
   const startAudit = async () => {
     setIsStarting(true);
-    setError("");
+    setError(clearErrorState());
     setCurrentAudit({ startedAt: new Date().toISOString() });
     try {
       await fetchReport();
@@ -81,8 +83,8 @@ export function SystemHealthPanel() {
       });
       // refresh
       await fetchReport();
-    } catch {
-      setError("Failed to delete stale file");
+    } catch (e) {
+      setError(updateErrorState(error, e));
     }
   };
 
@@ -95,8 +97,8 @@ export function SystemHealthPanel() {
       show("Marked reviewed");
       // Refresh the report so the UI can reflect any state (if desired in future)
       await fetchReport();
-    } catch {
-      setError("Failed to mark as reviewed");
+    } catch (e) {
+      setError(updateErrorState(error, e));
     }
   };
 
@@ -199,7 +201,16 @@ export function SystemHealthPanel() {
               <span className="text-xs px-2 py-1 rounded-full bg-gray-900 text-white">completed</span>
           </div>
           <div className="p-5">
-            {error && <div className="mb-3 text-sm text-red-600" role="alert">{error}</div>}
+            {error.hasError && (
+              <div className="mb-3">
+                <InlineError
+                  error={error}
+                  onDismiss={() => setError(clearErrorState())}
+                  variant="inline"
+                  size="sm"
+                />
+              </div>
+            )}
             {loadingReport && <div className="mb-3 text-sm text-gray-500">Loading report…</div>}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="text-center">

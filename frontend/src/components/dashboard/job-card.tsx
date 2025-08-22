@@ -10,6 +10,8 @@ import PaymentModal from './modals/payment-modal';
 import ConfirmDialog from './modals/confirm-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { apiRequest, getLegacyToken } from '../../lib/auth';
+import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
+import { InlineError } from '../ui/error-display';
 
 interface Job {
   id: string;
@@ -99,7 +101,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   const [notesStaffName, setNotesStaffName] = useState<string>("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>("");
-  const [saveError, setSaveError] = useState<string>("");
+  const [saveError, setSaveError] = useState(createErrorState());
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
@@ -289,7 +291,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setIsEditingNotes(true);
     setNotesDraft("");
     setSaveMessage("");
-    setSaveError("");
+    setSaveError(clearErrorState());
     // REMOVED: onModalOpenChange?.(true); - Notes editing doesn't need auto-refresh pause like real modals
     // Staff is already loaded on component mount
   };
@@ -299,7 +301,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     setNotesDraft(jobNotes || "");
     setNotesStaffName("");
     setSaveMessage("");
-    setSaveError("");
+    setSaveError(clearErrorState());
     // REMOVED: onModalOpenChange?.(false); - Notes editing doesn't need auto-refresh pause like real modals
   };
 
@@ -350,7 +352,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
     }
     try {
       setSavingNotes(true);
-      setSaveError("");
+      setSaveError(clearErrorState());
       setSaveMessage("Saving...");
       const data = await apiRequest<{ notes?: string }>(`/api/v1/jobs/${job.id}/notes`, {
         method: 'POST',
@@ -362,7 +364,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       setNotesDraft("");
       // REMOVED: onModalOpenChange?.(false); - Notes saving doesn't need auto-refresh pause like real modals
     } catch (e) {
-      setSaveError('Failed to add note. Please try again.');
+      setSaveError(updateErrorState(saveError, e));
     } finally {
       setSavingNotes(false);
       setTimeout(() => setSaveMessage(""), 1500);
@@ -574,7 +576,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   </div>
                   <div id={`notes-status-${job.id}`} className="mt-1 text-sm" aria-live="polite">
                     {saveMessage && <span className="text-green-600">{saveMessage}</span>}
-                    {saveError && <span className="text-red-600" role="alert">{saveError}</span>}
+                    {saveError.hasError && (
+                      <InlineError
+                        error={saveError}
+                        onDismiss={() => setSaveError(clearErrorState())}
+                        variant="inline"
+                        size="sm"
+                      />
+                    )}
                     {notesDraft.length > MAX_NOTES_LEN && (
                       <div className="text-red-600" role="alert">Notes must be at most {MAX_NOTES_LEN} characters.</div>
                     )}
