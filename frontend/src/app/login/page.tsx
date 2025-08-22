@@ -6,7 +6,7 @@ import LoginCard from '../../components/LoginCard';
 import { login } from '../../lib/auth';
 
 export default function LoginPage() {
-  const [workstationId, setWorkstationId] = useState('workstation-1');
+  const [workstationId, setWorkstationId] = useState('Workstation 1');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +36,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 to-white">
       <LoginCard>
-        <form onSubmit={handleSubmit} className="space-y-4 w-full">
+        <div className="space-y-4 w-full">
           <h1 className="text-2xl font-bold">Staff Login</h1>
           {mounted && error && (
             <div role="alert" aria-live="assertive" className="flex items-center space-x-2 bg-destructive-foreground bg-opacity-10 text-destructive px-4 py-2 mb-2 rounded transition-transform transform">
@@ -44,38 +44,40 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">Workstation</label>
-            <select
-              value={workstationId}
-              onChange={(e) => setWorkstationId(e.target.value)}
-              className="mt-1 w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
-              required
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Workstation</label>
+              <select
+                value={workstationId}
+                onChange={(e) => setWorkstationId(e.target.value)}
+                className="mt-1 w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
+                required
+              >
+                <option value="Workstation 1">Workstation 1</option>
+                <option value="Workstation 2">Workstation 2</option>
+                <option value="Development">Development</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center bg-primary text-primary-foreground px-4 py-2 rounded-lg btn-transition focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="workstation-1">Workstation 1</option>
-              <option value="workstation-2">Workstation 2</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="block text-sm font-medium">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full flex items-center justify-center bg-primary text-primary-foreground px-4 py-2 rounded-lg btn-transition focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-            Login
-          </button>
-        </form>
+              {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+              Login
+            </button>
+          </form>
+        </div>
       </LoginCard>
     </div>
   );
