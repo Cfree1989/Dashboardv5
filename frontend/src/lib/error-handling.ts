@@ -419,8 +419,30 @@ export function logError(
   // Report to error reporting service
   reportError(error, errorData);
   
-  // TODO: Send to analytics service when implemented
-  // analytics.track('error', errorData);
+  // Send to analytics service (async, fire and forget)
+  (async () => {
+    try {
+      // Import analytics service dynamically to avoid circular dependencies
+      const { AnalyticsService } = await import('./analytics-api');
+      AnalyticsService.track('error', errorData);
+    } catch (analyticsError) {
+      // Fallback to server error reporting if analytics service is not available
+      console.warn('Analytics service not available, falling back to server reporting:', analyticsError);
+      
+      // Send to server error reporting endpoint
+      try {
+        await fetch('/api/v1/admin/error-reporting', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(errorData),
+        });
+      } catch (serverError) {
+        console.warn('Server error reporting failed:', serverError);
+      }
+    }
+  })();
 }
 
 /**
@@ -434,13 +456,37 @@ export function trackErrorMetrics(
     userImpact: 'none' | 'low' | 'medium' | 'high';
   }
 ): void {
-  // TODO: Implement error metrics tracking
-  // metrics.track('error', {
-  //   type: metrics.errorType,
-  //   severity: metrics.severity,
-  //   userImpact: metrics.userImpact,
-  //   timestamp: new Date().toISOString(),
-  // });
+  // Implement error metrics tracking
+  const errorMetrics = {
+    type: metrics.errorType,
+    severity: metrics.severity,
+    userImpact: metrics.userImpact,
+    timestamp: new Date().toISOString(),
+    error_message: error.message || 'Unknown error',
+    error_stack: error.stack || '',
+  };
+
+  // Send to server error reporting endpoint (fire and forget)
+  fetch('/api/v1/admin/error-reporting', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: errorMetrics.error_message,
+      stack: errorMetrics.error_stack,
+      timestamp: errorMetrics.timestamp,
+      component: 'error-metrics',
+      action: 'track',
+      additionalData: {
+        errorType: errorMetrics.type,
+        severity: errorMetrics.severity,
+        userImpact: errorMetrics.userImpact
+      }
+    }),
+  }).catch(serverError => {
+    console.warn('Failed to send error metrics to server:', serverError);
+  });
 }
 
 // ============================================================================

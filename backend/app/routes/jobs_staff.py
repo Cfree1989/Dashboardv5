@@ -43,7 +43,8 @@ def _validate_staff_and_body(data):
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 
-# TODO: Implement job management routes 
+# Job management routes implemented using new service architecture
+# All routes use JobOrchestrationService, ValidationService, and ResponseService 
 
 @bp.route('', methods=['GET'])
 @token_required

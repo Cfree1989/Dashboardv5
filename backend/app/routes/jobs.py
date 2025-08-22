@@ -40,7 +40,9 @@ payment_service = PaymentService()
 file_discovery_service = FileDiscoveryService()
 job_query_service = JobQueryService()
 
-# TODO: Implement job management routes 
+# Job management routes implemented using new service architecture
+# All routes use JobOrchestrationService, ValidationService, and ResponseService 
+
 
 @bp.route('/<job_id>/validate', methods=['GET'])
 @token_required

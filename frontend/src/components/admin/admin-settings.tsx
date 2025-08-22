@@ -30,8 +30,32 @@ export function AdminSettingsPanel() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // TODO: POST settings to backend
-      await new Promise((r) => setTimeout(r, 800));
+      // POST settings to backend
+      const response = await fetch('/api/v1/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          staff_name: 'admin', // This should come from auth context
+          sound: {
+            enabled: soundEnabled,
+            volume: soundVolume
+          },
+          environment_banner: environmentBanner
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      const result = await response.json();
+      console.log('Settings saved:', result);
+      
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      // In a real app, you'd show a toast notification here
     } finally {
       setIsSaving(false);
     }

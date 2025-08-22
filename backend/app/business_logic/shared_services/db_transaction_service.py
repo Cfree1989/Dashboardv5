@@ -250,15 +250,44 @@ class TransactionContext:
         if not file_path:
             raise ValueError("Missing file_path for file delete")
         
-        # For now, use simple file deletion
-        # TODO: Implement atomic file deletion with staging
+        # Implement atomic file deletion with staging
         import os
+        import shutil
         from pathlib import Path
+        from datetime import datetime, timezone
         
         path = Path(file_path)
-        if path.exists():
-            path.unlink()
-            logger.debug(f"Deleted file: {file_path}")
+        if not path.exists():
+            logger.debug(f"File already deleted: {file_path}")
+            return
+        
+        # Create staging directory for safe deletion
+        staging_dir = Path("/tmp/file_deletion_staging")
+        staging_dir.mkdir(exist_ok=True)
+        
+        # Generate unique staging filename with timestamp
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        staging_filename = f"deleted_{timestamp}_{path.name}"
+        staging_path = staging_dir / staging_filename
+        
+        try:
+            # Move file to staging area first (atomic operation)
+            shutil.move(str(path), str(staging_path))
+            logger.debug(f"Moved file to staging: {file_path} -> {staging_path}")
+            
+            # Delete from staging area
+            staging_path.unlink()
+            logger.debug(f"Deleted file from staging: {staging_path}")
+            
+        except Exception as e:
+            # If staging deletion fails, try to restore original file
+            if staging_path.exists() and not path.exists():
+                try:
+                    shutil.move(str(staging_path), str(path))
+                    logger.warning(f"Restored file after staging deletion failure: {file_path}")
+                except Exception as restore_error:
+                    logger.error(f"Failed to restore file after staging deletion failure: {file_path}, restore error: {restore_error}")
+            raise e
     
     def _execute_db_update(self, params: Dict[str, Any]):
         """Execute a database update operation."""

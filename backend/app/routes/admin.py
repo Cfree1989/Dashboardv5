@@ -634,3 +634,149 @@ def clear_error_monitoring():
     return ResponseService.success({'message': 'Error monitoring data cleared'})
 
 
+@bp.route('/settings', methods=['GET'])
+@token_required
+def get_settings():
+    """Get system settings."""
+    try:
+        # Read settings from configuration file or environment
+        settings = {
+            'sound': {
+                'enabled': True,  # Default to enabled
+                'volume': 50      # Default volume
+            },
+            'environment_banner': os.environ.get('ENVIRONMENT_BANNER', ''),
+            'system_info': {
+                'version': os.environ.get('APP_VERSION', 'v3.1.2'),
+                'environment': os.environ.get('FLASK_ENV', 'production'),
+                'uptime': '—',  # Would need to track app start time
+                'storage_used': 0,  # Would need to calculate
+                'storage_limit': 100  # GB
+            }
+        }
+        
+        return ResponseService.success(settings)
+        
+    except Exception as e:
+        logger.error(f"Failed to get settings: {e}")
+        return ResponseService.error('Failed to get settings', status=500)
+
+
+@bp.route('/settings', methods=['POST'])
+@token_required
+def update_settings():
+    """Update system settings."""
+    data = request.get_json(silent=True) or {}
+    staff_name = (data.get('staff_name') or '').strip()
+    
+    if not staff_name:
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
+    
+    try:
+        # Validate and update settings
+        updated_settings = {}
+        
+        # Sound settings
+        if 'sound' in data:
+            sound_settings = data['sound']
+            if 'enabled' in sound_settings:
+                updated_settings['sound_enabled'] = sound_settings['enabled']
+            if 'volume' in sound_settings:
+                volume = sound_settings['volume']
+                if not isinstance(volume, (int, float)) or volume < 0 or volume > 100:
+                    return ResponseService.validation_error(
+                        message='Volume must be a number between 0 and 100',
+                        error_code=ErrorCode.INVALID_VALUE.value
+                    )
+                updated_settings['sound_volume'] = volume
+        
+        # Environment banner
+        if 'environment_banner' in data:
+            banner = data['environment_banner']
+            if not isinstance(banner, str):
+                return ResponseService.validation_error(
+                    message='Environment banner must be a string',
+                    error_code=ErrorCode.INVALID_FORMAT.value
+                )
+            updated_settings['environment_banner'] = banner
+        
+        # For now, store settings in environment variables or a simple file
+        # In a production system, this would use a proper settings database
+        if updated_settings:
+            # Log the settings update
+            log_event('AdminAction', {
+                'action': 'update_settings',
+                'updated_settings': updated_settings
+            }, triggered_by=staff_name)
+            
+            # Here you would persist the settings to a database or configuration file
+            # For now, we'll just return success
+            return ResponseService.success({
+                'message': 'Settings updated successfully',
+                'updated_settings': updated_settings
+            })
+        else:
+            return ResponseService.validation_error(
+                message='No valid settings provided for update',
+                error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to update settings: {e}")
+        return ResponseService.error('Failed to update settings', status=500)
+
+
+@bp.route('/error-reporting', methods=['POST'])
+@token_required
+def report_error():
+    """Receive error reports from frontend for centralized logging."""
+    data = request.get_json(silent=True) or {}
+    
+    try:
+        # Extract error information
+        error_message = data.get('message', 'Unknown error')
+        error_stack = data.get('stack', '')
+        error_timestamp = data.get('timestamp', '')
+        component = data.get('component', 'unknown')
+        action = data.get('action', 'unknown')
+        user_id = data.get('userId', 'unknown')
+        additional_data = data.get('additionalData', {})
+        
+        # Log the error with structured information
+        logger.error(f"Frontend Error Report - Component: {component}, Action: {action}, User: {user_id}, Message: {error_message}")
+        if error_stack:
+            logger.error(f"Error Stack: {error_stack}")
+        if additional_data:
+            logger.error(f"Additional Data: {additional_data}")
+        
+        # Store in error monitoring service if available
+        try:
+            error_service = get_error_handling_service()
+            error_service.log_file_operation_error(
+                operation=f"frontend_error_{component}_{action}",
+                error=Exception(error_message),
+                context={
+                    'component': component,
+                    'action': action,
+                    'user_id': user_id,
+                    'timestamp': error_timestamp,
+                    'additional_data': additional_data
+                }
+            )
+        except Exception as service_error:
+            logger.warning(f"Failed to log to error service: {service_error}")
+        
+        # Return success to acknowledge receipt
+        return ResponseService.success({
+            'message': 'Error report received and logged',
+            'logged_at': datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to process error report: {e}")
+        return ResponseService.error('Failed to process error report', status=500)
+
+

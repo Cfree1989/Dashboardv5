@@ -75,7 +75,36 @@ describe('JobList component', () => {
     await waitFor(() => expect(screen.getByText(/Failed to load jobs/i)).toBeInTheDocument());
   });
 
-  // TODO: Add Open File modal tests (render + POST `/log-file-open`) once test helpers are refactored
+  it('opens file modal and logs file open event', async () => {
+    // 1) Initial jobs fetch (UPLOADED)
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ id: 'f1', display_name: 'File Job', file_path: '/path/to/file.stl' }] }) })
+      // 2) POST log-file-open
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: 'logged' }) });
+
+    render(<JobList filters={{ status: 'UPLOADED' }} />);
+
+    // Wait for job to render
+    await waitFor(() => expect(screen.getByText('File Job')).toBeInTheDocument());
+    
+    // Click the "Open File" button
+    const openFileBtn = screen.getByRole('button', { name: /Open File/i });
+    fireEvent.click(openFileBtn);
+
+    // Verify the file open event was logged
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/v1/jobs/f1/log-file-open',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          }),
+          body: JSON.stringify({})
+        })
+      );
+    });
+  });
 
   it('adds a new note with staff attribution (append via POST)', async () => {
     // 1) Jobs fetch (UPLOADED)

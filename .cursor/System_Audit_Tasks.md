@@ -228,24 +228,50 @@ This document contains all actionable tasks identified in the System Audit, orga
 
 **Dependencies**: None
 
-### Task 10: Complete TODO Items in Jobs Route
-**Risk**: Medium | **Effort**: Small | **Estimated Time**: 1-2 hours
+### Task 10: Complete TODO Items Across Codebase
+**Risk**: Medium | **Effort**: Medium | **Estimated Time**: 3-4 hours
 
-**Description**: Complete incomplete implementations in the jobs route handler.
+**Description**: Complete all TODO items found across the codebase, including route handlers, services, frontend components, and tests.
 
 **Files to Modify**:
-- `backend/app/routes/jobs.py`
+- `backend/app/routes/jobs.py` (Line 42: Implement job management routes)
+- `backend/app/routes/jobs_staff.py` (Line 45: Implement job management routes) 
+- `backend/app/business_logic/shared_services/db_transaction_service.py` (Line 253: Atomic file deletion with staging)
+- `frontend/src/components/dashboard/job-list.test.tsx` (Line 77: Add Open File modal tests)
+- `frontend/src/components/admin/admin-settings.tsx` (Line 32: POST settings to backend)
+- `frontend/src/lib/error-handling.ts` (Lines 421, 436: Analytics service integration and error metrics)
+- `.cursor/scratchpad.md` (Line 426: Server error reporting)
+
+**TODO Summary**:
+- **Total TODOs**: 8 TODO comments across 7 different files
+- **Backend TODOs**: 3 files (routes and services)
+- **Frontend TODOs**: 3 files (components and utilities)  
+- **Documentation TODOs**: 1 file (scratchpad)
 
 **Implementation Steps**:
-1. Review all TODO comments
-2. Implement missing functionality
-3. Add proper error handling
-4. Update tests
+1. **Backend TODOs** (1.5-2 hours):
+   - Remove obsolete "Implement job management routes" TODOs (already implemented)
+   - Implement atomic file deletion with staging in db_transaction_service
+   - Add proper error handling and validation
+
+2. **Frontend TODOs** (1-1.5 hours):
+   - Add Open File modal tests to job-list.test.tsx
+   - Implement POST settings functionality in admin-settings.tsx
+   - Add analytics service integration and error metrics to error-handling.ts
+
+3. **Documentation TODOs** (15 minutes):
+   - Implement server error reporting or document decision to keep client-only
+
+4. **Testing and Validation** (30 minutes):
+   - Verify all implementations work correctly
+   - Run test suites to ensure no regressions
+   - Update documentation as needed
 
 **Success Criteria**:
-- [ ] All TODO items completed
+- [ ] All TODO items completed or properly documented as deferred
 - [ ] All functionality working correctly
-- [ ] Tests passing
+- [ ] Tests passing for new implementations
+- [ ] No obsolete TODO comments remaining
 
 **Dependencies**: None
 
@@ -382,10 +408,10 @@ After completing all tasks, you should be able to:
 - [x] Task 3: Consolidate File Handling Configuration
 - [x] Task 4: Simplify Dashboard State Management
 - [x] Task 5: Remove Debug Code from Production
-- [ ] Task 6: Standardize Error Response Formats
-- [ ] Task 7: Implement Consistent Frontend Error Handling
-- [ ] Task 8: Add Comprehensive File Validation
-- [ ] Task 9: Optimize API Call Patterns
+- [x] Task 6: Standardize Error Response Formats
+- [x] Task 7: Implement Consistent Frontend Error Handling
+- [x] Task 8: Add Comprehensive File Validation
+- [x] Task 9: Optimize API Call Patterns
 - [ ] Task 10: Complete TODO Items in Jobs Route
 - [ ] Task 11: Enhance Docker Health Checks
 - [ ] Task 12: Optimize Docker Layer Caching
