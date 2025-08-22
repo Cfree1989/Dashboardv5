@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { XCircle, Loader2 } from 'lucide-react';
 import LoginCard from '../../components/LoginCard';
@@ -10,7 +10,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +38,7 @@ export default function LoginPage() {
       <LoginCard>
         <form onSubmit={handleSubmit} className="space-y-4 w-full">
           <h1 className="text-2xl font-bold">Staff Login</h1>
-          {error && (
+          {mounted && error && (
             <div role="alert" aria-live="assertive" className="flex items-center space-x-2 bg-destructive-foreground bg-opacity-10 text-destructive px-4 py-2 mb-2 rounded transition-transform transform">
               <XCircle className="h-5 w-5" />
               <span>{error}</span>
