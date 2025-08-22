@@ -419,28 +419,18 @@ export function logError(
   // Report to error reporting service
   reportError(error, errorData);
   
-  // Send to analytics service (async, fire and forget)
+  // Send to server error reporting endpoint (async, fire and forget)
   (async () => {
     try {
-      // Import analytics service dynamically to avoid circular dependencies
-      const { AnalyticsService } = await import('./analytics-api');
-      AnalyticsService.track('error', errorData);
-    } catch (analyticsError) {
-      // Fallback to server error reporting if analytics service is not available
-      console.warn('Analytics service not available, falling back to server reporting:', analyticsError);
-      
-      // Send to server error reporting endpoint
-      try {
-        await fetch('/api/v1/admin/error-reporting', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(errorData),
-        });
-      } catch (serverError) {
-        console.warn('Server error reporting failed:', serverError);
-      }
+      await fetch('/api/v1/admin/error-reporting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(errorData),
+      });
+    } catch (serverError) {
+      console.warn('Server error reporting failed:', serverError);
     }
   })();
 }
@@ -501,11 +491,11 @@ export function formatErrorForDisplay(error: any): string {
     return error;
   }
   
-  if (error.message) {
+  if (error && error.message) {
     return error.message;
   }
   
-  if (error.toString) {
+  if (error && error.toString) {
     return error.toString();
   }
   

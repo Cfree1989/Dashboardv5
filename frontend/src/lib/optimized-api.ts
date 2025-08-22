@@ -230,7 +230,7 @@ class OptimizedApiService {
    * Stop all polling
    */
   stopAllPolling(): void {
-    for (const timeout of this.activePolling.values()) {
+    for (const timeout of Array.from(this.activePolling.values())) {
       clearTimeout(timeout);
     }
     this.activePolling.clear();

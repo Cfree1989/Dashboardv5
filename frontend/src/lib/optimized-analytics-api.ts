@@ -39,28 +39,28 @@ export async function fetchOptimizedAnalyticsData(params: AnalyticsFilters): Pro
   }
 
   // Batch all analytics requests into a single call
-  const batchedResponse = await optimizedApi.batchRequests<BatchedAnalyticsResponse>({
-    overview: {
+  const batchedResponse = await optimizedApi.batchRequests<BatchedAnalyticsResponse>([
+    {
       key: 'overview',
       url: `/api/v1/analytics/overview?${qp.toString()}`,
       config: { ttl: 5 * 60 * 1000 } // 5 minutes
     },
-    trends: {
+    {
       key: 'trends', 
       url: `/api/v1/analytics/trends?${qpTrends.toString()}`,
       config: { ttl: 5 * 60 * 1000 } // 5 minutes
     },
-    resources: {
+    {
       key: 'resources',
       url: `/api/v1/analytics/resources?${qp.toString()}`,
       config: { ttl: 5 * 60 * 1000 } // 5 minutes
     },
-    financial: {
+    {
       key: 'financial',
       url: `/api/v1/analytics/financial?${qp.toString()}`,
       config: { ttl: 5 * 60 * 1000 } // 5 minutes
     }
-  });
+  ]);
 
   // Transform batched response to match existing format
   const overview: OverviewData = {

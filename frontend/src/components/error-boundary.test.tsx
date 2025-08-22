@@ -4,6 +4,7 @@ import { ErrorBoundary } from './error-boundary';
 
 function Boom() {
 	throw new Error('boom');
+	return null; // This line will never be reached
 }
 
 describe('ErrorBoundary', () => {

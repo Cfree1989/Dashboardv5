@@ -11,7 +11,8 @@
 
 import React, { useState } from 'react';
 import { AlertTriangle, X, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { ErrorState, getErrorIcon, getErrorTitle, getErrorStyling } from '../../lib/error-handling';
+import { ErrorState, getErrorIcon, getErrorTitle } from '../../lib/error-handling';
+import { getErrorStyling } from '../../lib/api-error-handling';
 
 interface ErrorDisplayProps {
   error: ErrorState;

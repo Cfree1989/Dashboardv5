@@ -110,8 +110,8 @@ export function SystemHealthPanel() {
       });
       show("Metadata repaired");
       await fetchReport();
-    } catch {
-      setError("Failed to repair metadata");
+    } catch (e) {
+      setError(updateErrorState(error, e));
     }
   };
 
@@ -123,8 +123,8 @@ export function SystemHealthPanel() {
       });
       show("Location repaired");
       await fetchReport();
-    } catch {
-      setError("Failed to repair location");
+    } catch (e) {
+      setError(updateErrorState(error, e));
     }
   };
 
@@ -138,8 +138,8 @@ export function SystemHealthPanel() {
       });
       show("File relinked");
       await fetchReport();
-    } catch {
-      setError("Failed to relink file");
+    } catch (e) {
+      setError(updateErrorState(error, e));
     }
   };
 
@@ -205,9 +205,7 @@ export function SystemHealthPanel() {
               <div className="mb-3">
                 <InlineError
                   error={error}
-                  onDismiss={() => setError(clearErrorState())}
-                  variant="inline"
-                  size="sm"
+                  className="mb-2"
                 />
               </div>
             )}

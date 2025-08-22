@@ -7,7 +7,7 @@ import { handleApiError } from '../../lib/error-handling';
 import { optimizedApi } from '../../lib/optimized-api';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
-import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
+import { createErrorState, updateErrorState, clearErrorState, ErrorState } from '../../lib/error-handling';
 import { ErrorCard } from '../ui/error-display';
 
 export interface JobListFilters {
@@ -27,7 +27,7 @@ interface JobListState {
     loading: boolean;
     isFetching: boolean;
   };
-  error: ReturnType<typeof createErrorState>;
+  error: ErrorState;
   sorting: {
     sortBy: string;
     sortDir: 'asc' | 'desc';
@@ -68,6 +68,10 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   // Memoized sorted jobs for better performance
   const sortedJobs = useMemo(() => {
+    // Safety check: ensure jobs is an array before spreading
+    if (!Array.isArray(state.data.jobs)) {
+      return [];
+    }
     const copy = [...state.data.jobs];
     copy.sort((a, b) => {
       let aVal = a[state.sorting.sortBy];
@@ -258,10 +262,10 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     );
   }
 
-  if (state.error) {
+  if (state.error.hasError) {
     return (
       <div className="mt-8 text-center">
-        <p className="text-red-600 mb-4">{state.error}</p>
+        <p className="text-red-600 mb-4">{state.error.message}</p>
         <button
           onClick={fetchJobs}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"

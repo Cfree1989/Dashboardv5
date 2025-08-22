@@ -338,16 +338,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   const saveNotes = async () => {
     if (!notesStaffName) {
-      setSaveError('Please select your name before saving.');
+      setSaveError(updateErrorState(saveError, new Error('Please select your name before saving.')));
       return;
     }
     const MAX_ENTRY_LEN = 1000;
     if (notesDraft.length === 0) {
-      setSaveError('Please enter a note.');
+      setSaveError(updateErrorState(saveError, new Error('Please enter a note.')));
       return;
     }
     if (notesDraft.length > MAX_ENTRY_LEN) {
-      setSaveError(`Note must be at most ${MAX_ENTRY_LEN} characters.`);
+      setSaveError(updateErrorState(saveError, new Error(`Note must be at most ${MAX_ENTRY_LEN} characters.`)));
       return;
     }
     try {
@@ -579,9 +579,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     {saveError.hasError && (
                       <InlineError
                         error={saveError}
-                        onDismiss={() => setSaveError(clearErrorState())}
-                        variant="inline"
-                        size="sm"
+                        className="mt-1"
                       />
                     )}
                     {notesDraft.length > MAX_NOTES_LEN && (
