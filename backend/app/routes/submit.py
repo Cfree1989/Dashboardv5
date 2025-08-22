@@ -200,8 +200,8 @@ def submit_job():
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        print(tb)
-        return jsonify({'error': str(e), 'traceback': tb}), 500 
+        logger.error(f"Job submission failed: {str(e)}\n{tb}")
+        return jsonify({'error': str(e)}), 500 
 
 
 @bp.route('/confirm/<token>', methods=['POST'])

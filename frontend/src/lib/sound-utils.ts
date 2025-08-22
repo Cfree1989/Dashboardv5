@@ -51,7 +51,6 @@ export function playNewUploadSound(): void {
     oscillator.stop(ctx.currentTime + 0.3);
     
   } catch (error) {
-    console.warn('Failed to play notification sound:', error);
     // Fallback: try to play a simple beep using HTML5 Audio
     try {
       const audio = new Audio();
@@ -62,7 +61,7 @@ export function playNewUploadSound(): void {
         // Ignore autoplay policy errors
       });
     } catch (fallbackError) {
-      console.warn('Fallback audio also failed:', fallbackError);
+      // Silently handle fallback audio failures
     }
   }
 }
@@ -96,7 +95,7 @@ export function playStatusChangeSound(): void {
     oscillator.stop(ctx.currentTime + 0.2);
     
   } catch (error) {
-    console.warn('Failed to play status change sound:', error);
+    // Silently handle status change sound failures
   }
 }
 

@@ -32,7 +32,6 @@ export function HeaderNav() {
         try { window.location.assign('/login'); } catch { window.location.href = '/login'; }
       }
     } catch (error) {
-      console.error('Logout failed:', error);
       // Fallback to direct navigation
       if (typeof window !== 'undefined' && window.location) {
         try { window.location.assign('/login'); } catch { window.location.href = '/login'; }

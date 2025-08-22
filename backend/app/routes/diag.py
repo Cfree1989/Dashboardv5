@@ -6,8 +6,26 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.job import Job
 from sqlalchemy import func
 from app.business_logic.shared_services import email_service
+from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
 
 bp = Blueprint('diag', __name__, url_prefix='/api/v1/_diag')
+
+
+def _is_email_configured():
+    """Check if email is properly configured."""
+    return all([
+        current_app.config.get('MAIL_SERVER'),
+        current_app.config.get('MAIL_USERNAME'),
+        current_app.config.get('MAIL_DEFAULT_SENDER')
+    ])
+
+
+def send_email(subject, recipients, html_body, text_body):
+    """Send an email using the email service."""
+    try:
+        return email_service.send_email(subject, recipients, html_body, text_body)
+    except Exception:
+        return False
 
 
 @bp.route('', methods=['GET'])
@@ -67,18 +85,24 @@ def test_email():
     test_email = data.get('email')
     
     if not test_email:
-        return jsonify({'error': 'email parameter required'}), 400
+        return ResponseService.validation_error(
+            message='email parameter required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     
     # Check if email is configured
     if not _is_email_configured():
-        return jsonify({
-            'error': 'Email not configured',
-            'missing': {
-                'MAIL_SERVER': not current_app.config.get('MAIL_SERVER'),
-                'MAIL_USERNAME': not current_app.config.get('MAIL_USERNAME'),
-                'MAIL_DEFAULT_SENDER': not current_app.config.get('MAIL_DEFAULT_SENDER'),
+        return ResponseService.validation_error(
+            message='Email not configured',
+            error_code=ErrorCode.INVALID_VALUE.value,
+            details={
+                'missing': {
+                    'MAIL_SERVER': not current_app.config.get('MAIL_SERVER'),
+                    'MAIL_USERNAME': not current_app.config.get('MAIL_USERNAME'),
+                    'MAIL_DEFAULT_SENDER': not current_app.config.get('MAIL_DEFAULT_SENDER'),
+                }
             }
-        }), 400
+        )
     
     # Send test email
     subject = "3D Print System - Email Test"
@@ -92,12 +116,13 @@ def test_email():
     success = send_email(subject, [test_email], html_body, text_body)
     
     if success:
-        return jsonify({
+        return ResponseService.success({
             'message': 'Test email sent successfully',
             'to': test_email
-        }), 200
+        })
     else:
-        return jsonify({
-            'error': 'Failed to send test email',
-            'check_logs': True
-        }), 500
+        return ResponseService.server_error(
+            message='Failed to send test email',
+            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR.value,
+            details={'check_logs': True}
+        )

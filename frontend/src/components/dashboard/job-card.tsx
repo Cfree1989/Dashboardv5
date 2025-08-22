@@ -87,24 +87,9 @@ function convertToWindowsPath(filePath: string): string {
 }
 
 export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
-  // DIAGNOSTIC: Track component re-renders vs mounts
-  console.log(`[${job.id}] JobCard render - expandSignal: ${expandSignal}, collapseSignal: ${collapseSignal}`);
   const isLocked = typeof job.locked_by === 'string' && job.locked_until !== undefined && new Date(job.locked_until) > new Date();
   
   const [showMore, setShowMore] = useState(false);
-  
-  // DIAGNOSTIC: Detect component mounting
-  useEffect(() => {
-    console.log(`[${job.id}] JobCard MOUNTED - initial showMore: ${showMore}`);
-    return () => {
-      console.log(`[${job.id}] JobCard UNMOUNTING`);
-    };
-  }, []); // Empty deps = only on mount/unmount
-  
-  // DIAGNOSTIC: Track showMore state changes
-  useEffect(() => {
-    console.log(`[${job.id}] showMore changed to: ${showMore}`);
-  }, [showMore, job.id]);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -147,18 +132,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   useEffect(() => {
     if (typeof expandSignal === 'number' && expandSignal > 0) {
       // Open details
-      console.log(`[${job.id}] Global expand signal triggered: ${expandSignal}, setting showMore=true`);
       setShowMore(true);
     }
-  }, [expandSignal, job.id]);
+  }, [expandSignal]);
 
   useEffect(() => {
     if (typeof collapseSignal === 'number' && collapseSignal > 0) {
       // Close details
-      console.log(`[${job.id}] Global collapse signal triggered: ${collapseSignal}, setting showMore=false`);
       setShowMore(false);
     }
-  }, [collapseSignal, job.id]);
+  }, [collapseSignal]);
 
 
 
@@ -200,14 +183,14 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       try {
         await apiRequest(`/api/v1/jobs/${job.id}/lock`, { method: 'POST' });
       } catch (err) {
-        console.error('Lock request failed', err);
+        // Silently handle lock request failures
       }
     };
     const extendLock = async () => {
       try {
         await apiRequest(`/api/v1/jobs/${job.id}/extend`, { method: 'POST' });
       } catch (err) {
-        console.error('Extend lock failed', err);
+        // Silently handle extend lock failures
       }
     };
 
@@ -215,12 +198,16 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
       lockJob();
       intervalId = setInterval(extendLock, 4 * 60 * 1000);
     } else {
-      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(console.error);
+      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(() => {
+        // Silently handle unlock failures
+      });
     }
 
     return () => {
       clearInterval(intervalId);
-      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(console.error);
+      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(() => {
+        // Silently handle unlock failures
+      });
     };
   }, [showReviewModal, showRejectModal, showApprovalModal, showStatusChangeModal, showPaymentModal, showDeleteConfirm, showResendModal, job.id]);
 
@@ -299,7 +286,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const beginEditNotes = async () => {
-    console.log(`[${job.id}] beginEditNotes: showMore=${showMore}, NOT calling onModalOpenChange (notes editing doesn't need auto-refresh pause)`);
     setIsEditingNotes(true);
     setNotesDraft("");
     setSaveMessage("");
@@ -309,7 +295,6 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
   };
 
   const cancelEditNotes = () => {
-    console.log(`[${job.id}] cancelEditNotes: NOT calling onModalOpenChange (notes editing doesn't need auto-refresh pause)`);
     setIsEditingNotes(false);
     setNotesDraft(jobNotes || "");
     setNotesStaffName("");
@@ -459,9 +444,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
               <button
                 type="button"
                 onClick={() => {
-                  console.log(`[${job.id}] "Has notes" button clicked, current showMore: ${showMore}`);
-                  setShowMore(true);
-                  console.log(`[${job.id}] setShowMore(true) called`);
+                                  setShowMore(true);
                   beginEditNotes();
                   // Focus will move to textarea via effect
                 }}
@@ -511,10 +494,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    console.log(`[${job.id}] "No notes yet" placeholder clicked, current showMore: ${showMore}`);
+    
                     beginEditNotes();
                   }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); console.log(`[${job.id}] "No notes yet" keyboard activated`); beginEditNotes(); } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
                   aria-label="Click to add a note"
                 >
                   No notes added yet — click to add
@@ -527,10 +510,10 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                     role="button"
                     tabIndex={0}
                     onClick={() => {
-                      console.log(`[${job.id}] Existing notes area clicked, current showMore: ${showMore}`);
+      
                       beginEditNotes();
                     }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); console.log(`[${job.id}] Existing notes keyboard activated`); beginEditNotes(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); beginEditNotes(); } }}
                     aria-label="Click to add or edit note"
                   >
                     <ul className="list-disc ml-5 space-y-1 text-sm text-gray-900">
@@ -1002,7 +985,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                        // Provide more specific error messages
                        const errorMessage = e?.message || 'Failed to resend confirmation email';
                        show(`Error: ${errorMessage}`);
-                       console.error('Resend email error:', e);
+                       // Silently handle resend email errors
                      } finally {
                        setIsResendingConfirm(false);
                      }

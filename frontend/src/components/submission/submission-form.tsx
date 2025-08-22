@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { apiRequest } from '../../lib/auth';
+import { handleApiError } from '../../lib/api-error-handling';
 
 const disciplineOptions = ['Art', 'Architecture', 'Landscape Architecture', 'Interior Design', 'Engineering', 'Hobby/Personal', 'Other'];
 const printMethodOptions = ['Filament', 'Resin'];
@@ -85,78 +87,10 @@ export default function SubmissionForm() {
     e.preventDefault();
 
     // Clear previous errors
-    setFirstNameError(''); setLastNameError(''); setDisciplineError('');
-    setClassNumberError(''); setPrintMethodError(''); setColorError('');
-    setPrinterError(''); setMinChargeError(''); setScalingError('');
-    setEmailError(''); // reuse existing state
-    setSubmitError('');
-    let firstErrorField: string | null = null;
+    setFirstNameError('');
 
-    // Validate first name
-    if (firstName.trim().length < 2 || firstName.trim().length > 100) {
-      setFirstNameError('First name must be between 2 and 100 characters');
-      if (!firstErrorField) firstErrorField = 'firstName';
-    }
-    // Validate last name
-    if (lastName.trim().length < 2 || lastName.trim().length > 100) {
-      setLastNameError('Last name must be between 2 and 100 characters');
-      if (!firstErrorField) firstErrorField = 'lastName';
-    }
-    // Validate email
-    if (!studentEmail.trim()) {
-      setEmailError('Email is required');
-      if (!firstErrorField) firstErrorField = 'studentEmail';
-    } else if (!/^\S+@\S+\.\S+$/.test(studentEmail) || studentEmail.length > 100) {
-      setEmailError('Please enter a valid email under 100 characters');
-      if (!firstErrorField) firstErrorField = 'studentEmail';
-    }
-    // Validate discipline
-    if (!discipline) {
-      setDisciplineError('Please select a discipline');
-      if (!firstErrorField) firstErrorField = 'discipline';
-    }
-    // Validate class number
-    if (!classNumber.trim()) {
-      setClassNumberError('Class number is required');
-      if (!firstErrorField) firstErrorField = 'classNumber';
-    } else if (classNumber.length > 50) {
-      setClassNumberError('Class number cannot exceed 50 characters');
-      if (!firstErrorField) firstErrorField = 'classNumber';
-    }
-    // Validate print method
-    if (!printMethod) {
-      setPrintMethodError('Please select a print method');
-      if (!firstErrorField) firstErrorField = 'printMethod';
-    }
-    // Validate color
-    if (!color) {
-      setColorError('Please select a color');
-      if (!firstErrorField) firstErrorField = 'color';
-    }
-    // Validate printer
-    if (!printer) {
-      setPrinterError('Please select a printer');
-      if (!firstErrorField) firstErrorField = 'printer';
-    }
-    // Validate minimum charge consent
-    if (!minChargeConsent) {
-      setMinChargeError('You must acknowledge the minimum charge');
-      if (!firstErrorField) firstErrorField = 'minChargeConsent';
-    }
-    // Validate scaling confirmation
-    if (!scalingConfirmed) {
-      setScalingError('You must confirm that you have scaled your model correctly');
-      if (!firstErrorField) firstErrorField = 'scalingConfirmed';
-    }
-    // Validate file
     if (!file) {
-      setFileError('Please upload a model file');
-      if (!firstErrorField) firstErrorField = 'file';
-    }
-    // If any errors, scroll to first and abort
-    if (firstErrorField) {
-      const el = document.getElementById(firstErrorField);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setSubmitError('Please select a file to upload');
       return;
     }
     setIsSubmitting(true);
@@ -172,15 +106,18 @@ export default function SubmissionForm() {
       formData.append('printer', printer);
       formData.append('min_charge_consent', String(minChargeConsent));
       if (file) formData.append('file', file);
+      
       const res = await fetch('/api/v1/submit', { method: 'POST', body: formData });
       const data = await res.json();
+      
       if (res.ok) {
         router.push(`/submit/success?job=${data.id}`);
       } else {
-        setSubmitError(data.message || 'Submission failed');
+        // Use standardized error handling
+        handleApiError({ message: data.message || 'Submission failed' }, setSubmitError);
       }
-    } catch (err) {
-      setSubmitError('Network error, please try again');
+    } catch (err: any) {
+      handleApiError(err, setSubmitError);
     } finally {
       setIsSubmitting(false);
     }

@@ -1,6 +1,7 @@
 import functools
 from flask import request, jsonify, g
 from app.business_logic.shared_services import auth_service
+from app.business_logic.shared_services.response_service import ResponseService, ErrorCode
 import jwt
 
 def token_required(f):
@@ -10,7 +11,10 @@ def token_required(f):
         token = auth_service.get_token_from_request(request)
         
         if not token:
-            return jsonify({'message': 'Token is missing'}), 401
+            return ResponseService.unauthorized(
+                message="Token is missing",
+                error_code=ErrorCode.UNAUTHORIZED.value
+            )
             
         try:
             payload = auth_service.decode_token(token)
@@ -18,8 +22,14 @@ def token_required(f):
             # Provide a safe default for admin routes that expect g.staff_name
             g.staff_name = payload.get('staff_name') or payload.get('workstation_id') or 'Admin'
         except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired'}), 401
+            return ResponseService.unauthorized(
+                message="Token has expired",
+                error_code=ErrorCode.TOKEN_EXPIRED.value
+            )
         except jwt.InvalidTokenError:
-            return jsonify({'message': 'Invalid token'}), 401
+            return ResponseService.unauthorized(
+                message="Invalid token",
+                error_code=ErrorCode.INVALID_TOKEN.value
+            )
         return f(*args, **kwargs)
     return decorated

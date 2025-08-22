@@ -1,6 +1,8 @@
 // Authentication utilities for cookie-based JWT tokens
 // This replaces localStorage-based token storage for security
 
+import { apiRequestWithErrorHandling } from './api-error-handling';
+
 export interface AuthUser {
   workstation_id: string;
   isAuthenticated: boolean;
@@ -46,7 +48,7 @@ export async function checkAuthStatus(): Promise<AuthUser> {
       };
     }
   } catch (error) {
-    console.error('Auth check failed:', error);
+    // Silently handle auth check failures
   }
   
   return {
@@ -86,7 +88,7 @@ export async function logout(): Promise<void> {
       credentials: 'include', // Include cookies
     });
   } catch (error) {
-    console.error('Logout failed:', error);
+    // Silently handle logout failures
   }
 }
 
@@ -95,28 +97,7 @@ export async function apiRequest<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include', // Include cookies
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  if (response.status === 401) {
-    // Redirect to login on authentication failure
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-    throw new Error('Unauthorized');
-  }
-
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
-  }
-
-  return response.json();
+  return apiRequestWithErrorHandling<T>(url, options);
 }
 
 // Legacy support: Get token for components that still expect it
@@ -129,12 +110,10 @@ export function getLegacyToken(): string | null {
 // This will be removed once all components are updated
 export function setLegacyToken(token: string): void {
   // No-op: tokens are now handled by cookies
-  console.warn('setLegacyToken called - tokens are now cookie-based');
 }
 
 // Legacy support: Remove token (no-op for cookie-based auth)
 // This will be removed once all components are updated
 export function removeLegacyToken(): void {
   // No-op: tokens are now handled by cookies
-  console.warn('removeLegacyToken called - tokens are now cookie-based');
 }

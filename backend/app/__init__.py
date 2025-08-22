@@ -53,6 +53,87 @@ def create_app():
     CORS(app)
     limiter.init_app(app)
     mail.init_app(app)
+    
+    # Error response middleware for standardized error formatting
+    # Import here to avoid circular imports
+    from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
+    
+    @app.errorhandler(400)
+    def bad_request(error):
+        """Handle 400 Bad Request errors"""
+        return ResponseService.validation_error(
+            message="Bad request",
+            error_code=ErrorCode.INVALID_INPUT.value,
+            details={'description': str(error)}
+        )
+    
+    @app.errorhandler(401)
+    def unauthorized(error):
+        """Handle 401 Unauthorized errors"""
+        return ResponseService.unauthorized(
+            message="Unauthorized",
+            error_code=ErrorCode.UNAUTHORIZED.value
+        )
+    
+    @app.errorhandler(403)
+    def forbidden(error):
+        """Handle 403 Forbidden errors"""
+        return ResponseService.forbidden(
+            message="Forbidden",
+            error_code=ErrorCode.FORBIDDEN.value
+        )
+    
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 Not Found errors"""
+        return ResponseService.not_found(
+            resource="Resource",
+            error_code=ErrorCode.RESOURCE_NOT_FOUND.value
+        )
+    
+    @app.errorhandler(409)
+    def conflict(error):
+        """Handle 409 Conflict errors"""
+        return ResponseService.conflict(
+            message="Resource conflict",
+            error_code=ErrorCode.RESOURCE_CONFLICT.value
+        )
+    
+    @app.errorhandler(422)
+    def unprocessable_entity(error):
+        """Handle 422 Unprocessable Entity errors"""
+        return ResponseService.business_error(
+            message="Unprocessable entity",
+            error_code=ErrorCode.BUSINESS_RULE_VIOLATION.value
+        )
+    
+    @app.errorhandler(429)
+    def too_many_requests(error):
+        """Handle 429 Too Many Requests errors"""
+        return ResponseService.error(
+            message="Too many requests",
+            status=429,
+            error_code="RATE_LIMIT_EXCEEDED",
+            category=ErrorCategory.BUSINESS_LOGIC
+        )
+    
+    @app.errorhandler(500)
+    def internal_server_error(error):
+        """Handle 500 Internal Server Error"""
+        return ResponseService.server_error(
+            message="Internal server error",
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR.value
+        )
+    
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Handle all unhandled exceptions"""
+        app.logger.error(f"Unhandled exception: {str(error)}")
+        return ResponseService.server_error(
+            message="An unexpected error occurred",
+            error_code=ErrorCode.INTERNAL_SERVER_ERROR.value
+        )
+    
     # Log DB engine and sanitized URI for diagnostics
     with app.app_context():
         try:

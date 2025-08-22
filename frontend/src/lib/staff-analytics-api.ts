@@ -78,7 +78,7 @@ export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Pr
         dateRange: performanceJson.date_range ?? { start: '', end: '' },
       };
     } catch (error) {
-      console.error('Failed to fetch staff performance:', error);
+      // Silently handle staff performance fetch failures
     }
   }
 

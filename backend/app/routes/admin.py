@@ -10,6 +10,7 @@ from app.business_logic.shared_services import event_service
 from app.services.infrastructure.atomic_file_service import get_atomic_file_service, STATUS_TO_DIR
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
+from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
 from pathlib import Path
 import os
 import json
@@ -157,28 +158,44 @@ def delete_orphaned_file():
     file_path = (data.get('file_path') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     if not file_path or not staff_name:
-        return jsonify({'message': 'file_path and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='file_path and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     # Validate staff
     staff_res = ValidationService.validate_staff(staff_name)
     if not staff_res.is_valid:
-        return jsonify({'message': staff_res.error_message}), 400
+        return ResponseService.validation_error(
+            message=staff_res.error_message,
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     # Security: restrict deletions to STORAGE_PATH
     root = _storage_root().resolve()
     target = Path(file_path).resolve()
     if not str(target).startswith(str(root)):
-        return jsonify({'message': 'file_path must be within STORAGE_PATH'}), 400
+        return ResponseService.validation_error(
+            message='file_path must be within STORAGE_PATH',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     # Ensure not referenced by DB
     ref = db.session.query(Job).filter((Job.file_path == str(target)) | (Job.metadata_path == str(target))).first()
     if ref:
-        return jsonify({'message': 'file is referenced by a job; not an orphan'}), 409
+        return ResponseService.conflict(
+            message='file is referenced by a job; not an orphan',
+            error_code=ErrorCode.RESOURCE_CONFLICT.value
+        )
     try:
         if target.exists() and target.is_file():
             target.unlink()
-    except Exception:
-        abort(500, description='Failed to delete file')
+    except Exception as e:
+        logger.error(f"Failed to delete file {target}: {e}")
+        return ResponseService.file_operation_error(
+            message='Failed to delete file',
+            details={'file_path': str(target)}
+        )
     # Log event (system-level; no job)
     log_event('OrphanedFileDeleted', {'file_path': str(target)}, triggered_by=staff_name)
-    return jsonify({'message': 'deleted'}), 200
+    return ResponseService.success({'message': 'deleted'})
 
 
 @bp.route('/audit/stale-file', methods=['DELETE'])
@@ -188,26 +205,42 @@ def delete_stale_file():
     file_path = (data.get('file_path') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     if not file_path or not staff_name:
-        return jsonify({'message': 'file_path and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='file_path and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     # Validate staff
     staff_res = ValidationService.validate_staff(staff_name)
     if not staff_res.is_valid:
-        return jsonify({'message': staff_res.error_message}), 400
+        return ResponseService.validation_error(
+            message=staff_res.error_message,
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     root = _storage_root().resolve()
     target = Path(file_path).resolve()
     if not str(target).startswith(str(root)):
-        return jsonify({'message': 'file_path must be within STORAGE_PATH'}), 400
+        return ResponseService.validation_error(
+            message='file_path must be within STORAGE_PATH',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     # Ensure not authoritative reference by DB
     ref = db.session.query(Job).filter((Job.file_path == str(target)) | (Job.metadata_path == str(target))).first()
     if ref:
-        return jsonify({'message': 'file is referenced by a job; cannot delete'}), 409
+        return ResponseService.conflict(
+            message='file is referenced by a job; cannot delete',
+            error_code=ErrorCode.RESOURCE_CONFLICT.value
+        )
     try:
         if target.exists() and target.is_file():
             target.unlink()
-    except Exception:
-        abort(500, description='Failed to delete file')
+    except Exception as e:
+        logger.error(f"Failed to delete file {target}: {e}")
+        return ResponseService.file_operation_error(
+            message='Failed to delete file',
+            details={'file_path': str(target)}
+        )
     log_event('StaleFileDeleted', {'file_path': str(target)}, triggered_by=staff_name)
-    return jsonify({'message': 'deleted'}), 200
+    return ResponseService.success({'message': 'deleted'})
 
 
 @bp.route('/audit/mark-reviewed', methods=['POST'])
@@ -218,12 +251,15 @@ def mark_reviewed():
     staff_name = (data.get('staff_name') or '').strip()
     issues = data.get('issues') or []
     if not job_id or not staff_name:
-        return jsonify({'message': 'job_id and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='job_id and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     job = Job.query.get(job_id)
     if not job:
-        return jsonify({'message': 'Job not found'}), 404
+        return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     log_event('AuditIssueReviewed', {'issues': issues}, triggered_by=staff_name, job_id=job.id)
-    return jsonify({'message': 'reviewed'}), 200
+    return ResponseService.success({'message': 'reviewed'})
 
 
 @bp.route('/audit/repair-metadata', methods=['POST'])
@@ -233,10 +269,13 @@ def repair_metadata():
     job_id = (data.get('job_id') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     if not job_id or not staff_name:
-        return jsonify({'message': 'job_id and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='job_id and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     job = Job.query.get(job_id)
     if not job:
-        return jsonify({'message': 'Job not found'}), 404
+        return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     try:
         meta_path = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
         if not meta_path or not meta_path.exists():
@@ -247,9 +286,13 @@ def repair_metadata():
             db.session.commit()
         _update_metadata_status(meta_path, job.status, job.file_path)
         log_event('AuditMetadataRepaired', {'metadata_path': str(meta_path) if meta_path else None}, triggered_by=staff_name, job_id=job.id)
-        return jsonify({'message': 'metadata repaired'}), 200
-    except Exception:
-        abort(500, description='Failed to repair metadata')
+        return ResponseService.success({'message': 'metadata repaired'})
+    except Exception as e:
+        logger.error(f"Failed to repair metadata for job {job_id}: {e}")
+        return ResponseService.file_operation_error(
+            message='Failed to repair metadata',
+            details={'job_id': job_id}
+        )
 
 
 @bp.route('/audit/repair-location', methods=['POST'])
@@ -259,16 +302,22 @@ def repair_location():
     job_id = (data.get('job_id') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     if not job_id or not staff_name:
-        return jsonify({'message': 'job_id and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='job_id and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     job = Job.query.get(job_id)
     if not job:
-        return jsonify({'message': 'Job not found'}), 404
+        return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     try:
         # Move file/metadata into the directory that matches the current status
         atomic_service = get_atomic_file_service()
         success = atomic_service.atomic_move_authoritative(job, job.status)
         if not success:
-            abort(500, description='Failed to repair location - file operation failed')
+            return ResponseService.file_operation_error(
+                message='Failed to repair location - file operation failed',
+                details={'job_id': job_id}
+            )
         db.session.add(job)
         db.session.commit()
         # Update metadata.json to reflect new location/status
@@ -276,9 +325,13 @@ def repair_location():
         if meta_path:
             _update_metadata_status(meta_path, job.status, job.file_path)
         log_event('AuditLocationRepaired', {'status': job.status}, triggered_by=staff_name, job_id=job.id)
-        return jsonify({'message': 'location repaired'}), 200
-    except Exception:
-        abort(500, description='Failed to repair location')
+        return ResponseService.success({'message': 'location repaired'})
+    except Exception as e:
+        logger.error(f"Failed to repair location for job {job_id}: {e}")
+        return ResponseService.file_operation_error(
+            message='Failed to repair location',
+            details={'job_id': job_id}
+        )
 
 
 @bp.route('/audit/relink-file', methods=['POST'])
@@ -289,26 +342,39 @@ def relink_file():
     file_path = (data.get('file_path') or '').strip()
     staff_name = (data.get('staff_name') or '').strip()
     if not job_id or not staff_name or not file_path:
-        return jsonify({'message': 'job_id, file_path and staff_name are required'}), 400
+        return ResponseService.validation_error(
+            message='job_id, file_path and staff_name are required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     job = Job.query.get(job_id)
     if not job:
-        return jsonify({'message': 'Job not found'}), 404
+        return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     # Validate target path
     root = _storage_root().resolve()
     target = Path(file_path).resolve()
     if not str(target).startswith(str(root)):
-        return jsonify({'message': 'file_path must be within STORAGE_PATH'}), 400
+        return ResponseService.validation_error(
+            message='file_path must be within STORAGE_PATH',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     if not target.exists() or not target.is_file():
-        return jsonify({'message': 'file_path does not exist or is not a file'}), 400
+        return ResponseService.validation_error(
+            message='file_path does not exist or is not a file',
+            error_code=ErrorCode.FILE_NOT_FOUND.value
+        )
     try:
         # Point job to provided file, then normalize to status directory
         job.file_path = str(target.resolve())
         db.session.add(job)
         db.session.commit()
         log_event('AuditFileRelinked', {'file_path': job.file_path}, triggered_by=staff_name, job_id=job.id)
-        return jsonify({'message': 'file relinked'}), 200
-    except Exception:
-        abort(500, description='Failed to relink file')
+        return ResponseService.success({'message': 'file relinked'})
+    except Exception as e:
+        logger.error(f"Failed to relink file for job {job_id}: {e}")
+        return ResponseService.file_operation_error(
+            message='Failed to relink file',
+            details={'job_id': job_id, 'file_path': file_path}
+        )
 
 def _update_metadata_status(meta_path: Path, new_status: str, new_file_path: str | None = None) -> None:
     error_service = get_error_handling_service()
@@ -396,13 +462,22 @@ def archive_jobs():
     data = request.get_json(silent=True) or {}
     staff_name = (data.get('staff_name') or '').strip()
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     try:
         retention_days = int(data.get('retention_days') or 45)
     except Exception:
-        return jsonify({'message': 'retention_days must be an integer'}), 400
+        return ResponseService.validation_error(
+            message='retention_days must be an integer',
+            error_code=ErrorCode.INVALID_FORMAT.value
+        )
     if retention_days < 0:
-        return jsonify({'message': 'retention_days must be non-negative'}), 400
+        return ResponseService.validation_error(
+            message='retention_days must be non-negative',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     cutoff = datetime.utcnow() - timedelta(days=retention_days)
     # Eligible: PaidPickedUp or Rejected older than cutoff
     eligible = Job.query.filter(
@@ -434,7 +509,7 @@ def archive_jobs():
         count += 1
     # Batch admin action event (system-level)
     log_event('AdminAction', {'action': 'archive', 'jobs_archived': count, 'retention_days': retention_days}, triggered_by=staff_name)
-    return jsonify({'message': 'Archival process completed', 'jobs_archived': count}), 200
+    return ResponseService.success({'message': 'Archival process completed', 'jobs_archived': count})
 
 
 @bp.route('/prune', methods=['POST'])
@@ -443,13 +518,22 @@ def prune_jobs():
     data = request.get_json(silent=True) or {}
     staff_name = (data.get('staff_name') or '').strip()
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     try:
         retention_days = int(data.get('retention_days') or 365)
     except Exception:
-        return jsonify({'message': 'retention_days must be an integer'}), 400
+        return ResponseService.validation_error(
+            message='retention_days must be an integer',
+            error_code=ErrorCode.INVALID_FORMAT.value
+        )
     if retention_days < 0:
-        return jsonify({'message': 'retention_days must be non-negative'}), 400
+        return ResponseService.validation_error(
+            message='retention_days must be non-negative',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
     cutoff = datetime.utcnow() - timedelta(days=retention_days)
     archived = Job.query.filter(Job.status == 'ARCHIVED').all()
     deleted = 0
@@ -483,7 +567,7 @@ def prune_jobs():
             db.session.rollback()
             continue
     log_event('AdminAction', {'action': 'prune', 'jobs_deleted': deleted, 'retention_days': retention_days}, triggered_by=staff_name)
-    return jsonify({'message': 'Pruning process completed', 'jobs_deleted': deleted}), 200
+    return ResponseService.success({'message': 'Pruning process completed', 'jobs_deleted': deleted})
 
 
 ## Removed: mock-jobs generation endpoint
@@ -499,7 +583,10 @@ def get_error_monitoring():
     data = request.get_json(silent=True) or {}
     staff_name = (data.get('staff_name') or '').strip()
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     
     error_service = get_error_handling_service()
     error_summary = error_service.get_error_summary()
@@ -513,7 +600,7 @@ def get_error_monitoring():
             'recovery_suggestions': suggestions
         })
     
-    return jsonify({
+    return ResponseService.success({
         'error_summary': {
             'total_errors': error_summary['total_errors'],
             'error_counts': error_summary['error_counts'],
@@ -522,7 +609,7 @@ def get_error_monitoring():
         },
         'recent_errors': recent_errors_with_suggestions,
         'monitoring_timestamp': datetime.now(timezone.utc).isoformat()
-    }), 200
+    })
 
 
 @bp.route('/error-monitoring/clear', methods=['POST'])
@@ -532,7 +619,10 @@ def clear_error_monitoring():
     data = request.get_json(silent=True) or {}
     staff_name = (data.get('staff_name') or '').strip()
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     
     error_service = get_error_handling_service()
     error_service.recent_errors.clear()
@@ -541,6 +631,6 @@ def clear_error_monitoring():
     # Log the clearing action
     log_event('ErrorMonitoringCleared', {'cleared_by': staff_name}, triggered_by=staff_name)
     
-    return jsonify({'message': 'Error monitoring data cleared'}), 200
+    return ResponseService.success({'message': 'Error monitoring data cleared'})
 
 

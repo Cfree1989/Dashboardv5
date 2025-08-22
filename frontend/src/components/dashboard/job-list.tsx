@@ -1,8 +1,9 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
+import { handleApiError } from '../../lib/api-error-handling';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
 
@@ -11,6 +12,23 @@ export interface JobListFilters {
   search?: string;
   printer?: string;
   discipline?: string;
+}
+
+// Consolidated state interface
+interface JobListState {
+  data: {
+    jobs: any[];
+    hasLoaded: boolean;
+  };
+  loading: {
+    loading: boolean;
+    isFetching: boolean;
+  };
+  error: string;
+  sorting: {
+    sortBy: string;
+    sortDir: 'asc' | 'desc';
+  };
 }
 
 export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
@@ -25,28 +43,39 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   collapseSignal?: number,
   onToggleExpandCollapse?: () => void
 }) {
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState('');
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [sortBy, setSortBy] = useState<string>('created_at');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Consolidated state management
+  const [state, setState] = useState<JobListState>({
+    data: {
+      jobs: [],
+      hasLoaded: false,
+    },
+    loading: {
+      loading: true,
+      isFetching: false,
+    },
+    error: '',
+    sorting: {
+      sortBy: 'created_at',
+      sortDir: 'desc',
+    },
+  });
+
   const router = useRouter();
   const controllerRef = useRef<AbortController | null>(null);
 
-  const sortedJobs = () => {
-    const copy = [...jobs];
+  // Memoized sorted jobs for better performance
+  const sortedJobs = useMemo(() => {
+    const copy = [...state.data.jobs];
     copy.sort((a, b) => {
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
+      let aVal = a[state.sorting.sortBy];
+      let bVal = b[state.sorting.sortBy];
       
       // Handle null/undefined values
       if (aVal == null) aVal = '';
       if (bVal == null) bVal = '';
       
       // Handle dates
-      if (sortBy === 'created_at') {
+      if (state.sorting.sortBy === 'created_at') {
         aVal = new Date(aVal).getTime();
         bVal = new Date(bVal).getTime();
       }
@@ -55,8 +84,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (typeof aVal === 'string') aVal = aVal.toLowerCase();
       if (typeof bVal === 'string') bVal = bVal.toLowerCase();
       
-      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      if (aVal < bVal) return state.sorting.sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return state.sorting.sortDir === 'asc' ? 1 : -1;
       
       // Tie-breakers for stable sorting
       if (a.created_at !== b.created_at) {
@@ -73,9 +102,10 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       return (a.id || 0) - (b.id || 0);
     });
     return copy;
-  };
+  }, [state.data.jobs, state.sorting.sortBy, state.sorting.sortDir]);
 
-  useEffect(() => {
+  // Memoized fetch jobs function
+  const fetchJobs = useCallback(async () => {
     // cancel any in-flight
     if (controllerRef.current) {
       controllerRef.current.abort();
@@ -83,150 +113,153 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    async function fetchJobs() {
-      if (hasLoaded) {
-        setIsFetching(true);
-      } else {
-        setLoading(true);
+    if (state.data.hasLoaded) {
+      setState(prev => ({ ...prev, loading: { ...prev.loading, isFetching: true } }));
+    } else {
+      setState(prev => ({ ...prev, loading: { ...prev.loading, loading: true } }));
+    }
+    setState(prev => ({ ...prev, error: '' }));
+
+    try {
+      // Build query string based on filters
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      const qSearch = (filters?.search || "").trim();
+      if (qSearch) params.append('search', qSearch);
+      if (filters?.printer) params.append('printer', filters.printer);
+      if (filters?.discipline) params.append('discipline', filters.discipline);
+
+      const response = await apiRequest<any[]>(`/api/v1/jobs?${params.toString()}`, {
+        signal: controller.signal
+      });
+
+      if (!controller.signal.aborted) {
+        setState(prev => ({
+          ...prev,
+          data: { jobs: response, hasLoaded: true },
+          loading: { loading: false, isFetching: false },
+          error: ''
+        }));
       }
-      setError('');
-      try {
-        // Build query string based on filters
-        const params = new URLSearchParams();
-        if (filters?.status) params.append('status', filters.status);
-        const qSearch = (filters?.search || "").trim();
-        if (qSearch) params.append('search', qSearch);
-        if (filters?.printer) params.append('printer', filters.printer);
-        if (filters?.discipline) params.append('discipline', filters.discipline);
-        
-        const data = await apiRequest<any>(`/api/v1/jobs${params.toString() ? `?${params}` : ''}`);
-        setJobs(Array.isArray(data) ? data : (data.jobs || []));
-        setHasLoaded(true);
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          return; // ignore aborted
-        }
-        setError('Failed to load jobs');
-      } finally {
-        if (controllerRef.current === controller) {
-          setLoading(false);
-          setIsFetching(false);
-        }
+    } catch (err: any) {
+      if (!controller.signal.aborted) {
+        handleApiError(err, (message) => {
+          setState(prev => ({
+            ...prev,
+            loading: { loading: false, isFetching: false },
+            error: message
+          }));
+        });
       }
     }
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, state.data.hasLoaded]);
+
+  // Fetch jobs when filters change
+  useEffect(() => {
     fetchJobs();
+  }, [fetchJobs]);
+
+  // Refresh jobs when refreshToken changes
+  useEffect(() => {
+    if (refreshToken && state.data.hasLoaded) {
+      fetchJobs();
+    }
+  }, [refreshToken, fetchJobs, state.data.hasLoaded]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      if (controllerRef.current === controller) {
+      if (controllerRef.current) {
         controllerRef.current.abort();
       }
     };
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, refreshToken, router, hasLoaded]);
+  }, []);
 
-  const handleJobUpdate = async (jobId: string, updates: any) => {
+  // Memoized sort handler
+  const handleSort = useCallback((field: string) => {
+    setState(prev => ({
+      ...prev,
+      sorting: {
+        sortBy: field,
+        sortDir: prev.sorting.sortBy === field && prev.sorting.sortDir === 'asc' ? 'desc' : 'asc'
+      }
+    }));
+  }, []);
+
+  // Memoized job mutation handlers
+  const handleJobMutation = useCallback(() => {
+    if (onJobsMutated) {
+      onJobsMutated();
+    }
+    fetchJobs();
+  }, [onJobsMutated, fetchJobs]);
+
+  const handleJobUpdate = useCallback(async (jobId: string, updates: any) => {
     try {
       await apiRequest(`/api/v1/jobs/${jobId}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),
       });
-      
-      // Update local state
-      setJobs(prevJobs => 
-        prevJobs.map(job => 
-          job.id === jobId ? { ...job, ...updates } : job
-        )
-      );
-      
-      setIsJobOperation?.(true);
-      onJobsMutated?.();
+      handleJobMutation();
     } catch (error) {
-      console.error('Failed to update job:', error);
       throw error;
     }
-  };
+  }, [handleJobMutation]);
 
-  const handleJobDelete = async (jobId: string) => {
+  const handleJobDelete = useCallback(async (jobId: string) => {
     try {
       await apiRequest(`/api/v1/jobs/${jobId}`, {
         method: 'DELETE',
       });
-      
-      // Remove from local state
-      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      
-      setIsJobOperation?.(true);
-      onJobsMutated?.();
+      handleJobMutation();
     } catch (error) {
-      console.error('Failed to delete job:', error);
       throw error;
     }
-  };
+  }, [handleJobMutation]);
 
-  const handleJobApprove = async (jobId: string) => {
-    try {
-      // Remove from local state (job will move to PENDING status)
-      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      
-      setIsJobOperation?.(true);
-      onJobsMutated?.();
-    } catch (error) {
-      console.error('Failed to approve job:', error);
-      throw error;
+  // Memoized modal open change handler
+  const handleModalOpenChange = useCallback((open: boolean) => {
+    if (onModalOpenChange) {
+      onModalOpenChange(open);
     }
-  };
+  }, [onModalOpenChange]);
 
-  const handleJobReject = async (jobId: string) => {
-    try {
-      // Remove from local state (job will move to REJECTED status)
-      setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      
-      setIsJobOperation?.(true);
-      onJobsMutated?.();
-    } catch (error) {
-      console.error('Failed to reject job:', error);
-      throw error;
+  // Memoized search input handler
+  const handleSearchInput = useCallback((value: string) => {
+    if (onSearchInput) {
+      onSearchInput(value);
     }
-  };
+  }, [onSearchInput]);
 
-  const handleJobMarkReviewed = async (jobId: string, updatedJob?: any) => {
-    try {
-      // Update job in local state using the data returned from the API
-      setJobs(prevJobs => prevJobs.map(job => 
-        job.id === jobId 
-          ? { ...job, ...updatedJob } 
-          : job
-      ));
-      
-      setIsJobOperation?.(true);
-      onJobsMutated?.();
-    } catch (error) {
-      console.error('Failed to mark job as reviewed:', error);
-      throw error;
+  // Memoized job operation handler
+  const handleSetJobOperation = useCallback((value: boolean) => {
+    if (setIsJobOperation) {
+      setIsJobOperation(value);
     }
-  };
+  }, [setIsJobOperation]);
 
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortDir('desc');
-    }
-  };
-
-  if (loading) {
+  if (state.loading.loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (state.error) {
     return (
-      <div className="text-center py-8">
-        <p className="text-red-600 mb-4">{error}</p>
+      <div className="mt-8 text-center">
+        <p className="text-red-600 mb-4">{state.error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={fetchJobs}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Retry
@@ -235,112 +268,96 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     );
   }
 
-  const sortedJobList = sortedJobs();
-
   return (
-    <div className="space-y-4">
-      {/* Search and Sort Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        {/* Search Input */}
-        <div className="flex-1 max-w-sm flex items-center gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Search jobs..."
-              value={searchValue || ''}
-              onChange={(e) => onSearchInput?.(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  onSearchInput?.('');
-                }
-              }}
-              className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            {searchValue && searchValue.trim() && (
-              <button
-                onClick={() => onSearchInput?.('')}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
-                title="Clear search"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          <button
-            onClick={onToggleExpandCollapse}
-            className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            title={expandSignal !== undefined && collapseSignal !== undefined && expandSignal > collapseSignal ? 'Collapse All' : 'Expand All'}
-          >
-            {expandSignal !== undefined && collapseSignal !== undefined && expandSignal > collapseSignal ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-
-        {/* Sort Controls */}
-        <div className="flex items-center gap-2">
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-            }}
-            className="appearance-none px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
-          >
-            <option value="created_at">Time</option>
-            <option value="student_name">Name</option>
-            <option value="discipline">Class</option>
-            <option value="printer">Printer</option>
-            <option value="color">Color</option>
-            <option value="material">Material</option>
-            <option value="method">Method</option>
-          </select>
-          <button
-            onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-            className="flex items-center justify-center w-8 h-8 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            title={sortDir === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
-          >
-            {sortDir === 'asc' ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </div>
-
-
-
-      {/* Job Cards */}
-      <ErrorBoundary title="Job list error">
-        {sortedJobList.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>No jobs found</p>
-            {filters?.search && (
-              <p className="text-sm mt-2">Try adjusting your search terms</p>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedJobList.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                currentStatus={filters?.status || 'UPLOADED'}
-                onApprove={handleJobApprove}
-                onReject={handleJobReject}
-                onMarkReviewed={handleJobMarkReviewed}
-                onUpdate={handleJobUpdate}
-                onDelete={handleJobDelete}
-                onModalOpenChange={onModalOpenChange}
-                expandSignal={expandSignal}
-                collapseSignal={collapseSignal}
+    <ErrorBoundary title="Job list error">
+      <div className="mt-8">
+        {/* Search and Controls */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search jobs..."
+                value={searchValue || ''}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            ))}
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              {searchValue && (
+                <button
+                  onClick={() => handleSearchInput('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={onToggleExpandCollapse}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              {(expandSignal || 0) > (collapseSignal || 0) ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Collapse All
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Expand All
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Jobs Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sortedJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              currentStatus={filters?.status}
+              onApprove={handleJobMutation}
+              onReject={handleJobMutation}
+              onMarkReviewed={handleJobMutation}
+              onStatusAction={handleJobMutation}
+              onUpdate={handleJobUpdate}
+              onDelete={handleJobDelete}
+              onModalOpenChange={handleModalOpenChange}
+              expandSignal={expandSignal}
+              collapseSignal={collapseSignal}
+            />
+          ))}
+        </div>
+
+        {sortedJobs.length === 0 && !state.loading.loading && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No jobs found</p>
+            {filters?.search && (
+              <p className="text-gray-400 text-sm mt-2">
+                Try adjusting your search criteria
+              </p>
+            )}
           </div>
         )}
-      </ErrorBoundary>
-    </div>
+
+        {state.loading.isFetching && (
+          <div className="text-center py-4">
+            <div className="inline-flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              <span className="text-gray-600">Updating...</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }

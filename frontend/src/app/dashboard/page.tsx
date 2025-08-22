@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useReducer, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
@@ -10,68 +10,216 @@ import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
 
+// Consolidated state types
+interface DashboardState {
+  // Authentication and loading
+  auth: {
+    loading: boolean;
+    error: string;
+  };
+  // Search state
+  search: {
+    value: string;
+    debounced: string;
+    matchCounts: Record<string, number>;
+  };
+  // Refresh state
+  refresh: {
+    tick: number;
+    isRefreshing: boolean;
+    pauseRefresh: boolean;
+    lastUpdated: string;
+  };
+  // Job operations
+  jobOps: {
+    isJobOperation: boolean;
+    expandSignal: number;
+    collapseSignal: number;
+  };
+  // Data state
+  data: {
+    status: string;
+    counts: Record<string, number>;
+  };
+}
+
+// Action types for useReducer
+type DashboardAction =
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string }
+  | { type: 'SET_SEARCH_VALUE'; payload: string }
+  | { type: 'SET_DEBOUNCED_SEARCH'; payload: string }
+  | { type: 'SET_MATCH_COUNTS'; payload: Record<string, number> }
+  | { type: 'INCREMENT_REFRESH_TICK' }
+  | { type: 'SET_REFRESHING'; payload: boolean }
+  | { type: 'SET_PAUSE_REFRESH'; payload: boolean }
+  | { type: 'SET_LAST_UPDATED'; payload: string }
+  | { type: 'SET_JOB_OPERATION'; payload: boolean }
+  | { type: 'INCREMENT_EXPAND_SIGNAL' }
+  | { type: 'INCREMENT_COLLAPSE_SIGNAL' }
+  | { type: 'SET_STATUS'; payload: string }
+  | { type: 'SET_COUNTS'; payload: Record<string, number> };
+
+// Initial state
+const initialState: DashboardState = {
+  auth: {
+    loading: true,
+    error: '',
+  },
+  search: {
+    value: '',
+    debounced: '',
+    matchCounts: {},
+  },
+  refresh: {
+    tick: 0,
+    isRefreshing: false,
+    pauseRefresh: false,
+    lastUpdated: '',
+  },
+  jobOps: {
+    isJobOperation: false,
+    expandSignal: 0,
+    collapseSignal: 0,
+  },
+  data: {
+    status: 'UPLOADED',
+    counts: {},
+  },
+};
+
+// Reducer function
+function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
+  switch (action.type) {
+    case 'SET_LOADING':
+      return {
+        ...state,
+        auth: { ...state.auth, loading: action.payload }
+      };
+    case 'SET_ERROR':
+      return {
+        ...state,
+        auth: { ...state.auth, error: action.payload }
+      };
+    case 'SET_SEARCH_VALUE':
+      return {
+        ...state,
+        search: { ...state.search, value: action.payload }
+      };
+    case 'SET_DEBOUNCED_SEARCH':
+      return {
+        ...state,
+        search: { ...state.search, debounced: action.payload }
+      };
+    case 'SET_MATCH_COUNTS':
+      return {
+        ...state,
+        search: { ...state.search, matchCounts: action.payload }
+      };
+    case 'INCREMENT_REFRESH_TICK':
+      return {
+        ...state,
+        refresh: { ...state.refresh, tick: state.refresh.tick + 1 }
+      };
+    case 'SET_REFRESHING':
+      return {
+        ...state,
+        refresh: { ...state.refresh, isRefreshing: action.payload }
+      };
+    case 'SET_PAUSE_REFRESH':
+      return {
+        ...state,
+        refresh: { ...state.refresh, pauseRefresh: action.payload }
+      };
+    case 'SET_LAST_UPDATED':
+      return {
+        ...state,
+        refresh: { ...state.refresh, lastUpdated: action.payload }
+      };
+    case 'SET_JOB_OPERATION':
+      return {
+        ...state,
+        jobOps: { ...state.jobOps, isJobOperation: action.payload }
+      };
+    case 'INCREMENT_EXPAND_SIGNAL':
+      return {
+        ...state,
+        jobOps: { ...state.jobOps, expandSignal: state.jobOps.expandSignal + 1 }
+      };
+    case 'INCREMENT_COLLAPSE_SIGNAL':
+      return {
+        ...state,
+        jobOps: { ...state.jobOps, collapseSignal: state.jobOps.collapseSignal + 1 }
+      };
+    case 'SET_STATUS':
+      return {
+        ...state,
+        data: { ...state.data, status: action.payload }
+      };
+    case 'SET_COUNTS':
+      return {
+        ...state,
+        data: { ...state.data, counts: action.payload }
+      };
+    default:
+      return state;
+  }
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState(searchParams.get('status') || 'UPLOADED');
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<string>('');
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pauseRefresh, setPauseRefresh] = useState(false);
   
-  // DIAGNOSTIC: Track pauseRefresh changes
-  useEffect(() => {
-    console.log(`[DASHBOARD] pauseRefresh changed to: ${pauseRefresh}`);
-  }, [pauseRefresh]);
-  const [isJobOperation, setIsJobOperation] = useState(false);
-  const [searchValue, setSearchValue] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [expandSignal, setExpandSignal] = useState(0);
-  const [collapseSignal, setCollapseSignal] = useState(0);
-  
-  // DIAGNOSTIC: Track collapse signal changes
-  useEffect(() => {
-    console.log(`[DASHBOARD] collapseSignal changed to: ${collapseSignal}`);
-  }, [collapseSignal]);
-  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
+  // Use reducer for consolidated state management
+  const [state, dispatch] = useReducer(dashboardReducer, {
+    ...initialState,
+    data: {
+      ...initialState.data,
+      status: searchParams.get('status') || 'UPLOADED',
+    }
+  });
   
   // Use ref to track previous counts for sound comparison
   const previousCountsRef = useRef<Record<string, number>>({});
   const isFirstLoadRef = useRef(true);
 
+  // Memoized selectors for better performance
+  const { loading, error } = state.auth;
+  const { value: searchValue, debounced: debouncedSearch, matchCounts } = state.search;
+  const { tick: refreshTick, isRefreshing, pauseRefresh, lastUpdated } = state.refresh;
+  const { isJobOperation, expandSignal, collapseSignal } = state.jobOps;
+  const { status, counts } = state.data;
+
   // Debounce search input
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchValue), 400);
+    const timer = setTimeout(() => {
+      dispatch({ type: 'SET_DEBOUNCED_SEARCH', payload: searchValue });
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchValue]);
 
   // Calculate search match counts by status
   const fetchSearchMatchCounts = useCallback(async () => {
     if (!debouncedSearch.trim()) {
-      setMatchCounts({});
+      dispatch({ type: 'SET_MATCH_COUNTS', payload: {} });
       return;
     }
     
     try {
-      // Use the more efficient backend approach - get counts directly with search filter
       const counts = await apiRequest<Record<string, number>>('/api/v1/jobs/counts?search=' + encodeURIComponent(debouncedSearch));
-      setMatchCounts(counts);
+      dispatch({ type: 'SET_MATCH_COUNTS', payload: counts });
     } catch (err) {
-      console.error('Failed to fetch search match counts:', err);
-      setMatchCounts({});
+      // Silently handle search match count failures
+      dispatch({ type: 'SET_MATCH_COUNTS', payload: {} });
     }
   }, [debouncedSearch]);
 
   const fetchCounts = useCallback(async () => {
     try {
       const data = await apiRequest<Record<string, number>>('/api/v1/jobs/counts');
-      setCounts(data);
+      dispatch({ type: 'SET_COUNTS', payload: data });
       
       // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
-      // Skip sound on first load to prevent playing on page refresh
       const currentUploaded = data.UPLOADED || 0;
       const previousUploaded = previousCountsRef.current.UPLOADED || 0;
       if (currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation && !isFirstLoadRef.current) {
@@ -85,17 +233,17 @@ export default function DashboardPage() {
       isFirstLoadRef.current = false;
       
       // Reset job operation flag after counts update
-      setIsJobOperation(false);
+      dispatch({ type: 'SET_JOB_OPERATION', payload: false });
     } catch (err) {
-      console.error('Failed to fetch counts:', err);
-      setIsJobOperation(false);
+      // Silently handle count fetch failures
+      dispatch({ type: 'SET_JOB_OPERATION', payload: false });
     }
-  }, [pauseRefresh, isJobOperation]); // Remove counts from dependencies to avoid infinite loop
+  }, [pauseRefresh, isJobOperation]);
 
   // Check authentication on mount and load initial data
   useEffect(() => {
     const checkAuthAndLoad = async () => {
-      setLoading(true);
+      dispatch({ type: 'SET_LOADING', payload: true });
       try {
         // Test authentication by making a request to a protected endpoint
         await apiRequest('/api/v1/auth/protected');
@@ -104,7 +252,7 @@ export default function DashboardPage() {
       } catch {
         router.push('/login');
       } finally {
-        setLoading(false);
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
     checkAuthAndLoad();
@@ -127,43 +275,55 @@ export default function DashboardPage() {
     const interval = setInterval(() => {
       if (pauseRefresh) return;
       const ts = new Date().toLocaleTimeString();
-      setLastUpdated(ts);
+      dispatch({ type: 'SET_LAST_UPDATED', payload: ts });
       try { localStorage.setItem('lastUpdated', ts); } catch {}
-      setRefreshTick((t) => t + 1);
+      dispatch({ type: 'INCREMENT_REFRESH_TICK' });
       fetchCounts();
     }, 45000);
     return () => clearInterval(interval);
   }, [pauseRefresh, debouncedSearch]);
   
-  const refreshPage = async () => {
-    setIsRefreshing(true);
+  const refreshPage = useCallback(async () => {
+    dispatch({ type: 'SET_REFRESHING', payload: true });
     const ts = new Date().toLocaleTimeString();
-    setLastUpdated(ts);
+    dispatch({ type: 'SET_LAST_UPDATED', payload: ts });
     try { localStorage.setItem('lastUpdated', ts); } catch {}
-    setRefreshTick((t) => t + 1);
+    dispatch({ type: 'INCREMENT_REFRESH_TICK' });
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));
-    setIsRefreshing(false);
-  };
+    dispatch({ type: 'SET_REFRESHING', payload: false });
+  }, [fetchCounts]);
   
-  const updateStatus = (newStatus: string) => {
-    setStatus(newStatus);
+  const updateStatus = useCallback((newStatus: string) => {
+    dispatch({ type: 'SET_STATUS', payload: newStatus });
     const params = new URLSearchParams();
     params.set('status', newStatus);
     router.replace(`${window.location.pathname}?${params.toString()}`);
     fetchCounts(); // keep counts in sync on tab change
-  };
+  }, [router, fetchCounts]);
 
-  const toggleExpandCollapse = () => {
+  const toggleExpandCollapse = useCallback(() => {
     // Toggle between expand and collapse modes
     if (expandSignal > collapseSignal) {
       // Currently expanded, so collapse
-      setCollapseSignal(prev => prev + 1);
+      dispatch({ type: 'INCREMENT_COLLAPSE_SIGNAL' });
     } else {
       // Currently collapsed, so expand
-      setExpandSignal(prev => prev + 1);
+      dispatch({ type: 'INCREMENT_EXPAND_SIGNAL' });
     }
-  };
+  }, [expandSignal, collapseSignal]);
+
+  const setSearchValue = useCallback((value: string) => {
+    dispatch({ type: 'SET_SEARCH_VALUE', payload: value });
+  }, []);
+
+  const setPauseRefresh = useCallback((pause: boolean) => {
+    dispatch({ type: 'SET_PAUSE_REFRESH', payload: pause });
+  }, []);
+
+  const setIsJobOperation = useCallback((isOperation: boolean) => {
+    dispatch({ type: 'SET_JOB_OPERATION', payload: isOperation });
+  }, []);
 
   if (loading) {
     return (

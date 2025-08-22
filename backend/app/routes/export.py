@@ -8,6 +8,7 @@ from app.models.payment import Payment
 from app.models.job import Job
 from app.models.event import Event
 from app.models.staff import Staff
+from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
 from app.utils.decorators import token_required
 
 
@@ -31,15 +32,24 @@ def export_payments():
     # Validate staff attribution
     staff_name = (data.get('staff_name') or '').strip()
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error(
+            message='staff_name is required',
+            error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+        )
     staff = Staff.query.get(staff_name)
     if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+        return ResponseService.validation_error(
+            message='Invalid or inactive staff_name',
+            error_code=ErrorCode.INVALID_VALUE.value
+        )
 
     start_date = _parse_date(data.get('start_date'))
     end_date = _parse_date(data.get('end_date'))
     if start_date == 'invalid' or end_date == 'invalid':
-        return jsonify({'message': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        return ResponseService.validation_error(
+            message='Invalid date format. Use YYYY-MM-DD',
+            error_code=ErrorCode.INVALID_FORMAT.value
+        )
     # If only one bound provided, allow open-ended filtering
     # If neither provided, default to no filtering (all rows)
 

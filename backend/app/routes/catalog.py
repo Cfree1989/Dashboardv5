@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from app.business_logic.shared_services.catalog_service import CatalogService
+from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
 from app.schemas.catalog import CatalogUpdateRequest, CatalogData
 from app.utils.decorators import token_required
 from app import limiter
@@ -25,7 +26,11 @@ def get_catalog():
         
     except Exception as e:
         logger.error(f"Error getting catalog: {str(e)}")
-        return jsonify({'error': 'Failed to retrieve catalog'}), 500
+        return ResponseService.server_error(
+            message='Failed to retrieve catalog',
+            error_code=ErrorCode.DATABASE_ERROR.value,
+            details={'operation': 'get_catalog'}
+        )
 
 
 @bp.route('', methods=['PUT'])
@@ -37,19 +42,28 @@ def update_catalog():
         # Get request data
         request_data = request.get_json()
         if not request_data:
-            return jsonify({'error': 'No data provided'}), 400
+            return ResponseService.validation_error(
+                message='No data provided',
+                error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
+            )
         
         # Validate the request
         try:
             update_request = CatalogUpdateRequest.from_dict(request_data)
         except Exception as e:
-            return jsonify({'error': f'Invalid request data: {str(e)}'}), 400
+            return ResponseService.validation_error(
+                message=f'Invalid request data: {str(e)}',
+                error_code=ErrorCode.INVALID_FORMAT.value
+            )
         
         # Validate the catalog data
         try:
             validated_data = CatalogService.validate_catalog_data(update_request.data.to_dict())
         except ValueError as e:
-            return jsonify({'error': str(e)}), 400
+            return ResponseService.validation_error(
+                message=str(e),
+                error_code=ErrorCode.INVALID_VALUE.value
+            )
         
         # Get the current user
         updated_by = getattr(g, 'staff_name', 'unknown')
@@ -65,11 +79,15 @@ def update_catalog():
             'updated_at': updated_catalog.updated_at.isoformat() if updated_catalog.updated_at else None
         }
         
-        return jsonify(response_data), 200
+        return ResponseService.success(response_data)
         
     except Exception as e:
         logger.error(f"Error updating catalog: {str(e)}")
-        return jsonify({'error': 'Failed to update catalog'}), 500
+        return ResponseService.server_error(
+            message='Failed to update catalog',
+            error_code=ErrorCode.DATABASE_ERROR.value,
+            details={'operation': 'update_catalog'}
+        )
 
 
 @bp.route('/version', methods=['GET'])
@@ -89,4 +107,8 @@ def get_catalog_version():
         
     except Exception as e:
         logger.error(f"Error getting catalog version: {str(e)}")
-        return jsonify({'error': 'Failed to retrieve catalog version'}), 500
+        return ResponseService.server_error(
+            message='Failed to retrieve catalog version',
+            error_code=ErrorCode.DATABASE_ERROR.value,
+            details={'operation': 'get_catalog_version'}
+        )
