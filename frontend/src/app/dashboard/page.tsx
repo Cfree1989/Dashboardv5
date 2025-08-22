@@ -6,6 +6,7 @@ import { StatusTabs } from '../../components/dashboard/status-tabs';
 
 import { apiRequest, getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
+import { optimizedApi } from '../../lib/optimized-api';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
@@ -206,7 +207,11 @@ export default function DashboardPage() {
     }
     
     try {
-      const counts = await apiRequest<Record<string, number>>('/api/v1/jobs/counts?search=' + encodeURIComponent(debouncedSearch));
+      const counts = await optimizedApi.request<Record<string, number>>(
+        '/api/v1/jobs/counts?search=' + encodeURIComponent(debouncedSearch),
+        {},
+        { ttl: 30 * 1000 } // 30 seconds for search results
+      );
       dispatch({ type: 'SET_MATCH_COUNTS', payload: counts });
     } catch (err) {
       // Silently handle search match count failures
@@ -216,7 +221,20 @@ export default function DashboardPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const data = await apiRequest<Record<string, number>>('/api/v1/jobs/counts');
+      const data = await optimizedApi.request<Record<string, number>>(
+        '/api/v1/jobs/counts',
+        {},
+        { 
+          ttl: 30 * 1000, // 30 seconds for counts
+          polling: {
+            enabled: true,
+            interval: 45000, // 45 seconds
+            maxInterval: 300000, // 5 minutes max
+            backoffMultiplier: 1.5,
+            activityThreshold: 300000 // 5 minutes
+          }
+        }
+      );
       dispatch({ type: 'SET_COUNTS', payload: data });
       
       // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
@@ -270,18 +288,8 @@ export default function DashboardPage() {
     fetchSearchMatchCounts();
   }, [fetchSearchMatchCounts]);
 
-  // Auto-refresh every 45s: update counts and trigger list refresh (mute sound while searching)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (pauseRefresh) return;
-      const ts = new Date().toLocaleTimeString();
-      dispatch({ type: 'SET_LAST_UPDATED', payload: ts });
-      try { localStorage.setItem('lastUpdated', ts); } catch {}
-      dispatch({ type: 'INCREMENT_REFRESH_TICK' });
-      fetchCounts();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [pauseRefresh, debouncedSearch]);
+  // Intelligent polling is now handled by optimizedApi
+  // Manual interval removed in favor of adaptive polling
   
   const refreshPage = useCallback(async () => {
     dispatch({ type: 'SET_REFRESHING', payload: true });

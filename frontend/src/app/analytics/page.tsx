@@ -1,9 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart3, DollarSign, Users, GraduationCap } from 'lucide-react';
-import { fetchAnalyticsData } from '../../lib/analytics-api';
-import { fetchStaffAnalyticsData } from '../../lib/staff-analytics-api';
-import { fetchStudentAnalyticsData } from '../../lib/student-analytics-api';
+import { fetchOptimizedAnalyticsData } from '../../lib/optimized-analytics-api';
+import { fetchOptimizedStaffAnalyticsData } from '../../lib/optimized-analytics-api';
+import { fetchOptimizedStudentAnalyticsData } from '../../lib/optimized-analytics-api';
 import type { AnalyticsData, AnalyticsFilters, StaffAnalyticsData, StaffAnalyticsFilters, StudentAnalyticsData, StudentAnalyticsFilters } from '../../types/analytics';
 import { OverviewCards } from '../../components/analytics/overview-cards';
 import { TrendCharts } from '../../components/analytics/trend-charts';
@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
     try {
       setSystemLoading(true);
       setSystemError(clearErrorState());
-      const d = await fetchAnalyticsData(systemFilters);
+      const d = await fetchOptimizedAnalyticsData(systemFilters);
       setSystemData(d);
       const now = new Date();
       setRefreshedAt(now);
@@ -85,7 +85,7 @@ export default function AnalyticsPage() {
     try {
       setStaffLoading(true);
       setStaffError(clearErrorState());
-      const d = await fetchStaffAnalyticsData(staffFilters);
+      const d = await fetchOptimizedStaffAnalyticsData(staffFilters);
       setStaffData(d);
       const now = new Date();
       setRefreshedAt(now);
@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
     try {
       setStudentLoading(true);
       setStudentError(clearErrorState());
-      const d = await fetchStudentAnalyticsData(studentFilters);
+      const d = await fetchOptimizedStudentAnalyticsData(studentFilters);
       setStudentData(d);
       const now = new Date();
       setRefreshedAt(now);

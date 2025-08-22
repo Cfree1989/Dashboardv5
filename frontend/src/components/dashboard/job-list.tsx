@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
 import { apiRequest } from '../../lib/auth';
 import { handleApiError } from '../../lib/error-handling';
+import { optimizedApi } from '../../lib/optimized-api';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
@@ -131,8 +132,10 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
 
-      const response = await apiRequest<any[]>(`/api/v1/jobs?${params.toString()}`, {
+      const response = await optimizedApi.request<any[]>(`/api/v1/jobs?${params.toString()}`, {
         signal: controller.signal
+      }, {
+        ttl: 60 * 1000 // 1 minute for job lists
       });
 
       if (!controller.signal.aborted) {
