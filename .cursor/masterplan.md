@@ -445,110 +445,161 @@ The project follows a clear separation between backend and frontend, designed fo
 ```
 DASHBOARDV5/
 ├── frontend/                # Next.js Application
-│   ├── app/                 # App Router pages
-│   │   ├── dashboard/
-│   │   │   └── page.tsx     # Staff dashboard
-│   │   ├── submit/
-│   │   │   ├── page.tsx     # Student submission form
-│   │   │   └── success/
-│   │   │       └── page.tsx # Submission success
-│   │   ├── login/
-│   │   │   └── page.tsx     # Workstation login page
-│   │   ├── confirm/
-│   │   │   └── [token]/
-│   │   │       └── page.tsx # Student email confirmation
-│   │   ├── globals.css      # Global styles
-│   │   ├── layout.tsx       # Root layout
-│   │   └── page.tsx         # Home page (redirect to dashboard)
-│   ├── components/          # UI Components
-│   │   ├── dashboard/       # Dashboard-specific components
-│   │   │   ├── dashboard.tsx
-│   │   │   ├── job-card.tsx
-│   │   │   ├── job-list.tsx
-│   │   │   ├── status-tabs.tsx
-│   │   │   └── modals/
-│   │   │       ├── approval-modal.tsx
-│   │   │       └── rejection-modal.tsx
-│   │   ├── analytics/       # Analytics dashboard components
-│   │   │   ├── overview-cards.tsx
-│   │   │   ├── trend-charts.tsx
-│   │   │   ├── resource-metrics.tsx
-│   │   │   └── financial-summary.tsx
-│   │   ├── payment/         # Payment workflow components  
-│   │   │   └── payment-modal.tsx
-│   │   ├── submission/      # Form components
-│   │   │   └── submission-form.tsx
-│   │   └── ui/              # shadcn/ui components
-│   │       ├── button.tsx
-│   │       ├── card.tsx
-│   │       ├── input.tsx
-│   │       ├── select.tsx
-│   │       └── ... (other UI components)
-│   ├── lib/                 # Utility functions
-│   │   ├── api.ts           # API client functions
-│   │   └── utils.ts         # General utilities
-│   ├── types/               # TypeScript types
-│   │   └── job.ts           # Job-related types
-│   ├── .env.local           # Frontend environment variables
+│   ├── src/
+│   │   ├── app/             # App Router pages
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx     # Staff dashboard
+│   │   │   ├── submit/
+│   │   │   │   ├── page.tsx     # Student submission form
+│   │   │   │   └── success/
+│   │   │   │       └── page.tsx # Submission success
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx     # Workstation login page
+│   │   │   ├── confirm/
+│   │   │   │   └── [token]/
+│   │   │   │       └── page.tsx # Student email confirmation
+│   │   │   ├── admin/           # Admin dashboard pages
+│   │   │   ├── analytics/       # Analytics dashboard pages
+│   │   │   ├── staff-analytics/ # Staff analytics pages
+│   │   │   ├── globals.css      # Global styles
+│   │   │   ├── layout.tsx       # Root layout
+│   │   │   ├── error.tsx        # Error boundary
+│   │   │   ├── not-found.tsx    # 404 page
+│   │   │   └── page.tsx         # Home page (redirect to dashboard)
+│   │   ├── components/          # UI Components
+│   │   │   ├── dashboard/       # Dashboard-specific components
+│   │   │   │   ├── job-card.tsx
+│   │   │   │   ├── job-list.tsx
+│   │   │   │   ├── status-tabs.tsx
+│   │   │   │   ├── diag-panel.tsx
+│   │   │   │   ├── last-updated.tsx
+│   │   │   │   └── modals/
+│   │   │   │       ├── approval-modal.tsx
+│   │   │   │       ├── rejection-modal.tsx
+│   │   │   │       ├── payment-modal.tsx
+│   │   │   │       ├── review-modal.tsx
+│   │   │   │       ├── status-change-modal.tsx
+│   │   │   │       └── confirm-dialog.tsx
+│   │   │   ├── analytics/       # Analytics dashboard components
+│   │   │   ├── admin/           # Admin dashboard components
+│   │   │   ├── staff-analytics/ # Staff analytics components
+│   │   │   ├── student-analytics/ # Student analytics components
+│   │   │   ├── submission/      # Form components
+│   │   │   ├── layout/          # Layout components
+│   │   │   ├── error-boundary.tsx # Error boundary component
+│   │   │   ├── LoginCard.tsx    # Login component
+│   │   │   └── ui/              # shadcn/ui components
+│   │   │       ├── button.tsx
+│   │   │       ├── card.tsx
+│   │   │       ├── input.tsx
+│   │   │       ├── select.tsx
+│   │   │       └── ... (other UI components)
+│   │   ├── lib/                 # Utility functions
+│   │   │   ├── api.ts           # API client functions
+│   │   │   └── utils.ts         # General utilities
+│   │   └── types/               # TypeScript types
+│   │       └── index.ts         # Type definitions
+│   ├── .env.local               # Frontend environment variables
 │   ├── package.json
-│   └── next.config.mjs
+│   ├── next.config.js
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── jest.config.js
+│   ├── jest.setup.ts
+│   ├── Dockerfile               # Development Dockerfile
+│   └── Dockerfile.prod          # Production Dockerfile
 │
 ├── backend/                 # Flask API Application
 │   ├── app/
 │   │   ├── __init__.py      # App factory
-│   │   ├── config.py        # Configuration
 │   │   ├── models/
 │   │   │   ├── __init__.py
 │   │   │   ├── job.py       # Job model
 │   │   │   ├── event.py     # Event log model
-│   │   │   └── payment.py   # Payment model
+│   │   │   ├── payment.py   # Payment model
+│   │   │   └── staff.py     # Staff model
 │   │   ├── routes/
 │   │   │   ├── __init__.py
 │   │   │   ├── auth.py      # Authentication endpoints (workstation validation)
 │   │   │   ├── jobs.py      # Job management endpoints
+│   │   │   ├── jobs_staff.py # Staff job operations
 │   │   │   ├── submit.py    # Student submission endpoints
 │   │   │   ├── payment.py   # Payment processing endpoints
-│   │   │   └── analytics.py # Analytics and reporting endpoints
+│   │   │   ├── analytics.py # Analytics and reporting endpoints
+│   │   │   ├── staff.py     # Staff management endpoints
+│   │   │   ├── admin.py     # Admin operations endpoints
+│   │   │   └── health.py    # Health check endpoints
 │   │   ├── services/        # Business logic and orchestration
 │   │   │   ├── __init__.py
 │   │   │   ├── orchestration/
 │   │   │   │   ├── __init__.py
 │   │   │   │   └── job_orchestration_service.py  # Unified service interface
-│   │   │   ├── business_logic/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── job_lifecycle/
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── job_approval_service.py
-│   │   │   │   │   ├── job_status_service.py
-│   │   │   │   │   └── job_transition_service.py
-│   │   │   │   ├── admin_operations/
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── job_admin_service.py
-│   │   │   │   │   └── job_notes_service.py
-│   │   │   │   └── shared_services/
-│   │   │   │       ├── __init__.py
-│   │   │   │       ├── job_locking_service.py
-│   │   │   │       └── job_event_service.py
 │   │   │   ├── infrastructure/
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── file_configuration_service.py
 │   │   │   │   ├── file_discovery_service.py
 │   │   │   │   ├── atomic_file_service.py
-│   │   │   │   ├── db_transaction_service.py
-│   │   │   │   ├── validation_service.py
-│   │   │   │   ├── response_service.py
-│   │   │   │   └── monitoring_service.py
+│   │   │   │   ├── file_lock_service.py
+│   │   │   │   ├── job_query_service.py
+│   │   │   │   ├── payment_service.py
+│   │   │   │   └── payment_service_interface.py
+│   │   │   ├── monitoring_service.py
 │   │   │   ├── file_service.py
 │   │   │   ├── email_service.py
-│   │   │   └── auth_service.py  # Workstation token validation
-│   │   └── utils/           # Utilities
-│   │       ├── __init__.py
-│   │       ├── decorators.py # Auth decorators
-│   │       └── validators.py # Input validation
+│   │   │   ├── auth_service.py
+│   │   │   ├── payment_service.py
+│   │   │   ├── db_transaction_service.py
+│   │   │   ├── error_handling_service.py
+│   │   │   ├── event_service.py
+│   │   │   ├── token_service.py
+│   │   │   ├── catalog_service.py
+│   │   │   ├── caching_service.py
+│   │   │   ├── analytics_service.py
+│   │   │   ├── response_service.py
+│   │   │   └── validation_service.py
+│   │   ├── business_logic/  # Business logic services
+│   │   │   ├── __init__.py
+│   │   │   ├── job_lifecycle/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── job_approval_service.py
+│   │   │   │   ├── job_status_service.py
+│   │   │   │   └── job_transition_service.py
+│   │   │   ├── admin_operations/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── job_admin_service.py
+│   │   │   │   └── job_notes_service.py
+│   │   │   ├── shared_services/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── job_locking_service.py
+│   │   │   │   ├── job_event_service.py
+│   │   │   │   ├── db_transaction_service.py
+│   │   │   │   ├── response_service.py
+│   │   │   │   ├── validation_service.py
+│   │   │   │   ├── auth_service.py
+│   │   │   │   ├── event_service.py
+│   │   │   │   ├── error_handling_service.py
+│   │   │   │   ├── email_service.py
+│   │   │   │   ├── token_service.py
+│   │   │   │   └── catalog_service.py
+│   │   │   └── analytics/
+│   │   ├── schemas/         # API schemas
+│   │   ├── utils/           # Utilities
+│   │   │   ├── __init__.py
+│   │   │   ├── decorators.py # Auth decorators
+│   │   │   └── validators.py # Input validation
+│   │   ├── templates/       # Email templates
+│   │   └── seed.py          # Database seeding
 │   ├── migrations/          # Database migrations
+│   ├── tests/               # Test suite
+│   ├── scripts/             # Utility scripts
+│   ├── docs/                # Documentation
+│   ├── logs/                # Application logs
+│   ├── instance/            # Instance-specific files
 │   ├── .env                 # Backend environment variables
 │   ├── requirements.txt     # Python dependencies
-│   └── run.py               # Development server
+│   ├── run.py               # Development server
+│   ├── Dockerfile           # Development Dockerfile
+│   └── Dockerfile.prod      # Production Dockerfile
 │
 ├── storage/                 # File storage (network-mounted)
 │   ├── Uploaded/
@@ -557,43 +608,75 @@ DASHBOARDV5/
 │   ├── Printing/
 │   ├── Completed/
 │   ├── PaidPickedUp/
+│   ├── Rejected/
 │   └── Archived/
 │
 ├── SlicerOpener/            # Protocol handler
 │   ├── SlicerOpener.py      # Python script
+│   ├── SlicerOpener.exe     # Compiled executable (PyInstaller)
+│   ├── config.ini           # Configuration file
+│   ├── config.example.ini   # Example configuration
 │   ├── register.bat         # Windows registry setup
-│   └── SlicerOpener.exe     # Compiled executable (PyInstaller)
+│   ├── SlicerOpener.spec    # PyInstaller spec file
+│   ├── sliceropener.log     # Application logs
+│   ├── README.md            # Documentation
+│   ├── build/               # Build artifacts
+│   ├── dist/                # Distribution files
+│   └── releases/            # Release packages
 │
-├── docker-compose.yml       # Defines all services for development and production
+├── scripts/                 # Utility scripts
+├── tests/                   # Integration tests
+├── logs/                    # System logs
+├── docker-compose.dev.yml   # Development environment
+├── docker-compose.prod.yml  # Production environment
 ├── .dockerignore            # Specifies files to ignore in Docker builds
-└── Dockerfile.backend       # Dockerfile for the Flask API
-└── Dockerfile.frontend      # Dockerfile for the Next.js frontend
+├── pytest.ini              # Test configuration
+└── .gitignore              # Git ignore rules
+```
 
 ### 3.1.1 Current Service Architecture
 The system has evolved from a monolithic service architecture to a decomposed, orchestrated architecture:
 
 **Orchestration Layer**:
-- **JobOrchestrationService**: Unified interface for all job lifecycle operations
-- **Service Composition**: Coordinates between 7 specialized business logic services
+- **JobOrchestrationService**: Unified interface for all job lifecycle operations (`backend/app/services/orchestration/job_orchestration_service.py`)
+- **Service Composition**: Coordinates between specialized business logic services
 - **API Compatibility**: Maintains existing route interfaces while providing clean separation
 
 **Business Logic Services** (Decomposed from monolithic JobLifecycleService):
-- **JobApprovalService**: Handles job approval, rejection, and review workflows
-- **JobStatusService**: Manages status transitions (printing, complete, pickup, etc.)
-- **JobTransitionService**: Validates and orchestrates status changes
-- **JobAdminService**: Handles admin operations (force unlock, status changes, etc.)
-- **JobNotesService**: Manages job notes and comments
-- **JobLockingService**: Handles job locking for concurrency control
-- **JobEventService**: Manages event logging and audit trails
+- **JobApprovalService**: Handles job approval, rejection, and review workflows (`backend/app/business_logic/job_lifecycle/job_approval_service.py`)
+- **JobStatusService**: Manages status transitions (printing, complete, pickup, etc.) (`backend/app/business_logic/job_lifecycle/job_status_service.py`)
+- **JobTransitionService**: Validates and orchestrates status changes (`backend/app/business_logic/job_lifecycle/job_transition_service.py`)
+- **JobAdminService**: Handles admin operations (force unlock, status changes, etc.) (`backend/app/business_logic/admin_operations/job_admin_service.py`)
+- **JobNotesService**: Manages job notes and comments (`backend/app/business_logic/admin_operations/job_notes_service.py`)
+- **JobLockingService**: Handles job locking for concurrency control (`backend/app/business_logic/shared_services/job_locking_service.py`)
+- **JobEventService**: Manages event logging and audit trails (`backend/app/business_logic/shared_services/job_event_service.py`)
 
 **Infrastructure Services**:
-- **FileConfigurationService**: File validation, security, and configuration management
-- **FileDiscoveryService**: Discovers and validates candidate files for approval
-- **AtomicFileService**: Ensures atomic file operations with rollback capabilities
-- **DbTransactionService**: Manages database transactions and consistency
-- **ValidationService**: Centralized input validation and error handling
-- **ResponseService**: Standardized API response formatting
-- **MonitoringService**: Comprehensive system monitoring and health checks
+- **FileConfigurationService**: File validation, security, and configuration management (`backend/app/services/infrastructure/file_configuration_service.py`)
+- **FileDiscoveryService**: Discovers and validates candidate files for approval (`backend/app/services/infrastructure/file_discovery_service.py`)
+- **AtomicFileService**: Ensures atomic file operations with rollback capabilities (`backend/app/services/infrastructure/atomic_file_service.py`)
+- **FileLockService**: Manages file-level locking for concurrent access (`backend/app/services/infrastructure/file_lock_service.py`)
+- **JobQueryService**: Handles job querying and filtering operations (`backend/app/services/infrastructure/job_query_service.py`)
+- **PaymentService**: Manages payment processing and calculations (`backend/app/services/infrastructure/payment_service.py`)
+- **MonitoringService**: Comprehensive system monitoring and health checks (`backend/app/services/monitoring_service.py`)
+
+**Shared Services** (in both business_logic and services):
+- **DbTransactionService**: Manages database transactions and consistency (`backend/app/business_logic/shared_services/db_transaction_service.py`)
+- **ValidationService**: Centralized input validation and error handling (`backend/app/business_logic/shared_services/validation_service.py`)
+- **ResponseService**: Standardized API response formatting (`backend/app/business_logic/shared_services/response_service.py`)
+- **ErrorHandlingService**: Comprehensive error handling and recovery (`backend/app/business_logic/shared_services/error_handling_service.py`)
+- **EventService**: Event logging and management (`backend/app/business_logic/shared_services/event_service.py`)
+- **TokenService**: Token generation and validation (`backend/app/business_logic/shared_services/token_service.py`)
+- **CatalogService**: Data catalog and reference management (`backend/app/business_logic/shared_services/catalog_service.py`)
+- **CachingService**: Request caching and optimization (`backend/app/business_logic/analytics/caching_service.py`)
+- **AnalyticsService**: Analytics and reporting functionality (`backend/app/business_logic/analytics/analytics_service.py`)
+
+**Service Architecture Evolution**:
+- **Emergency Service Decomposition**: Successfully decomposed 1,166-line monolithic `JobLifecycleService` into 8 focused services
+- **API Compatibility**: Maintained 100% compatibility with existing route interfaces during transition
+- **Import Hierarchy**: Clean dependency management preventing circular imports
+- **Service Composition**: Orchestration layer coordinates between specialized business logic services
+- **Backward Compatibility**: Import aliases in `services/__init__.py` provide seamless transition
 
 ### 3.2 Database Schema & Models
 
@@ -617,11 +700,12 @@ class Staff(db.Model):
 **Job Model** - Central entity representing each 3D print request:
 ```python
 class Job(db.Model):
-   id = db.Column(db.String, primary_key=True)   # uuid4 hex
-   student_name = db.Column(db.String(100))
-   student_email = db.Column(db.String(100))
-   discipline = db.Column(db.String(50))
-   class_number = db.Column(db.String(50))
+   id = db.Column(db.String, primary_key=True, default=lambda: uuid.uuid4().hex)
+   short_id = db.Column(db.String(12), unique=True, index=True, nullable=True)
+   student_name = db.Column(db.String(100), nullable=False)
+   student_email = db.Column(db.String(100), nullable=False)
+   discipline = db.Column(db.String(50), nullable=False)
+   class_number = db.Column(db.String(50), nullable=False)
    
    # File Management
    original_filename = db.Column(db.String(256), nullable=False)
@@ -694,6 +778,17 @@ class Event(db.Model):
    details = db.Column(db.JSON, nullable=True)
    triggered_by = db.Column(db.String(100), nullable=False)
    workstation_id = db.Column(db.String(100), nullable=False)
+   
+   def to_dict(self):
+       return {
+           'id': self.id,
+           'job_id': self.job_id,
+           'timestamp': self.timestamp.isoformat(),
+           'event_type': self.event_type,
+           'details': self.details,
+           'triggered_by': self.triggered_by,
+           'workstation_id': self.workstation_id
+       }
 ```
 
 **Payment Model** - Financial transaction tracking for completed jobs:
@@ -701,7 +796,7 @@ class Event(db.Model):
 class Payment(db.Model):
     job_id = db.Column(db.String, db.ForeignKey('job.id'), primary_key=True)
     grams = db.Column(db.Float, nullable=False)           # Actual weight from scale
-    price_cents = db.Column(db.Integer, nullable=False)   # Final calculated price
+    price_cents = db.Column(db.Integer, nullable=False)   # Final calculated price in cents
     txn_no = db.Column(db.String(50), nullable=False)     # Tiger-Cash transaction number
     picked_up_by = db.Column(db.String(100), nullable=False)  # Person who collected
     paid_ts = db.Column(db.DateTime, default=datetime.utcnow)
@@ -715,6 +810,14 @@ class Staff(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
     deactivated_at = db.Column(db.DateTime, nullable=True)
+    
+    def to_dict(self):
+        return {
+            'name': self.name,
+            'is_active': self.is_active,
+            'added_at': self.added_at.isoformat() if self.added_at else None,
+            'deactivated_at': self.deactivated_at.isoformat() if self.deactivated_at else None
+        }
 ```
 
 #### 3.2.2 Key Design Decisions
@@ -726,6 +829,19 @@ class Staff(db.Model):
 **Flexible Status System**: String-based status allows for easy expansion of workflow states without schema changes.
 
 **Audit Trail**: Every action creates an immutable Event record with full context for debugging and accountability.
+
+**Data Class Architecture**: Comprehensive data classes for type-safe service communication:
+- **JobApprovalData**: Staff name, weight, time, authoritative filename, printer override
+- **JobRejectionData**: Staff name, reasons list, custom reason
+- **JobReviewData**: Staff name, reviewed boolean
+- **JobStatusTransitionData**: Staff name, workstation ID, additional data
+- **JobAdminStatusChangeData**: Staff name, new status, reason
+- **JobDeleteData**: Staff name, reason
+- **JobResendEmailData**: Staff name, email type
+- **JobForceUnlockData**: Staff name, reason
+- **JobNoteData**: Staff name, note content
+- **JobUpdateNotesData**: Staff name, notes text
+- **JobLockData**: Staff name, lock duration
 
 ### 3.3 Authentication Architecture
 
@@ -790,7 +906,37 @@ Students do not have accounts or passwords. Instead, their approval for a print 
 
 *   **JWT Validation Middleware**: All protected endpoints validate the workstation JWT in the `Authorization: Bearer <token>` header. The middleware makes the `workstation_id` available to the request context.
 
-### 3.4 Job Lifecycle & Workflow Management
+### 3.4 Route Handler Architecture
+
+The system uses a comprehensive route handler architecture that integrates with the orchestrated service layer:
+
+**Route Handler Organization**:
+- **jobs.py**: Main job management endpoints using JobOrchestrationService (`backend/app/routes/jobs.py`)
+- **jobs_staff.py**: Staff-specific job operations with validation (`backend/app/routes/jobs_staff.py`)
+- **admin.py**: Administrative operations and system management (`backend/app/routes/admin.py`)
+- **auth.py**: Workstation authentication with environment-based configuration (`backend/app/routes/auth.py`)
+- **submit.py**: Student submission endpoints with comprehensive validation
+- **payment.py**: Payment processing and financial operations
+- **analytics.py**: Analytics and reporting endpoints
+- **staff.py**: Staff management operations
+- **health.py**: System health monitoring endpoints
+
+**Route Handler Integration Pattern**:
+- **Service Composition**: Routes use JobOrchestrationService for unified interface
+- **Validation Layer**: ValidationService provides consistent input validation
+- **Response Standardization**: ResponseService ensures consistent API responses
+- **Error Handling**: Centralized error handling with proper HTTP status codes
+- **Rate Limiting**: Flask-Limiter integration for abuse protection
+- **Authentication**: JWT middleware for workstation authentication
+
+**Testing Architecture**:
+- **Unit Tests**: Comprehensive test suite for business logic services (`backend/tests/unit/`)
+- **Integration Tests**: End-to-end workflow testing (`backend/tests/tests/integration/`)
+- **Test Coverage**: Service-level testing with mock dependencies
+- **Test Patterns**: Simple tests for business logic, integration tests for workflows
+- **Mock Framework**: Jest and React Testing Library for frontend components
+
+### 3.5 Job Lifecycle & Workflow Management
 
 The system manages 3D print jobs through a comprehensive, event-driven workflow that ensures accountability, file integrity, and clear communication with students.
 
@@ -1003,14 +1149,14 @@ To ensure system stability and simplify management, the system is designed with 
 
 1.  **Backend Host (One Computer):**
     *   A single, designated staff PC or server acts as the **backend host**. This machine is responsible for running the entire Docker Compose stack, which includes:
-        *   The Flask API
+        *   The Flask API (port 5000)
         *   The PostgreSQL Database
         *   The Redis message broker and RQ worker
     *   This centralized approach prevents database locking issues, simplifies backups, and ensures a single source of truth for all data and operations.
 
 2.  **Client Workstations (Up to Two Computers):**
     *   Up to two additional lab computers can act as **client workstations**.
-    *   These machines **do not run any server code**. Staff simply access the Next.js dashboard by navigating to the backend host's network IP address in a web browser (e.g., `http://192.168.1.100`).
+    *   These machines **do not run any server code**. Staff simply access the Next.js dashboard by navigating to the backend host's network IP address in a web browser (e.g., `http://192.168.1.100:3000`).
     *   The only software required on client workstations is the `SlicerOpener` protocol handler, which enables them to open files directly from the browser.
 
 3.  **Shared Network Storage:**
@@ -1018,9 +1164,28 @@ To ensure system stability and simplify management, the system is designed with 
     *   **All computers** (the backend host and all client workstations) must mount this shared storage at the **exact same path** (e.g., `Z:\storage\` on Windows or `/mnt/3dprint_files` on Linux).
     *   Path consistency is critical for the `SlicerOpener` protocol handler and the Flask API to correctly locate and manage job files.
 
-4.  **Database Strategy (PostgreSQL Recommended):**
+4.  **Database Strategy (PostgreSQL):**
     *   The PostgreSQL database runs in a Docker container on the backend host.
     *   This provides superior concurrency, data integrity, and scalability compared to file-based databases like SQLite, which is essential for a multi-user environment with background tasks.
+
+**Implementation Status**: The deployment configuration is fully implemented:
+- **Development Environment**: `docker-compose.dev.yml` (225 lines) with hot reloading and development features
+- **Production Environment**: `docker-compose.prod.yml` (213 lines) with optimized builds and security hardening
+- **Resource Limits**: Backend limited to 1GB RAM, 1 CPU; Frontend limited to 512MB RAM, 0.5 CPU
+- **Health Checks**: Automated health monitoring for both backend and frontend services
+- **Security**: No-new-privileges security option enabled for all containers
+- **Logging**: JSON-formatted logs with rotation (10MB max, 3 files)
+- **Networking**: Dedicated bridge network for service communication
+- **Volume Mounts**: Source code mounted for development, storage directory shared across containers
+
+**Environment Variable Configuration**:
+- **Database**: `DATABASE_URL` (required, prevents SQLite fallback in production)
+- **Authentication**: `SECRET_KEY`, JWT cookie settings, workstation passwords
+- **Email**: Office 365 SMTP configuration (`MAIL_SERVER`, `MAIL_USERNAME`, etc.)
+- **File Handling**: `STORAGE_PATH`, `ALLOWED_FILE_EXTENSIONS`, `MAX_FILE_SIZE_MB`
+- **Redis**: `REDIS_URL`, `REDIS_PASSWORD` for background task processing
+- **Frontend**: `NEXT_PUBLIC_API_URL`, `FRONTEND_PUBLIC_URL` for API communication
+- **System**: `FLASK_ENV`, `APP_VERSION`, `ENVIRONMENT_BANNER` for operational settings
 
 ### 4.2 Custom Protocol Handler
 - A custom URL protocol (e.g., 3dprint://) is registered on the single staff computer.
@@ -1036,7 +1201,7 @@ To ensure system stability and simplify management, the system is designed with 
     (A `.bat` or `.reg` file can automate this setup on staff machines).
 2.  **Helper Application (`SlicerOpener.py`)**:
     *   A small Python script (compiled to `.exe` using PyInstaller) that serves as the protocol handler.
-    *   **External Configuration**: The script **must** load its settings from an external configuration file (e.g., `config.ini`) located in the same directory. Hardcoding paths is not acceptable. The configuration will define:
+    *   **External Configuration**: The script **must** load its settings from an external configuration file (`config.ini`) located in the same directory. Hardcoding paths is not acceptable. The configuration defines:
         -   The authoritative storage base path (`AUTHORITATIVE_STORAGE_BASE_PATH`).
         -   A list of recognized slicer applications, each with a name, an absolute path to its executable, and a comma-separated list of supported file extensions (e.g., `.stl,.obj,.3mf`).
         -   The path for the local log file.
@@ -1048,7 +1213,17 @@ To ensure system stability and simplify management, the system is designed with 
         -   If exactly one compatible slicer is found, it opens the file directly.
         -   If multiple compatible slicers are found, it **must** display a GUI dialog prompting the user to select which slicer to use.
         -   If no compatible slicers are found, it displays a GUI error dialog.
-    *   **Logging**: All actions, configuration loads, validation results, and errors must be logged to a local file for auditing and troubleshooting.
+    *   **Logging**: All actions, configuration loads, validation results, and errors must be logged to a local file (`sliceropener.log`) for auditing and troubleshooting.
+
+**Implementation Status**: The SlicerOpener protocol handler is fully implemented and deployed:
+- **Source Code**: `SlicerOpener/SlicerOpener.py` (210 lines)
+- **Compiled Executable**: `SlicerOpener/SlicerOpener.exe` (11MB, PyInstaller build)
+- **Configuration**: `SlicerOpener/config.ini` and `SlicerOpener/config.example.ini`
+- **Registry Setup**: `SlicerOpener/register.bat` for Windows protocol registration
+- **Build System**: `SlicerOpener/SlicerOpener.spec` for PyInstaller configuration
+- **Documentation**: `SlicerOpener/README.md` with setup and usage instructions
+- **Logging**: `SlicerOpener/sliceropener.log` for operational debugging
+- **Distribution**: `SlicerOpener/releases/` contains packaged releases
     ```python
     # SlicerOpener.py (Conceptual, with slicer selection)
     import sys, subprocess, os, configparser
@@ -1164,10 +1339,22 @@ To ensure system stability and simplify management, the system is designed with 
 
 **Frontend Components:**
 - **Next.js Application**: Modern App Router architecture with TypeScript, Tailwind CSS, and comprehensive shadcn/ui component library
-- **Authentication Flow**: Simple login form for workstations, JWT storage in browser, and inclusion in subsequent API requests.
+- **Authentication Flow**: Simple login form for workstations, JWT storage in browser, and inclusion in subsequent API requests
 - **Dashboard Interface**: Real-time updating dashboard with background-only sound on new submissions, visual alerts, job age tracking, and advanced filtering
 - **Interactive Workflows**: Sophisticated approval/rejection modals, inline notes editing, and comprehensive form validation
 - **Student Submission Interface**: Dynamic form with contextual validation, progressive disclosure, and educational content
+- **Admin Dashboard**: Dedicated admin interface for system management and overrides
+- **Analytics Dashboard**: Comprehensive analytics and reporting interface
+- **Error Boundaries**: Component-level error isolation with fallback UI and retry mechanisms
+
+**Implementation Status**: The frontend is fully implemented with comprehensive component architecture:
+- **App Router Pages**: Dashboard, submit, login, confirm, admin, analytics, staff-analytics
+- **Dashboard Components**: Job cards, job lists, status tabs, modals, diagnostic panel
+- **Modal System**: Approval, rejection, payment, review, status change, and confirmation dialogs
+- **Error Handling**: Error boundaries, fallback UI, and retry mechanisms
+- **Testing**: Comprehensive test suite with Jest and React Testing Library
+- **Build System**: Development and production Dockerfiles with optimized builds
+- **Configuration**: Tailwind CSS, TypeScript, Jest, and Next.js configuration files
 
 **Integration Components:**
 - **API Communication Layer**: Robust frontend-backend integration with comprehensive error handling and retry logic
