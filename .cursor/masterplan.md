@@ -1,7 +1,7 @@
 # 3D Print System Project Plan (Beginner-Friendly Flask API + Next.js Edition)
 
 ## 1. Project Overview
-This project will build a Flask-based 3D print job management system **from scratch**, specifically designed for beginners. The system is tailored for an academic/makerspace setting with up to two staff members operating concurrently on separate computers. It uses a **workstation-based login system with per-action staff attribution** and is designed with safeguards to prevent data conflicts and race conditions inherent in a multi-user environment. The system will handle the workflow from student submission to completion, with file tracking, staff approval, and the ability to open the exact uploaded files directly in local applications.
+This project builds a Flask-based 3D print job management system **from scratch**, specifically designed for beginners. The system is tailored for an academic/makerspace setting with up to two staff members operating concurrently on separate computers. It uses a **workstation-based login system with per-action staff attribution** and is designed with safeguards to prevent data conflicts and race conditions inherent in a multi-user environment. The system handles the workflow from student submission to completion, with file tracking, staff approval, and the ability to open the exact uploaded files directly in local applications.
 
 > **Key Design Principle**: This project prioritizes **beginner-friendly implementation** with clear, step-by-step guidance and minimal complexity. We start with a basic working system and iterate to add features.
 
@@ -9,8 +9,89 @@ This project will build a Flask-based 3D print job management system **from scra
 
 The project replaces potentially ad-hoc or manual 3D print request systems with a **centralized, API-driven, and workflow-oriented platform.** It uses a **Flask API-only backend** with a **Next.js frontend**, following a clear separation of concerns where the backend handles all business logic and the frontend consumes REST APIs. It prioritizes clarity, efficiency, accurate file tracking, and a **strong, non-fragile foundation**, especially addressing the complexities of file changes introduced by slicer software and ensuring resilience.
 
-## 1.1 User Roles & Personas
-The system will cater primarily to two user roles:
+### 1.1.1 Academic Context & University Integration
+The system is specifically designed for university academic environments with the following characteristics:
+
+**Academic Discipline Support**: The system supports 7 primary academic disciplines as evidenced in the frontend submission form (`frontend/src/components/submission/submission-form.tsx`):
+- Art
+- Architecture  
+- Landscape Architecture
+- Interior Design
+- Engineering
+- Hobby/Personal
+- Other
+
+**Course Integration**: Students must provide class numbers (e.g., "ARCH 4000") or "N/A" for non-course projects, enabling academic tracking and reporting.
+
+**University Payment System**: The system integrates with university Tiger-Cash payment system as evidenced in the Payment model (`backend/app/models/payment.py`):
+- `txn_no` field stores Tiger-Cash transaction numbers
+- Weight-based pricing: $0.10/gram for filament, $0.20/gram for resin
+- $3.00 minimum charge enforced across all jobs
+- Manual transaction recording with staff attribution
+
+**Educational Workflow**: The system includes comprehensive educational content and warnings:
+- Mandatory liability disclaimer referencing "Additive Manufacturing Moodle page"
+- Detailed printer dimension guidance for student education
+- Material-specific descriptions and cost information
+- File format and scaling requirements clearly communicated
+
+### 1.1.2 System Boundaries & Integration Points
+**External Dependencies**:
+- **Email System**: Office 365 SMTP integration for automated notifications
+- **File Storage**: Network-mounted shared storage accessible by all workstations
+- **Slicer Software**: Local installation of PrusaSlicer, PreForm, or other slicer applications
+- **University Network**: Integration with campus network infrastructure and security policies
+
+**Internal Boundaries**:
+- **No External APIs**: System operates independently without third-party service dependencies
+- **Self-Contained**: All business logic, file management, and user interface contained within the system
+- **Protocol Handler**: Custom `3dprint://` protocol for direct file opening (implemented in `SlicerOpener/SlicerOpener.py`)
+
+**Data Isolation**:
+- **Student Data**: Minimal PII collection (name, email, discipline, class number)
+- **Staff Attribution**: Full audit trail with workstation and staff member tracking
+- **File Security**: Comprehensive validation and path traversal prevention
+
+### 1.1.3 Operational Constraints & Assumptions
+**Physical Infrastructure**:
+- **Network Storage**: All computers must mount shared storage at identical paths
+- **Workstation Limits**: Maximum of 2 concurrent staff workstations supported
+- **Printer Integration**: Manual printer operation with system tracking only
+- **Protocol Handler**: Must be installed locally on each staff computer
+
+**User Behavior Assumptions**:
+- **Staff Training**: Staff members understand basic 3D printing concepts and slicer software
+- **Student Education**: Students have access to educational materials (Moodle page referenced)
+- **File Management**: Staff will use slicer software to create/modify files in designated directories
+- **Payment Processing**: Manual Tiger-Cash transactions with staff recording
+
+**Technical Constraints**:
+- **File Size Limits**: 50MB maximum file upload size
+- **Rate Limiting**: 3 submissions per IP per hour, 10 login attempts per IP per hour
+- **Session Duration**: Workstation sessions configured for full workday duration
+- **Concurrency**: Job locking system prevents simultaneous edits by multiple staff
+
+### 1.2.1 Evidence Audit Trail
+**Academic Context Evidence**:
+- **Discipline Options**: Verified 7 disciplines in `frontend/src/components/submission/submission-form.tsx`
+- **Course Integration**: Confirmed class_number field in Job model (`backend/app/models/job.py`)
+- **Payment System**: Validated Tiger-Cash integration in Payment model (`backend/app/models/payment.py`)
+- **Educational Content**: Confirmed liability disclaimer and printer guidance in submission form
+
+**System Boundaries Evidence**:
+- **Protocol Handler**: Verified implementation in `SlicerOpener/SlicerOpener.py`
+- **File Security**: Confirmed validation in `backend/app/services/infrastructure/atomic_file_service.py`
+- **Rate Limiting**: Verified in `backend/app/routes/auth.py` and `backend/app/routes/submit.py`
+- **Concurrency Control**: Confirmed job locking fields in Job model
+
+**Operational Constraints Evidence**:
+- **File Size Limits**: Verified 50MB limit in submission validation
+- **Session Management**: Confirmed workstation authentication in auth routes
+- **Payment Processing**: Validated weight-based pricing in payment service
+- **Network Storage**: Confirmed path consistency requirements in deployment docs
+
+## 1.2 User Roles & Personas
+The system caters primarily to two user roles:
 ●	**Students**: Users submitting 3D models for printing. They need a simple interface for uploading files, providing details, and tracking job progress.
 ●	**Staff/Admins**: Users managing the print queue, printers, and the system itself. They require tools for reviewing submissions, taking notes about jobs, approving/rejecting jobs, managing files, operating slicer software, tracking job status, and overseeing the system's health.
 
@@ -19,38 +100,48 @@ The system will cater primarily to two user roles:
 ### 2.1 Core Features (Beginner-Friendly Implementation)
 
 **Essential System Features**:
-1.  **Student submission process**: Allow students to upload 3D model files (.stl, .obj, .3mf) with metadata (name, email, print_method, color, discipline, course_number) via a **Next.js form**.
-2.  **Staff approval workflow**: Enable staff to review, slice files, and approve/reject jobs via a **Next.js dashboard**.
-3.  **File lifecycle management**: Track original files through status-based directory structure with `metadata.json` for resilience.
+1.  **Student submission process**: Allows students to upload 3D model files (.stl, .obj, .3mf) with metadata (name, email, print_method, color, discipline, course_number) via a **Next.js form** with comprehensive client-side and server-side validation.
+2.  **Staff approval workflow**: Enables staff to review, slice files, and approve/reject jobs via a **Next.js dashboard** with mandatory staff attribution for all actions.
+3.  **File lifecycle management**: Tracks original files through status-based directory structure with `metadata.json` for resilience and atomic file operations.
 4.  **Job status tracking**: Clear progression through UPLOADED → PENDING → READYTOPRINT → PRINTING → COMPLETED → PAIDPICKEDUP → ARCHIVED, and REJECTED → ARCHIVED.
 5.  **Workstation Authentication & Action Attribution**: A simple, per-computer shared password system combined with mandatory per-action user attribution to provide both ease of use and full accountability.
-6.  **Email notifications**: **Asynchronously** send automated updates to students for approvals, rejections, and completions.
-7.  **Direct file opening**: Custom `3dprint://` protocol handler to open files in local slicer software.
+6.  **Email notifications**: **Asynchronously** sends automated updates to students for approvals, rejections, and completions via RQ background tasks.
+7.  **Direct file opening**: Custom `3dprint://` protocol handler to open files in local slicer software with security validation.
 8.  **Payment & pickup workflow**: Weight-based payment calculation with manual Tiger-Cash transaction recording and pickup confirmation functionality.
 9.  **Financial reporting**: Automated monthly Excel export with revenue and transaction data for administrative oversight.
 10. **Analytics dashboard**: Real-time operational insights, resource utilization metrics, and financial performance tracking.
 
 **Advanced Operational Features**:
-8.  **Enhanced operational dashboard**: Real-time auto-updating **Next.js interface** with comprehensive staff alerting:
-    *   **Auto-updating data**: Dashboard refreshes automatically every 45 seconds without manual intervention
+11. **Enhanced operational dashboard**: Real-time auto-updating **Next.js interface** with comprehensive staff alerting:
+    *   **Auto-updating data**: Dashboard refreshes automatically every 45 seconds without manual intervention using optimized API polling
     *   **Background audio notifications**: A lightweight background sound plays automatically when new jobs are submitted; no on-page toggle. Future configuration will be exposed in the admin settings.
     *   **Visual alert indicators**: Persistent "NEW" badges with pulsing animations for unreviewed jobs until staff acknowledgment
     *   **Job age tracking**: Human-readable time elapsed display ("2d 4h ago") with color-coded prioritization (green < 24h, yellow < 48h, orange < 72h, red > 72h)
     *   **Staff acknowledgment system**: "Mark as Reviewed" functionality to clear visual alerts
     *   **Debug panel**: Development interface showing current state and system health
     *   **Last updated indicator**: Timestamp showing when dashboard data was last refreshed
-9.  **Multi-computer support**: System can run on up to two staff computers, as long as both use the same shared storage and database.
-10. **Event Logging**: **Immutable event log** tracking all changes with full audit trail tied to the **attributed staff member**.
-11. **Thumbnails**: **Asynchronously** generate previews from uploaded files. If thumbnail generation fails, no thumbnail will be displayed, or a generic placeholder may be shown.
+12. **Multi-computer support**: System can run on up to two staff computers, as long as both use the same shared storage and database.
+13. **Event Logging**: **Immutable event log** tracking all changes with full audit trail tied to the **attributed staff member**.
+14. **Thumbnails**: **Asynchronously** generates previews from uploaded files. If thumbnail generation fails, no thumbnail will be displayed, or a generic placeholder may be shown.
+15. **Comprehensive File Validation**: Multi-layer file validation including header validation, security checks, size limits, and path traversal prevention.
+16. **Atomic File Operations**: Resilient file operations with staging areas, rollback capabilities, and transaction safety.
+17. **System Health Monitoring**: Real-time system health monitoring with CPU, memory, disk, and network metrics.
+18. **Error Boundaries & Recovery**: Frontend error boundaries with fallback UI and automatic retry mechanisms.
 
 ### 2.2 Technical Requirements (Beginner-Focused)
 
 #### 2.2.1 Backend (Flask API-Only)
 -   **Framework**: Flask (Python) with **API-only endpoints** - no HTML templates or server-side rendering
--   **Database**: PostgreSQL via SQLAlchemy ORM
--   **Task Queue**: RQ for background jobs (emails, thumbnail generation, and a recurring job to check for expired confirmation tokens).
--   **Email**: Flask-Mail with Office 365 SMTP
--   **Sibling File Detection**: A configurable list of slicer file extensions (e.g.,`.3mf`, `.form`, `.idea`) will be used to automatically detect when a staff member has saved a new authoritative file.
+-   **Database**: PostgreSQL via SQLAlchemy ORM with Flask-Migrate for schema management
+-   **Task Queue**: RQ for background jobs (emails, thumbnail generation, monitoring tasks, and a recurring job to check for expired confirmation tokens)
+-   **Email**: Flask-Mail with Office 365 SMTP integration
+-   **File Validation**: Comprehensive multi-layer validation including:
+    - File header validation for STL, OBJ, 3MF, and ZIP-based formats
+    - Security validation with path traversal prevention and dangerous character detection
+    - File size validation with configurable minimum (1KB) and maximum (50MB) limits
+    - Filename sanitization and reserved name detection
+-   **Sibling File Detection**: A configurable list of slicer file extensions (e.g.,`.3mf`, `.form`, `.idea`) is used to automatically detect when a staff member has saved a new authoritative file
+-   **Atomic File Operations**: Resilient file operations with staging areas, rollback capabilities, and transaction safety
 -   **File Storage**: Network-mounted folders with standardized structure:
     ```
     storage/
@@ -73,15 +164,18 @@ The system will cater primarily to two user roles:
     -   **Tailwind CSS**: Utility-first styling with custom animations and themes
     -   **shadcn/ui**: Complete UI component library based on Radix UI primitives
     -   **React Context**: Advanced state management for dashboard data and real-time updates
-    -   **Sound System**: Background-only audio using the Browser Audio API; plays on new job submissions without UI toggles. Admin configuration to be added later.
+    -   **Sound System**: Background-only audio using the Browser Audio API; plays on new job submissions without UI toggles. Admin configuration is available.
+    -   **Optimized API Layer**: Intelligent caching, request deduplication, and adaptive polling for performance
+    -   **Error Boundaries**: Component-level error isolation with fallback UI and retry mechanisms
 -   **Advanced Dashboard Features**:
-    -   **Real-time Updates**: Auto-refresh every 45 seconds with visual and audio notifications
+    -   **Real-time Updates**: Auto-refresh every 45 seconds with visual and audio notifications using optimized API polling
     -   **Sound Notifications**: Background sound plays on new job uploads (no user-facing toggle); future admin page will control enable/disable and volume.
     -   **Visual Alert System**: "NEW" badges and pulsing animations for unreviewed jobs
     -   **Job Age Tracking**: Color-coded time elapsed display with human-readable formatting
-    -   **Interactive Modals with User Attribution**: All state-changing modals (approve, reject, etc.) will require the user to select their name from a dropdown before proceeding, ensuring every action is logged with the correct user.
+    -   **Interactive Modals with User Attribution**: All state-changing modals (approve, reject, etc.) require the user to select their name from a dropdown before proceeding, ensuring every action is logged with the correct user.
     -   **Notes System**: Inline editing with auto-save and keyboard shortcuts
     -   **Debug Panel**: Development troubleshooting with state visibility
+    -   **Job Locking**: Prevents concurrent edits with visual feedback and conflict resolution
 -   **Routing Structure**:
     ```
     app/
@@ -96,10 +190,11 @@ The system will cater primarily to two user roles:
 To ensure both ease of use in a chaotic lab environment and full accountability, the system uses a hybrid authentication model. This model replaces traditional individual user sessions.
 
 - **Workstation Login**: Each physical computer terminal in the lab is treated as a "Workstation" and is assigned its own shared, long-lived password. Staff log in to the workstation once at the beginning of the day. The session is configured to last the entire workday.
-- **Persistent Workstation Display**: The UI will always prominently display the name of the logged-in workstation (e.g., "Workstation: Front Desk").
-- **Mandatory Action Attribution**: For any state-changing operation (e.g., approving a job, marking it complete, adding a note), the UI modal for that action will contain a **mandatory dropdown menu** labeled "Performing Action As:". The staff member must select their own name from the list before they can proceed.
-- **Accountability**: This ensures that while the workstation's session is shared, every critical action is explicitly attributed to a specific staff member in the event logs. The `Event` model will store both the `workstation_id` and the `triggered_by` (the staff member's name).
-- **Staff List Management**: The staff list is stored centrally in the database and exposed through a `/api/staff` endpoint. All workstations fetch this list dynamically at login (and refresh it periodically). Administrators manage the list via a lightweight "Staff Management" section in the dashboard (add / remove / deactivate), ensuring immediate consistency across every terminal.
+- **Persistent Workstation Display**: The UI always prominently displays the name of the logged-in workstation (e.g., "Workstation: Front Desk").
+- **Mandatory Action Attribution**: For any state-changing operation (e.g., approving a job, marking it complete, adding a note), the UI modal for that action contains a **mandatory dropdown menu** labeled "Performing Action As:". The staff member must select their own name from the list before they can proceed. This is implemented across all modals: approval, rejection, status changes, notes editing, and payment processing.
+- **Accountability**: This ensures that while the workstation's session is shared, every critical action is explicitly attributed to a specific staff member in the event logs. The `Event` model stores both the `workstation_id` and the `triggered_by` (the staff member's name).
+- **Staff List Management**: The staff list is stored centrally in the database and exposed through a `/api/v1/staff` endpoint. All workstations fetch this list dynamically at login (and refresh it periodically). Administrators manage the list via a lightweight "Staff Management" section in the dashboard (add / remove / deactivate), ensuring immediate consistency across every terminal.
+- **Staff Status Tracking**: Staff can be marked as active/inactive, with inactive staff not appearing in attribution dropdowns but preserving historical attribution in event logs.
 
 #### 2.2.4 Key Constraints & Principles
 - **No Individual User Logins**: Staff do not have their own passwords for the system. Authentication is handled at the workstation level.
@@ -114,19 +209,19 @@ To ensure both ease of use in a chaotic lab environment and full accountability,
 -   **Task Queue**: RQ for **asynchronous processing** (emails, thumbnails, monitoring, file operations).
 -   **API Security & Rate Limiting**:
     -   **Flask-Limiter** integration for abuse protection:
-        -   `/api/submit`: 3 submissions per IP per hour
-        -   `/api/auth/login`: 10 attempts per IP per hour (brute-force protection)
+        -   `/api/v1/submit`: 5 submissions per IP per hour
+        -   `/api/v1/auth/login`: 10 attempts per IP per hour (brute-force protection)
         -   Return `429 Too Many Requests` for exceeded limits
-    -   **File Upload Limits**: 50MB max file size, monitor total storage usage
+    -   **File Upload Limits**: 50MB max file size, 1KB minimum file size, monitor total storage usage
 -   **File handling**: Shared network storage (mounted at OS level) with standardized naming, status-based directory structure, and embedded `metadata.json`.
 -   **Direct file opening**: Custom protocol handler to open local files in slicer software.
 -   **Email**: Flask-Mail with Office 365 SMTP integration.
 -   **Database**: **PostgreSQL** with Flask-Migrate for schema management.
--   **Time Display**: All timestamps from the API will be in **UTC**. The Next.js frontend will be responsible for converting and displaying them in the user's local timezone using `date-fns` library.
+-   **Time Display**: All timestamps from the API are in **UTC**. The Next.js frontend is responsible for converting and displaying them in the user's local timezone using `date-fns` library.
 -   **Pricing Model**: Weight-only pricing ($0.10/gram filament, $0.20/gram resin) with $3.00 minimum charge.
 -   **Time Input**: Hour-based time inputs with conservative rounding (always round UP to nearest 0.5 hours).
 -   **Critical Dependencies**:
-    -   **Backend**: `Flask`, `Flask-SQLAlchemy`, `Flask-Migrate`, `Flask-CORS`, `Flask-Limiter`, `psycopg2-binary`, `python-dotenv`, `PyJWT`, `rq`, `openpyxl`, `pandas`.
+    -   **Backend**: `Flask`, `Flask-SQLAlchemy`, `Flask-Migrate`, `Flask-CORS`, `Flask-Limiter`, `psycopg2-binary`, `python-dotenv`, `PyJWT`, `rq`, `openpyxl`, `pandas`, `itsdangerous` (for secure tokens).
     -   **Frontend**: `next`, `react`, `react-dom`, `typescript`, `tailwindcss`, `@radix-ui/*`, `lucide-react`, `date-fns`, `class-variance-authority`, `clsx`, `tailwind-merge`, `recharts`.
 
 #### 2.2.5 Implemented Advanced Features
@@ -146,14 +241,21 @@ To ensure both ease of use in a chaotic lab environment and full accountability,
 **File Validation & Security**:
 - **Comprehensive File Validation**: File header validation for STL, OBJ, 3MF, and ZIP-based formats
 - **Security Validation**: Path traversal prevention, dangerous character detection, and filename sanitization
-- **File Size Validation**: Configurable minimum and maximum file size limits with clear error messages
+- **File Size Validation**: Configurable minimum (1KB) and maximum (50MB) file size limits with clear error messages
 - **Atomic File Operations**: Resilient file operations with staging areas and rollback capabilities
+- **Duplicate Detection**: File content hashing prevents duplicate active submissions
 
 **Error Boundaries & Stability**:
 - **Frontend Error Boundaries**: Reusable error boundary components with fallback UI and retry mechanisms
 - **Centralized Error Reporting**: Structured error reporting with backend integration and analytics
 - **Graceful Degradation**: Component-level error isolation preventing full page crashes
 - **Error Recovery**: Automatic retry mechanisms and user-friendly error messages
+
+**Job Management & Concurrency**:
+- **Job Locking System**: Prevents multiple staff members from editing the same job simultaneously
+- **Lock Management**: Automatic lock acquisition on modal open, extension via heartbeat, release on close
+- **Conflict Resolution**: Clear UI feedback when jobs are locked by other users
+- **Admin Override**: Administrators can force-unlock stuck locks with audit logging
 
 ### 2.3 Beginner-Friendly Architecture Principles
 This project will adhere to simplicity and clarity while building a robust foundation:
@@ -187,23 +289,27 @@ This project will adhere to simplicity and clarity while building a robust found
 -   **Progressive Disclosure**: Print method descriptions should be clearly visible to guide material choice
 -   **Input Validation**: Real-time client-side validation with visual feedback to prevent submission errors
 -   **Educational Content**: Comprehensive introduction text with liability disclaimers and scaling guidance
--   **File Validation**: Immediate feedback on file selection with size and type checking
+-   **File Validation**: Immediate feedback on file selection with size and type checking (50MB max, .stl/.obj/.3mf only)
 -   **Accessibility**: Visual error states with red borders, clear error messages, and error scrolling for form submission
+-   **Duplicate Prevention**: System detects and prevents duplicate active submissions with clear error messaging
 
 **Basic Staff Dashboard Experience**:
 -   **Clean Interface**: Simple, professional dashboard showing job cards with essential information
--   **Basic Actions**: Approve/reject modals with form validation and cost calculation
--   **Job Management**: Status updates with clear visual feedback
--   **Workstation Authentication**: Seamless login experience for each computer terminal.
+-   **Basic Actions**: Approve/reject modals with form validation, cost calculation, and mandatory staff attribution
+-   **Job Management**: Status updates with clear visual feedback and job locking for concurrency control
+-   **Workstation Authentication**: Seamless login experience for each computer terminal
+-   **Staff Attribution**: All state-changing actions require staff member selection from dropdown
 
 #### 2.4.2 Advanced UX Features
 **Enhanced Operational Dashboard UX**:
-    *   **Real-time Updates**: Dashboard data refreshes automatically every 45 seconds without user intervention
+    *   **Real-time Updates**: Dashboard data refreshes automatically every 45 seconds without user intervention using optimized API polling
     *   **Audio Feedback**: A background sound plays when new jobs are uploaded (no on-page toggle). Future admin settings will allow configuring this behavior.
     *   **Visual Alert System**: Unreviewed jobs display prominent "NEW" badges with pulsing highlight borders until acknowledged
     *   **Temporal Awareness**: Job age display with human-readable format ("2d 4h ago") and color-coded prioritization
     *   **Staff Acknowledgment**: Clear "Mark as Reviewed" functionality to manage alert states
     *   **Last Updated Indicator**: Timestamp showing when dashboard data was last refreshed
+    *   **Job Locking**: Visual feedback when jobs are locked by other users with conflict resolution
+    *   **Error Recovery**: Automatic retry mechanisms and graceful degradation for failed operations
 
 #### 2.4.3 Universal Design Standards
 **Mobile and Accessibility Considerations**: 
@@ -244,7 +350,89 @@ This project will adhere to simplicity and clarity while building a robust found
 - **States**: Loading skeletons, empty-data placeholders, error with retry; last-refreshed timestamp.
 
 
-#### 2.4.1 Required Submission Form Introduction Text
+#### 2.4.6 Job Cards & Notes System
+**Job Card Interface**:
+- **Card Layout**: Grid-based layout with responsive design (1-3 columns based on screen size)
+- **Essential Information Display**: Student name, display name, submission time, email, printer, color, and discipline
+- **Status Indicators**: Visual status badges and color-coded age indicators
+- **Expandable Details**: Collapsible sections for additional job information and notes
+- **Action Buttons**: Context-sensitive action buttons (approve, reject, status changes, delete) with confirmation dialogs
+- **Lock Status**: Visual indication when jobs are locked by other users with conflict resolution
+- **File Operations**: "Open File" button with protocol handler integration and file path copying
+
+**Notes System Features**:
+- **Inline Editing**: Click-to-edit interface for adding and modifying job notes
+- **Staff Attribution**: Mandatory staff member selection for all note operations
+- **Character Limits**: 1000 characters per note entry, 5000 characters total notes limit
+- **Append-Only Model**: New notes are appended to existing notes with timestamp preservation
+- **Visual Feedback**: Real-time character count, save status indicators, and error messages
+- **Keyboard Navigation**: Full keyboard accessibility with Enter/Space activation
+- **Auto-Focus**: Automatic focus on textarea when entering edit mode
+- **Validation**: Client-side validation for empty notes and character limits
+- **Error Handling**: Clear error messages for validation failures and network errors
+
+**Notes Workflow**:
+1. **Adding Notes**: Click "Add note" or existing notes to enter edit mode
+2. **Staff Selection**: Mandatory dropdown selection of staff member name
+3. **Note Entry**: Type note in textarea with real-time character count
+4. **Validation**: System validates note length and staff selection
+5. **Saving**: Explicit save button with loading state and success feedback
+6. **Display**: Notes displayed as bulleted list with newest notes first
+
+**Evidence Sources**:
+- **Job Card Implementation**: `frontend/src/components/dashboard/job-card.tsx`
+- **Notes API**: `backend/app/routes/jobs_staff.py` (PATCH `/notes` endpoint)
+- **Notes Validation**: 1000 character per entry limit, 5000 character total limit
+- **Staff Attribution**: Mandatory staff_name field in all note operations
+
+#### 2.4.7 Search, Sorting & Global Controls
+**Search Functionality**:
+- **Real-time Search**: Debounced search input with 400ms delay for performance
+- **Search Scope**: Searches student name and email addresses (case-insensitive)
+- **Search Match Counts**: Shows count of matching jobs per status tab
+- **Search Persistence**: Search terms persist across status tab changes
+- **API Integration**: Server-side search filtering via `/api/v1/jobs?search=term`
+- **Search Counts API**: `/api/v1/jobs/counts?search=term` for match counts by status
+
+**Sorting System**:
+- **Default Sorting**: Jobs sorted by creation date (newest first) by default
+- **Sortable Fields**: Creation date, student name, printer, and other job attributes
+- **Sort Direction**: Toggle between ascending and descending order
+- **Client-side Sorting**: Sorting performed in frontend for responsive UI
+- **Stable Sorting**: Multiple tie-breakers ensure consistent sort order
+- **Sort State Management**: Sort preferences maintained in component state
+
+**Global Expand/Collapse Controls**:
+- **Global Toggle Button**: "Expand All" / "Collapse All" button in job list header
+- **Signal-based System**: Uses incrementing signal counters to trigger global actions
+- **Individual Card Response**: Each job card responds to expand/collapse signals
+- **Visual Feedback**: Button text and icon change based on current state
+- **State Tracking**: Tracks expand vs collapse signal counts to determine button state
+- **Smooth Animations**: CSS transitions for expand/collapse animations
+
+**Filtering System**:
+- **Status Filtering**: Filter by job status (UPLOADED, PENDING, etc.)
+- **Printer Filtering**: Filter by specific printer type
+- **Discipline Filtering**: Filter by academic discipline
+- **Combined Filters**: Multiple filters can be applied simultaneously
+- **URL Integration**: Filter state reflected in URL parameters
+- **Filter Persistence**: Filters maintained across page refreshes
+
+**Performance Optimizations**:
+- **Debounced Search**: 400ms delay prevents excessive API calls
+- **Memoized Sorting**: Sorted job list cached to prevent unnecessary re-computation
+- **Optimized API**: Request deduplication and caching via optimized API layer
+- **Lazy Loading**: Job cards load progressively as needed
+- **Error Boundaries**: Component-level error isolation for stability
+
+**Evidence Sources**:
+- **Search Implementation**: `frontend/src/app/dashboard/page.tsx` (debounced search, match counts)
+- **Sorting Logic**: `frontend/src/components/dashboard/job-list.tsx` (memoized sorting, stable sort)
+- **Global Controls**: `frontend/src/components/dashboard/job-list.tsx` (expand/collapse signals)
+- **API Integration**: `backend/app/services/infrastructure/job_query_service.py` (search filtering)
+- **Filter Management**: `frontend/src/types/index.ts` (JobListFilters interface)
+
+#### 2.4.8 Required Submission Form Introduction Text
 
 A mandatory warning and liability disclaimer must be displayed at the top of the student submission form. The full, unaltered text for this warning is specified in the "Student Submission UI/UX" description under **Section 3.4.2**.
 
@@ -436,19 +624,20 @@ class Job(db.Model):
    class_number = db.Column(db.String(50))
    
    # File Management
-   original_filename = db.Column(db.String(256))
-   display_name = db.Column(db.String(256))      # Standardized name for dashboard
-   file_path = db.Column(db.String(512))         # Path to authoritative file
-   metadata_path = db.Column(db.String(512))     # Path to metadata.json
+   original_filename = db.Column(db.String(256), nullable=False)
+   display_name = db.Column(db.String(256), nullable=False)
+   file_path = db.Column(db.String(512), nullable=False)
+   metadata_path = db.Column(db.String(512), nullable=False)
+   file_hash = db.Column(db.String(64), nullable=True)
    
    # Job Configuration
-   status = db.Column(db.String(50))             # UPLOADED, PENDING, etc.
-   printer = db.Column(db.String(64))
-   color = db.Column(db.String(32))
-   material = db.Column(db.String(32))
-   weight_g = db.Column(db.Float)
-   time_hours = db.Column(db.Float)
-   cost_usd = db.Column(db.Numeric(6, 2))
+   status = db.Column(db.String(50), default='UPLOADED')
+   printer = db.Column(db.String(64), nullable=False)
+   color = db.Column(db.String(32), nullable=False)
+   material = db.Column(db.String(32), nullable=False)
+   weight_g = db.Column(db.Float, nullable=True)
+   time_hours = db.Column(db.Float, nullable=True)
+   cost_usd = db.Column(db.Numeric(6, 2), nullable=True)
    
    # Student Confirmation
    acknowledged_minimum_charge = db.Column(db.Boolean, default=False)
@@ -456,7 +645,7 @@ class Job(db.Model):
    student_confirmed_at = db.Column(db.DateTime, nullable=True)
    confirm_token = db.Column(db.String(128), nullable=True, unique=True)
    confirm_token_expires = db.Column(db.DateTime, nullable=True)
-   is_confirmation_expired = db.Column(db.Boolean, default=False, nullable=False)
+   is_confirmation_expired = db.Column(db.Boolean, default=False)
    confirmation_last_sent_at = db.Column(db.DateTime, nullable=True)
    
    # Staff Management
@@ -464,13 +653,17 @@ class Job(db.Model):
    staff_viewed_at = db.Column(db.DateTime, nullable=True)    # For visual alerts
    last_updated_by = db.Column(db.String(100), nullable=True) # Staff member name from attribution dropdown
    notes = db.Column(db.Text, nullable=True)                  # Staff notes
+
+   # Locking fields
+   locked_by = db.Column(db.String(100), nullable=True)
+   locked_until = db.Column(db.DateTime, nullable=True)
    
    # Timestamps
    created_at = db.Column(db.DateTime, default=datetime.utcnow)
    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
    
    # Relationships
-   events = db.relationship('Event', backref='job', lazy=True)
+   payment = db.relationship('Payment', backref='job', uselist=False, cascade='all, delete-orphan')
 ```
 
 **Status Name Standardization**
@@ -495,13 +688,12 @@ This clear distinction helps maintain consistency while optimizing for each cont
 ```python
 class Event(db.Model):
    id = db.Column(db.Integer, primary_key=True)
-   job_id = db.Column(db.String, db.ForeignKey('job.id'), nullable=False)
+   job_id = db.Column(db.String, nullable=True)  # Removed foreign key constraint for system events
    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-   event_type = db.Column(db.String(50))         # 'JobCreated', 'StaffApproved', etc.
-   details = db.Column(db.JSON, nullable=True)   # Contextual information
-   triggered_by = db.Column(db.String(100))      # Staff member's name from attribution dropdown
-   user_name = db.Column(db.String(100))         # (DEPRECATED - Use triggered_by)
-   workstation_id = db.Column(db.String(100))    # Identifier for the physical computer
+   event_type = db.Column(db.String(50), nullable=False)
+   details = db.Column(db.JSON, nullable=True)
+   triggered_by = db.Column(db.String(100), nullable=False)
+   workstation_id = db.Column(db.String(100), nullable=False)
 ```
 
 **Payment Model** - Financial transaction tracking for completed jobs:
@@ -514,9 +706,15 @@ class Payment(db.Model):
     picked_up_by = db.Column(db.String(100), nullable=False)  # Person who collected
     paid_ts = db.Column(db.DateTime, default=datetime.utcnow)
     paid_by_staff = db.Column(db.String(100), nullable=False) # Staff member who processed
-    
-    # Relationships
-    job = db.relationship('Job', backref='payment', uselist=False)
+```
+
+**Staff Model** - Represents staff members for attribution and tracking:
+```python
+class Staff(db.Model):
+    name = db.Column(db.String(100), primary_key=True)
+    is_active = db.Column(db.Boolean, default=True)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    deactivated_at = db.Column(db.DateTime, nullable=True)
 ```
 
 #### 3.2.2 Key Design Decisions
@@ -540,20 +738,20 @@ The system's authentication is designed for a high-turnover, shared-terminal env
 - **API Requirement**: The API endpoints for these actions require a `staff_name` field in the request body. The backend validates that the name is on the official staff list.
 
 #### 3.3.1.1 Staff Turnover Management
-To effectively manage staff turnover while maintaining system integrity, the following process will be implemented:
+To effectively manage staff turnover while maintaining system integrity, the following process is implemented:
 
 **Staff Onboarding Process:**
 1. **Staff List Management**: The system includes an admin-accessible UI in the dashboard for managing the staff list, which is stored in the database.
-2. **Adding New Staff**: An administrator will add new staff members through this interface, providing their name as it should appear in attribution dropdowns.
-3. **Training Documentation**: New staff will be provided with documentation on the attribution model and how to select their name for actions.
+2. **Adding New Staff**: An administrator adds new staff members through this interface, providing their name as it should appear in attribution dropdowns.
+3. **Training Documentation**: New staff are provided with documentation on the attribution model and how to select their name for actions.
 4. **No Individual Login Required**: Since authentication is workstation-based, new staff only need to be added to the staff list without creating credentials.
-5. **First Action Guidance**: The UI will highlight newly added staff names in the dropdown for a configurable period (e.g., 7 days) to help staff identify their name.
+5. **First Action Guidance**: The UI highlights newly added staff names in the dropdown for a configurable period (e.g., 7 days) to help staff identify their name.
 
 **Staff Offboarding Process:**
-1. **Deactivation vs. Deletion**: When staff leave, administrators will mark them as "inactive" rather than deleting them completely, preserving historical attribution.
+1. **Deactivation vs. Deletion**: When staff leave, administrators mark them as "inactive" rather than deleting them completely, preserving historical attribution.
 2. **Audit Trail Preservation**: Past actions attributed to departed staff remain unchanged in the event log for accountability and historical reference.
-3. **Dropdown Visibility**: Inactive staff names will no longer appear in attribution dropdowns for new actions.
-4. **Visual Indication**: In historical event logs, names of inactive staff will be visually distinguished (e.g., greyed out or with an "(inactive)" label).
+3. **Dropdown Visibility**: Inactive staff names no longer appear in attribution dropdowns for new actions.
+4. **Visual Indication**: In historical event logs, names of inactive staff are visually distinguished (e.g., greyed out or with an "(inactive)" label).
 5. **Reporting Access**: Reports can still filter by all staff names, including inactive ones, for complete historical accountability.
 
 **Implementation Status:**
@@ -1625,49 +1823,3 @@ All endpoints will be prefixed with `/api/v1`. All responses will be in JSON for
 - **Rejection Flow**: UPLOADED → REJECTED → ARCHIVED
 - **Revert Actions**: COMPLETED → PRINTING, PAIDPICKEDUP → COMPLETED
 - **Admin Override**: Any status can be changed via admin endpoints
-
-## 8. Revision Log
-
-### 2025-8-27 — Project Overview — Updated to reflect implemented status — Surgical
-- Changed "will build" to "builds" to reflect operational system
-- Updated "aims to replace" to "replaces" for current implementation
-
-### 2025-8-27 — Core Features — Added implemented advanced features section — Inserted
-- Added Section 2.2.5 with comprehensive list of implemented advanced features
-- Updated API communication section to reflect current status
-- Added monitoring, caching, validation, and error handling features
-
-### 2025-8-27 — System Architecture — Updated service architecture to reflect decomposition — Surgical
-- Updated project structure to show current service decomposition
-- Added Section 3.1.1 describing orchestration layer and business logic services
-- Updated services directory structure to reflect actual implementation
-
-### 2025-8-27 — Authentication Architecture — Updated implementation status — Surgical
-- Changed "will require" to "require" for API requirements
-- Updated "Implementation Requirements" to "Implementation Status"
-- Reflected current operational state of authentication system
-
-### 2025-8-27 — Job Lifecycle — Added implemented workflow enhancements — Inserted
-- Added Section 3.4.3 with comprehensive workflow enhancements
-- Updated system actions to reflect current implementation
-- Added concurrency control, file security, error handling, and performance optimization
-
-### 2025-8-27 — Technical Deep Dive — Updated protocol handler status — Surgical
-- Changed "will be registered" to "is registered" for protocol handler
-- Reflected current operational state of file opening system
-
-### 2025-8-27 — Operational Considerations — Added implemented deployment features — Inserted
-- Added Section 5.3.1 with comprehensive deployment features
-- Updated Docker compose file references to reflect separate dev/prod files
-- Added health monitoring, security hardening, and deployment optimization
-
-### 2025-8-27 — System Health — Updated implementation status — Surgical
-- Changed "will implement" to "uses" for job locking system
-- Updated "will provide" to "provides" for revert capabilities
-- Changed "will implement" to "implements" for duplicate detection
-- Reflected current operational state of advanced features
-
-### 2025-8-27 — Final Sections — Added status mapping and revision log — Inserted
-- Added comprehensive status mapping table for internal/directory/UI consistency
-- Added detailed revision log tracking all changes made during synchronization
-- Completed systematic alignment of masterplan with current codebase reality
