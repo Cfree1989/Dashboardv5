@@ -7,32 +7,9 @@ import { handleApiError } from '../../lib/error-handling';
 import { optimizedApi } from '../../lib/optimized-api';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
-import { createErrorState, updateErrorState, clearErrorState, ErrorState } from '../../lib/error-handling';
+import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { ErrorCard } from '../ui/error-display';
-
-export interface JobListFilters {
-  status?: string;
-  search?: string;
-  printer?: string;
-  discipline?: string;
-}
-
-// Consolidated state interface
-interface JobListState {
-  data: {
-    jobs: any[];
-    hasLoaded: boolean;
-  };
-  loading: {
-    loading: boolean;
-    isFetching: boolean;
-  };
-  error: ErrorState;
-  sorting: {
-    sortBy: string;
-    sortDir: 'asc' | 'desc';
-  };
-}
+import { JobListFilters, JobListState, Job } from '../../types';
 
 export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
   filters?: JobListFilters, 
@@ -74,8 +51,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
     const copy = [...state.data.jobs];
     copy.sort((a, b) => {
-      let aVal = a[state.sorting.sortBy];
-      let bVal = b[state.sorting.sortBy];
+      let aVal: any = (a as any)[state.sorting.sortBy];
+      let bVal: any = (b as any)[state.sorting.sortBy];
       
       // Handle null/undefined values
       if (aVal == null) aVal = '';
@@ -96,8 +73,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       
       // Tie-breakers for stable sorting
       if (a.created_at !== b.created_at) {
-        const aTime = new Date(a.created_at).getTime();
-        const bTime = new Date(b.created_at).getTime();
+        const aTime = new Date(a.created_at || '').getTime();
+        const bTime = new Date(b.created_at || '').getTime();
         return aTime - bTime;
       }
       if (a.student_name !== b.student_name) {
@@ -106,7 +83,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (a.printer !== b.printer) {
         return (a.printer || '').localeCompare(b.printer || '');
       }
-      return (a.id || 0) - (b.id || 0);
+      return (a.id || '').localeCompare(b.id || '');
     });
     return copy;
   }, [state.data.jobs, state.sorting.sortBy, state.sorting.sortDir]);

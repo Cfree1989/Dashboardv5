@@ -2,8 +2,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useToast } from "../../ui/toast";
 import { apiRequest } from "../../../lib/auth";
-
-type Staff = { name: string; is_active: boolean };
+import { Staff } from '../../../types';
 
 type JobDetails = {
   material: string;

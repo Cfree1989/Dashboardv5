@@ -10,56 +10,7 @@ import { optimizedApi } from '../../lib/optimized-api';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
-
-// Consolidated state types
-interface DashboardState {
-  // Authentication and loading
-  auth: {
-    loading: boolean;
-    error: string;
-  };
-  // Search state
-  search: {
-    value: string;
-    debounced: string;
-    matchCounts: Record<string, number>;
-  };
-  // Refresh state
-  refresh: {
-    tick: number;
-    isRefreshing: boolean;
-    pauseRefresh: boolean;
-    lastUpdated: string;
-  };
-  // Job operations
-  jobOps: {
-    isJobOperation: boolean;
-    expandSignal: number;
-    collapseSignal: number;
-  };
-  // Data state
-  data: {
-    status: string;
-    counts: Record<string, number>;
-  };
-}
-
-// Action types for useReducer
-type DashboardAction =
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string }
-  | { type: 'SET_SEARCH_VALUE'; payload: string }
-  | { type: 'SET_DEBOUNCED_SEARCH'; payload: string }
-  | { type: 'SET_MATCH_COUNTS'; payload: Record<string, number> }
-  | { type: 'INCREMENT_REFRESH_TICK' }
-  | { type: 'SET_REFRESHING'; payload: boolean }
-  | { type: 'SET_PAUSE_REFRESH'; payload: boolean }
-  | { type: 'SET_LAST_UPDATED'; payload: string }
-  | { type: 'SET_JOB_OPERATION'; payload: boolean }
-  | { type: 'INCREMENT_EXPAND_SIGNAL' }
-  | { type: 'INCREMENT_COLLAPSE_SIGNAL' }
-  | { type: 'SET_STATUS'; payload: string }
-  | { type: 'SET_COUNTS'; payload: Record<string, number> };
+import { DashboardState, DashboardAction, JobStatus } from '../../types';
 
 // Initial state
 const initialState: DashboardState = {
@@ -84,7 +35,7 @@ const initialState: DashboardState = {
     collapseSignal: 0,
   },
   data: {
-    status: 'UPLOADED',
+    status: JobStatus.UPLOADED,
     counts: {},
   },
 };
@@ -176,7 +127,7 @@ export default function DashboardPage() {
     ...initialState,
     data: {
       ...initialState.data,
-      status: searchParams.get('status') || 'UPLOADED',
+      status: searchParams.get('status') || JobStatus.UPLOADED,
     }
   });
   
@@ -238,9 +189,9 @@ export default function DashboardPage() {
       dispatch({ type: 'SET_COUNTS', payload: data });
       
       // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
-      const currentUploaded = data.UPLOADED || 0;
-      const previousUploaded = previousCountsRef.current.UPLOADED || 0;
-      if (currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation && !isFirstLoadRef.current) {
+          const currentUploaded = data[JobStatus.UPLOADED] || 0;
+    const previousUploaded = previousCountsRef.current[JobStatus.UPLOADED] || 0;
+    if (currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation && !isFirstLoadRef.current) {
         playNewUploadSound();
       }
       

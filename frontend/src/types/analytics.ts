@@ -1,14 +1,10 @@
-export type DateCount = { date: string; count: number };
+// Import shared types from the main types file
+import { DateCount, DateRange } from './index';
 
 export type StaffActivity = {
   name: string;
   action_count: number;
   is_active: boolean;
-};
-
-export type DateRange = {
-  start: string;
-  end: string;
 };
 
 export type OverviewData = {

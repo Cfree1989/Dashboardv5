@@ -12,53 +12,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/
 import { apiRequest, getLegacyToken } from '../../lib/auth';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { InlineError } from '../ui/error-display';
-
-interface Job {
-  id: string;
-  short_id?: string;
-  display_name?: string;
-  student_name?: string;
-  student_email?: string;
-  original_filename?: string;
-  printer?: string;
-  color?: string;
-  material?: string;
-  weight_g?: number;
-  time_hours?: number;
-  cost_usd?: number;
-  created_at?: string;
-  notes?: string;
-  staff_viewed_at?: string;
-  file_path?: string;
-  discipline?: string;
-  class_number?: string;
-  payment?: {
-    job_id: string;
-    grams: number;
-    price_cents: number;
-    price_usd: number;
-    txn_no: string;
-    picked_up_by: string;
-    paid_ts: string;
-    paid_by_staff: string;
-  };
-  locked_by?: string;
-  locked_until?: string;
-}
-
-interface JobCardProps {
-  job: Job;
-  currentStatus?: string;
-  onApprove?: (jobId: string) => void;
-  onReject?: (jobId: string) => void;
-  onMarkReviewed?: (jobId: string, updatedJob?: Job) => void;
-  onStatusAction?: (jobId: string, action: "mark-printing" | "mark-complete" | "mark-picked-up") => void;
-  onUpdate?: (jobId: string, updates: any) => Promise<void>;
-  onDelete?: (jobId: string) => Promise<void>;
-  onModalOpenChange?: (open: boolean) => void; // pause auto-refresh while editing notes
-  expandSignal?: number;
-  collapseSignal?: number;
-}
+import { Job, JobCardProps, JobStatus, JobStatusAction, StatusChangeModalConfig, ReviewModalState } from '../../types';
 
 /**
  * Convert database file paths to Windows paths for SlicerOpener
@@ -88,7 +42,7 @@ function convertToWindowsPath(filePath: string): string {
   return `C:\\Dashboardv5\\storage\\${filePath}`.replace(/\//g, '\\');
 }
 
-export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
+export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
   const isLocked = typeof job.locked_by === 'string' && job.locked_until !== undefined && new Date(job.locked_until) > new Date();
   
   const [showMore, setShowMore] = useState(false);
@@ -215,7 +169,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
   // Staff data is already loaded on component mount, no need for separate resend modal loading
   
-  const isUnreviewed = currentStatus === 'UPLOADED' && !job.staff_viewed_at;
+  const isUnreviewed = currentStatus === JobStatus.UPLOADED && !job.staff_viewed_at;
 
   // Calculate job age and determine color
   const getAgeColor = (createdAt: string) => {
@@ -387,7 +341,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
         🔒 Locked by {job.locked_by}
       </div>
     )}
-		{currentStatus === 'UPLOADED' && isUnreviewed && (
+		        {currentStatus === JobStatus.UPLOADED && isUnreviewed && (
           <div className="flex items-center justify-between mb-3">
 				<span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
             <Tooltip>
@@ -635,9 +589,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   {typeof job.weight_g === 'number' && (
                     <div className="text-gray-700">
                       <span className="text-gray-500">
-                        {currentStatus === 'PAIDPICKEDUP' && job.payment ? 'Final Weight:' : 'Weight:'}
+                        {currentStatus === JobStatus.PAIDPICKEDUP && job.payment ? 'Final Weight:' : 'Weight:'}
                       </span> 
-                      {currentStatus === 'PAIDPICKEDUP' && job.payment ? job.payment.grams : job.weight_g} g
+                      {currentStatus === JobStatus.PAIDPICKEDUP && job.payment ? job.payment.grams : job.weight_g} g
                     </div>
                   )}
                   {typeof job.time_hours === 'number' && (
@@ -646,9 +600,9 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                   {typeof job.cost_usd === 'number' && (
                     <div className="text-gray-700">
                       <span className="text-gray-500">
-                        {currentStatus === 'PAIDPICKEDUP' && job.payment ? 'Final Cost:' : 'Estimated Cost:'}
+                        {currentStatus === JobStatus.PAIDPICKEDUP && job.payment ? 'Final Cost:' : 'Estimated Cost:'}
                       </span> 
-                      ${currentStatus === 'PAIDPICKEDUP' && job.payment ? job.payment.price_usd.toFixed(2) : job.cost_usd.toFixed(2)}
+                      ${currentStatus === JobStatus.PAIDPICKEDUP && job.payment ? job.payment.price_usd.toFixed(2) : job.cost_usd.toFixed(2)}
                     </div>
                   )}
                 </div>
@@ -659,7 +613,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
 
                  <div className="flex flex-wrap items-center mt-4 gap-2">
            <div className="flex flex-wrap gap-2">
-             {currentStatus === "UPLOADED" && (
+             {currentStatus === JobStatus.UPLOADED && (
                <>
  				{!!job.staff_viewed_at && (
                  <Tooltip>
@@ -753,7 +707,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                <span className="hidden sm:inline">Open File</span>
              </button>
 
-             {currentStatus === "PRINTING" && (
+             {currentStatus === JobStatus.PRINTING && (
                                 <button
                    onClick={() => {
                      setShowStatusChangeModal({
@@ -769,7 +723,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                  <span className="hidden sm:inline">Mark Complete</span>
                </button>
              )}
-             {currentStatus === "COMPLETED" && (
+             {currentStatus === JobStatus.COMPLETED && (
                                            <button
                  onClick={() => {
                    setShowPaymentModal(true);
@@ -780,7 +734,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
                  <span className="hidden sm:inline">Record Payment</span>
                </button>
              )}
-              {(["UPLOADED","PENDING","READYTOPRINT","PRINTING","COMPLETED"].includes(currentStatus)) && (
+              {([JobStatus.UPLOADED, JobStatus.PENDING, JobStatus.READYTOPRINT, JobStatus.PRINTING, JobStatus.COMPLETED].includes(currentStatus as JobStatus)) && (
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isDeleting}
@@ -1017,7 +971,7 @@ export default function JobCard({ job, currentStatus = "UPLOADED", onApprove, on
        {showStatusChangeModal && (
          <StatusChangeModal
            jobId={job.id}
-           action={showStatusChangeModal.action as "mark-printing" | "mark-complete" | "mark-picked-up"}
+           action={showStatusChangeModal.action as JobStatusAction}
            title={showStatusChangeModal.title}
            description={showStatusChangeModal.description}
            confirmVerb={showStatusChangeModal.confirmVerb}

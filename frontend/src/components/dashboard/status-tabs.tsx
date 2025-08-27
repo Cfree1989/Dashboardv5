@@ -1,5 +1,7 @@
 "use client"
 
+import { JobStatus } from '../../types';
+
 interface StatusTabsProps {
   currentStatus: string
   onStatusChange: (status: string) => void
@@ -9,20 +11,20 @@ interface StatusTabsProps {
 }
 
 interface TabConfig {
-  key: string
+  key: JobStatus
   title: string
 }
 
 export function StatusTabs({ currentStatus, onStatusChange, stats, matchCounts, searchActive }: StatusTabsProps) {
   const tabs: TabConfig[] = [
-    { key: "UPLOADED", title: "Uploaded" },
-    { key: "PENDING", title: "Pending" },
-    { key: "READYTOPRINT", title: "Ready to Print" },
-    { key: "PRINTING", title: "Printing" },
-    { key: "COMPLETED", title: "Completed" },
-    { key: "PAIDPICKEDUP", title: "Paid & Picked Up" },
-    { key: "REJECTED", title: "Rejected" },
-    { key: "ARCHIVED", title: "Archived" },
+    { key: JobStatus.UPLOADED, title: "Uploaded" },
+    { key: JobStatus.PENDING, title: "Pending" },
+    { key: JobStatus.READYTOPRINT, title: "Ready to Print" },
+    { key: JobStatus.PRINTING, title: "Printing" },
+    { key: JobStatus.COMPLETED, title: "Completed" },
+    { key: JobStatus.PAIDPICKEDUP, title: "Paid & Picked Up" },
+    { key: JobStatus.REJECTED, title: "Rejected" },
+    { key: JobStatus.ARCHIVED, title: "Archived" },
   ]
 
   return (

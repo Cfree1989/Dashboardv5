@@ -2,18 +2,20 @@ import React from 'react';
 import type { OverviewData } from '../../types/analytics';
 import { BarChart3, Clock, Inbox, AlertTriangle } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
+import { JobStatus } from '../../types';
 
 type Props = { data: OverviewData };
 
 // Define the workflow order for status display
-const STATUS_ORDER = ['UPLOADED', 'PENDING', 'READYTOPRINT', 'PRINTING', 'COMPLETED', 'PAIDPICKEDUP', 'REJECTED', 'ARCHIVED'];
+
+const STATUS_ORDER = Object.values(JobStatus);
 
 export function OverviewCards({ data }: Props) {
   // Sort status entries by workflow order
   const sortedStatusEntries = Object.entries(data.byStatus || {})
     .sort(([a], [b]) => {
-      const aIndex = STATUS_ORDER.indexOf(a);
-      const bIndex = STATUS_ORDER.indexOf(b);
+      const aIndex = STATUS_ORDER.indexOf(a as JobStatus);
+      const bIndex = STATUS_ORDER.indexOf(b as JobStatus);
       return aIndex - bIndex;
     });
 

@@ -199,7 +199,7 @@ class ErrorReportingService {
           'global',
           'resource_error',
           {
-            target: event.target?.tagName,
+            target: (event.target as any)?.tagName,
             src: (event.target as any)?.src
           }
         );

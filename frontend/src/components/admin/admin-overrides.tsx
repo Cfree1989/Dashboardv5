@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { AlertTriangle, Unlock, CheckCircle, RotateCcw, XCircle } from "lucide-react";
 import { useToast } from "../ui/toast";
 import { apiRequest } from "../../lib/auth";
+import { JobStatus } from '../../types';
 
 export function AdminOverridesPanel() {
   const [jobId, setJobId] = useState("");
@@ -23,7 +24,7 @@ export function AdminOverridesPanel() {
     { value: "mark_failed", label: "Mark Failed", icon: XCircle, description: "Mark job as failed with reason" },
   ];
 
-  const statusOptions = ["UPLOADED", "PENDING", "READYTOPRINT", "PRINTING", "COMPLETED", "PAIDPICKEDUP", "REJECTED"];
+  const statusOptions = Object.values(JobStatus);
 
   const onSubmit = () => {
     setErrorMsg("");
