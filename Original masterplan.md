@@ -7,7 +7,7 @@ This project will build a Flask-based 3D print job management system **from scra
 
 > **Note:** The system is designed for a multi-user environment and is deployed using Docker. The core services (API, database, background workers) run as containers on a single host machine. Staff can access the system from up to two lab computers via a web browser. Both computers must have access to the same shared network storage for file management, and the `SlicerOpener` protocol handler must be installed locally on each.
 
-The project replaces potentially ad-hoc or manual 3D print request systems with a **centralized, API-driven, and workflow-oriented platform.** It uses a **Flask API-only backend** with a **Next.js frontend**, following a clear separation of concerns where the backend handles all business logic and the frontend consumes REST APIs. It prioritizes clarity, efficiency, accurate file tracking, and a **strong, non-fragile foundation**, especially addressing the complexities of file changes introduced by slicer software and ensuring resilience.
+The project aims to replace potentially ad-hoc or manual 3D print request systems with a **centralized, API-driven, and workflow-oriented platform.** It uses a **Flask API-only backend** with a **Next.js frontend**, following a clear separation of concerns where the backend handles all business logic and the frontend consumes REST APIs. It prioritizes clarity, efficiency, accurate file tracking, and a **strong, non-fragile foundation**, especially addressing the complexities of file changes introduced by slicer software and ensuring resilience.
 
 ## 1.1 User Roles & Personas
 The system will cater primarily to two user roles:
@@ -108,10 +108,10 @@ To ensure both ease of use in a chaotic lab environment and full accountability,
 - **CORS Configuration**: Enabled for Next.js development server integration
 
 -   **API Communication**:
-    -   Cross-Origin Resource Sharing (CORS) is enabled on the Flask API to allow requests from the Next.js frontend.
-    -   The API is stateless and RESTful.
+    -   Cross-Origin Resource Sharing (CORS) will be enabled on the Flask API to allow requests from the Next.js frontend.
+    -   The API will be stateless and RESTful.
     -   Native **fetch API** for HTTP requests with error handling and retry logic.
--   **Task Queue**: RQ for **asynchronous processing** (emails, thumbnails, monitoring, file operations).
+-   **Task Queue**: RQ for **asynchronous processing** (emails, thumbnails).
 -   **API Security & Rate Limiting**:
     -   **Flask-Limiter** integration for abuse protection:
         -   `/api/submit`: 3 submissions per IP per hour
@@ -128,32 +128,6 @@ To ensure both ease of use in a chaotic lab environment and full accountability,
 -   **Critical Dependencies**:
     -   **Backend**: `Flask`, `Flask-SQLAlchemy`, `Flask-Migrate`, `Flask-CORS`, `Flask-Limiter`, `psycopg2-binary`, `python-dotenv`, `PyJWT`, `rq`, `openpyxl`, `pandas`.
     -   **Frontend**: `next`, `react`, `react-dom`, `typescript`, `tailwindcss`, `@radix-ui/*`, `lucide-react`, `date-fns`, `class-variance-authority`, `clsx`, `tailwind-merge`, `recharts`.
-
-#### 2.2.5 Implemented Advanced Features
-**System Monitoring & Health**:
-- **Comprehensive Monitoring Service**: Real-time system health monitoring with CPU, memory, disk, and network metrics
-- **Performance Monitoring**: Request timing, error rates, and slow endpoint detection with automatic alerts
-- **Structured Logging**: JSON-structured logging for production with automatic log rotation
-- **Health Check Endpoints**: Granular health checks for database, Redis, storage, and system resources
-- **Cross-platform Monitoring Scripts**: Linux/Mac and Windows monitoring scripts for production deployment
-
-**API Optimization & Caching**:
-- **Intelligent Caching**: Request deduplication, adaptive TTL, and performance statistics tracking
-- **Optimized API Patterns**: Adaptive polling, request batching, and activity-based optimization
-- **Error Handling**: Standardized error response formats across all API endpoints
-- **Performance Analytics**: Request timing, cache hit rates, and performance metrics
-
-**File Validation & Security**:
-- **Comprehensive File Validation**: File header validation for STL, OBJ, 3MF, and ZIP-based formats
-- **Security Validation**: Path traversal prevention, dangerous character detection, and filename sanitization
-- **File Size Validation**: Configurable minimum and maximum file size limits with clear error messages
-- **Atomic File Operations**: Resilient file operations with staging areas and rollback capabilities
-
-**Error Boundaries & Stability**:
-- **Frontend Error Boundaries**: Reusable error boundary components with fallback UI and retry mechanisms
-- **Centralized Error Reporting**: Structured error reporting with backend integration and analytics
-- **Graceful Degradation**: Component-level error isolation preventing full page crashes
-- **Error Recovery**: Automatic retry mechanisms and user-friendly error messages
 
 ### 2.3 Beginner-Friendly Architecture Principles
 This project will adhere to simplicity and clarity while building a robust foundation:
@@ -321,35 +295,8 @@ DASHBOARDV5/
 │   │   │   ├── submit.py    # Student submission endpoints
 │   │   │   ├── payment.py   # Payment processing endpoints
 │   │   │   └── analytics.py # Analytics and reporting endpoints
-│   │   ├── services/        # Business logic and orchestration
+│   │   ├── services/        # Business logic
 │   │   │   ├── __init__.py
-│   │   │   ├── orchestration/
-│   │   │   │   ├── __init__.py
-│   │   │   │   └── job_orchestration_service.py  # Unified service interface
-│   │   │   ├── business_logic/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── job_lifecycle/
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── job_approval_service.py
-│   │   │   │   │   ├── job_status_service.py
-│   │   │   │   │   └── job_transition_service.py
-│   │   │   │   ├── admin_operations/
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── job_admin_service.py
-│   │   │   │   │   └── job_notes_service.py
-│   │   │   │   └── shared_services/
-│   │   │   │       ├── __init__.py
-│   │   │   │       ├── job_locking_service.py
-│   │   │   │       └── job_event_service.py
-│   │   │   ├── infrastructure/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── file_configuration_service.py
-│   │   │   │   ├── file_discovery_service.py
-│   │   │   │   ├── atomic_file_service.py
-│   │   │   │   ├── db_transaction_service.py
-│   │   │   │   ├── validation_service.py
-│   │   │   │   ├── response_service.py
-│   │   │   │   └── monitoring_service.py
 │   │   │   ├── file_service.py
 │   │   │   ├── email_service.py
 │   │   │   └── auth_service.py  # Workstation token validation
@@ -380,32 +327,6 @@ DASHBOARDV5/
 ├── .dockerignore            # Specifies files to ignore in Docker builds
 └── Dockerfile.backend       # Dockerfile for the Flask API
 └── Dockerfile.frontend      # Dockerfile for the Next.js frontend
-
-### 3.1.1 Current Service Architecture
-The system has evolved from a monolithic service architecture to a decomposed, orchestrated architecture:
-
-**Orchestration Layer**:
-- **JobOrchestrationService**: Unified interface for all job lifecycle operations
-- **Service Composition**: Coordinates between 7 specialized business logic services
-- **API Compatibility**: Maintains existing route interfaces while providing clean separation
-
-**Business Logic Services** (Decomposed from monolithic JobLifecycleService):
-- **JobApprovalService**: Handles job approval, rejection, and review workflows
-- **JobStatusService**: Manages status transitions (printing, complete, pickup, etc.)
-- **JobTransitionService**: Validates and orchestrates status changes
-- **JobAdminService**: Handles admin operations (force unlock, status changes, etc.)
-- **JobNotesService**: Manages job notes and comments
-- **JobLockingService**: Handles job locking for concurrency control
-- **JobEventService**: Manages event logging and audit trails
-
-**Infrastructure Services**:
-- **FileConfigurationService**: File validation, security, and configuration management
-- **FileDiscoveryService**: Discovers and validates candidate files for approval
-- **AtomicFileService**: Ensures atomic file operations with rollback capabilities
-- **DbTransactionService**: Manages database transactions and consistency
-- **ValidationService**: Centralized input validation and error handling
-- **ResponseService**: Standardized API response formatting
-- **MonitoringService**: Comprehensive system monitoring and health checks
 
 ### 3.2 Database Schema & Models
 
@@ -537,7 +458,7 @@ The system's authentication is designed for a high-turnover, shared-terminal env
 - **Workstation Login**: Each physical computer is considered a "Workstation" and is assigned a unique password. This password is used to initiate a long-lived session (e.g., 12 hours) for that specific computer. Staff do not have individual passwords.
 - **Session Management**: A simple, long-lived JWT is issued to the browser upon successful workstation login. This token contains the `workstation_id` (e.g., "Front-Desk-Computer").
 - **Per-Action Attribution**: For every state-changing action (approve, reject, etc.), the UI modal **requires** the acting user to select their name from a dropdown list of active staff members.
-- **API Requirement**: The API endpoints for these actions require a `staff_name` field in the request body. The backend validates that the name is on the official staff list.
+- **API Requirement**: The API endpoints for these actions will require a `staff_name` field in the request body. The backend will validate that the name is on the official staff list.
 
 #### 3.3.1.1 Staff Turnover Management
 To effectively manage staff turnover while maintaining system integrity, the following process will be implemented:
@@ -556,11 +477,11 @@ To effectively manage staff turnover while maintaining system integrity, the fol
 4. **Visual Indication**: In historical event logs, names of inactive staff will be visually distinguished (e.g., greyed out or with an "(inactive)" label).
 5. **Reporting Access**: Reports can still filter by all staff names, including inactive ones, for complete historical accountability.
 
-**Implementation Status:**
-- The `Staff` model includes an `is_active` boolean field, defaulting to `true`.
-- The staff management UI includes "Add Staff," "Deactivate Staff," and "Reactivate Staff" capabilities.
-- Only active staff are included in attribution dropdowns in the frontend.
-- API endpoints for staff list retrieval include an optional `include_inactive` parameter.
+**Implementation Requirements:**
+- The `Staff` model will include an `is_active` boolean field, defaulting to `true`.
+- The staff management UI will include "Add Staff," "Deactivate Staff," and "Reactivate Staff" capabilities.
+- Only active staff will be included in attribution dropdowns in the frontend.
+- API endpoints for staff list retrieval will include an optional `include_inactive` parameter.
 
 #### 3.3.2 Student Authentication: Email-Based Confirmation
 Students do not have accounts or passwords. Instead, their approval for a print job is handled via a secure, one-time-use email link.
@@ -622,10 +543,10 @@ The system manages 3D print jobs through a comprehensive, event-driven workflow 
   * Database updates: `file_path`, `original_filename`, `display_name`, `metadata_path`
   * Thumbnail generation (asynchronous, failure-tolerant)
 * **System Actions:** 
-  * File validation includes comprehensive security checks and header validation
-  * Duplicate submission detection prevents identical active jobs
-  * Job locking system prevents concurrent edits
-  * Event logging captures all actions with staff attribution
+  * Staff member attribution for the approval action is logged.
+  * Print parameters (weight, time, cost) submitted by the staff are validated.
+  * A secure confirmation token is generated for the student.
+  * An approval email, containing the job details and confirmation link, is queued for sending.
 
 **Student Submission UI/UX (Corresponds to 'Uploaded' Status)**
     **Page Flow**:
@@ -770,31 +691,6 @@ The system manages 3D print jobs through a comprehensive, event-driven workflow 
 - Use consistent iconography across all status indicators
 - Follow modern web animation guidelines
 
-#### 3.4.3 Implemented Workflow Enhancements
-**Concurrency Control**:
-- **Job Locking System**: Prevents multiple staff members from editing the same job simultaneously
-- **Lock Management**: Automatic lock acquisition on modal open, extension via heartbeat, release on close
-- **Conflict Resolution**: Clear UI feedback when jobs are locked by other users
-- **Admin Override**: Administrators can force-unlock stuck locks with audit logging
-
-**File Security & Validation**:
-- **Comprehensive File Validation**: File header validation for STL, OBJ, 3MF, and ZIP-based formats
-- **Security Validation**: Path traversal prevention, dangerous character detection, filename sanitization
-- **Duplicate Detection**: File content hashing prevents duplicate active submissions
-- **Atomic File Operations**: Resilient file operations with staging areas and rollback capabilities
-
-**Error Handling & Recovery**:
-- **Standardized Error Responses**: Consistent error format across all API endpoints
-- **Frontend Error Boundaries**: Component-level error isolation preventing full page crashes
-- **Graceful Degradation**: Fallback UI and retry mechanisms for failed operations
-- **Error Reporting**: Centralized error reporting with backend integration and analytics
-
-**Performance Optimization**:
-- **Intelligent Caching**: Request deduplication, adaptive TTL, and performance statistics
-- **Optimized API Patterns**: Adaptive polling, request batching, and activity-based optimization
-- **Background Processing**: Asynchronous task processing for emails, monitoring, and file operations
-- **Real-time Updates**: Auto-refreshing dashboard with visual and audio notifications
-
 ## 4. Technical Deep Dive: Direct File Access
 
 > **Note:** All actions listed below automatically trigger an entry in the `Event` log as described in Section 3.2 and 3.4.
@@ -825,7 +721,7 @@ To ensure system stability and simplify management, the system is designed with 
     *   This provides superior concurrency, data integrity, and scalability compared to file-based databases like SQLite, which is essential for a multi-user environment with background tasks.
 
 ### 4.2 Custom Protocol Handler
-- A custom URL protocol (e.g., 3dprint://) is registered on the single staff computer.
+- A custom URL protocol (e.g., 3dprint://) will be registered on the single staff computer.
 - Example URL: 3dprint://open?path=Z:\storage\Uploaded\JaneDoe_Filament_Blue_123.stl
 
 ### 4.3 File Opening Solution
@@ -1008,7 +904,7 @@ To ensure system stability and simplify management, the system is designed with 
 ### 5.3 Deployment Considerations
 The entire application stack is designed to be deployed using Docker and Docker Compose, which dramatically simplifies setup and ensures consistency between development and production environments.
 
-1.  **Dockerized Services**: The `docker-compose.dev.yml` and `docker-compose.prod.yml` files define all necessary services:
+1.  **Dockerized Services**: The `docker-compose.yml` file defines all necessary services:
     *   `backend`: The Flask API application, served by Gunicorn.
     *   `frontend`: The Next.js application. For production, this container will run `npm start` to serve the application with server-side rendering.
     *   `db`: A PostgreSQL database service, with its data persisted in a Docker volume to prevent data loss on container restart.
@@ -1026,7 +922,7 @@ The entire application stack is designed to be deployed using Docker and Docker 
         3.  Run the migration command inside a temporary `backend` container: `docker-compose run --rm backend flask db upgrade`.
         4.  Once the migration is complete, start the rest of the application: `docker-compose up -d`.
         - **Rationale**: This manual process is chosen for its simplicity and safety. It prevents potential race conditions or failed startup loops that can occur with automated migration scripts in container entrypoints, making it more reliable for a beginner-level operational workflow.
-    *   **Launch**: After the initial setup and any necessary migrations, the entire application is launched with a single command: `docker-compose -f docker-compose.dev.yml up -d` for development or `docker-compose -f docker-compose.prod.yml up -d` for production. This builds the necessary images if they don't exist and starts all services in the correct order.
+    *   **Launch**: After the initial setup and any necessary migrations, the entire application is launched with a single command: `docker-compose up -d`. This builds the necessary images if they don't exist and starts all services in the correct order.
 
 3.  **Accessing the System**:
     *   Staff will access the Next.js frontend by navigating to the IP address of the host machine in their web browser (e.g., `http://192.168.1.50`).
@@ -1037,25 +933,6 @@ The entire application stack is designed to be deployed using Docker and Docker 
     *   **SlicerOpener Protocol Handler**: The `SlicerOpener.exe` and its `config.ini` must be installed locally on **each** staff computer. The `config.ini` on each machine must point to the correct path for the shared network storage.
 
 5. **CORS Configuration**: In production, the Flask API's CORS settings must be restricted to allow requests only from the domain (or IP address) where the Next.js frontend is hosted. This is configured via environment variables.
-
-### 5.3.1 Implemented Deployment Features
-**Development/Production Separation**:
-- **Separate Compose Files**: `docker-compose.dev.yml` and `docker-compose.prod.yml` with environment-specific configurations
-- **Production Optimization**: Frontend runs in production mode, optimized builds, and security hardening
-- **Development Features**: Volume mounts, hot reloading, and debugging capabilities
-- **Environment Variables**: Separate `.env` files for development and production configurations
-
-**Enhanced Health Monitoring**:
-- **Health Check Endpoints**: Granular health checks for database, Redis, storage, and system resources
-- **Monitoring Scripts**: Cross-platform monitoring scripts for Linux/Mac and Windows
-- **Performance Monitoring**: Request timing, error rates, and slow endpoint detection
-- **Structured Logging**: JSON-structured logging for production with automatic log rotation
-
-**Security Hardening**:
-- **Network Isolation**: Dedicated Docker networks for service communication
-- **Redis Authentication**: Password-protected Redis with secure configuration
-- **Resource Limits**: Memory and CPU limits for all containers
-- **Security Options**: No-new-privileges and read-only mounts where appropriate
 
 ### 5.4 University Network Considerations
 - Firewalls: May block custom protocols or outgoing connections for the helper app. Liaise with IT.
@@ -1245,7 +1122,7 @@ To ensure long-term data resilience, the system will include an admin-triggered 
 ### 5.16 System Health and Service Monitoring
 To ensure high availability and prevent silent failures of critical backend components, the system will include a dedicated health monitoring endpoint. This is distinct from the data integrity audit and focuses on the operational status of the services themselves.
 
-- **Health Check Endpoint**: A public, unauthenticated API endpoint (`GET /api/v1/health`) is implemented. This endpoint allows automated monitoring tools (e.g., UptimeRobot, university IT monitoring) to check the system's status without requiring credentials.
+- **Health Check Endpoint**: A public, unauthenticated API endpoint (`GET /api/v1/health`) will be implemented. This endpoint will allow automated monitoring tools (e.g., UptimeRobot, university IT monitoring) to check the system's status without requiring credentials.
 - **Component Status Checks**: The health check will verify the status of all critical infrastructure components:
     1.  **API Service**: The endpoint responding with a `200 OK` status confirms the Flask API is running.
     2.  **Database Connectivity**: The endpoint will attempt a simple, non-locking query (e.g., `SELECT 1`) to confirm the database is reachable and responsive.
@@ -1255,7 +1132,7 @@ To ensure high availability and prevent silent failures of critical backend comp
 ### 5.17 Concurrency Control and Data Integrity
 To ensure data consistency and prevent race conditions in a multi-user, multi-computer environment, the system will implement the following safeguards:
 
-- **API-Level Job Locking**: To prevent two staff members from simultaneously performing conflicting state-changing actions on the same job, the system uses a robust, stateful, API-level locking mechanism.
+- **API-Level Job Locking**: To prevent two staff members from simultaneously performing conflicting state-changing actions on the same job, the system will use a robust, stateful, API-level locking mechanism.
     - **Acquiring a Lock**: Before initiating a critical action (e.g., opening an approval modal), the frontend will first request a lock from the backend. The API will set a `locked_by_user` field and a `locked_until` timestamp (e.g., 5 minutes in the future) on the job.
     - **Lock Heartbeat**: While a user has a job locked for an extended UI interaction (like an open modal), the frontend will automatically send a periodic "heartbeat" request to extend the lock's duration. This prevents the lock from expiring during legitimate use.
     - **Releasing a Lock**: When the user completes or cancels the action, the frontend will explicitly release the lock. Critical state-changing API endpoints must guarantee the release of the lock upon completion of the request, regardless of success or failure. This ensures that a failed operation does not leave a job permanently locked.
@@ -1275,7 +1152,7 @@ To ensure data consistency and prevent race conditions in a multi-user, multi-co
 ### 5.18 Staff-Level Error Correction
 To handle common human errors gracefully without requiring administrator intervention, the system will provide a "revert" capability for certain status changes. This empowers staff to correct their own mistakes quickly and cleanly.
 
-- **Contextual Revert Actions**: After a staff member changes a job's status, a contextual "Revert" button appears in the UI.
+- **Contextual Revert Actions**: After a staff member changes a job's status, a contextual "Revert" button will appear in the UI.
 - **Supported Reversions**: This functionality will be available for specific, non-destructive transitions, such as:
     - Reverting a job from `COMPLETED` back to `PRINTING`.
     - Reverting a job from `PAIDPICKEDUP` back to `COMPLETED`.
@@ -1289,7 +1166,7 @@ To handle common human errors gracefully without requiring administrator interve
 ### 5.19 Duplicate Submission Handling
 To prevent accidental or redundant job submissions, the system will implement content-based deduplication at the API level.
 
-- **File Content Hashing**: Upon every file upload via the `POST /api/submit` endpoint, the backend calculates a SHA-256 hash of the file's contents.
+- **File Content Hashing**: Upon every file upload via the `POST /api/submit` endpoint, the backend will calculate a SHA-256 hash of the file's contents.
 - **Deduplication Logic**: Before creating a new job, the API will query the database to see if an "active" job already exists with the same file hash and the same student email address.
     - An "active" job is defined as being in any status *before* printing has begun (e.g., `UPLOADED`, `PENDING`, `READYTOPRINT`).
 - **Collision Handling**:
@@ -1604,70 +1481,3 @@ All endpoints will be prefixed with `/api/v1`. All responses will be in JSON for
 - Consistent error response format: `{ "error": "error_code", "message": "Human readable message", "details": {...} }`
 - All list endpoints support pagination via `?page=1&limit=50` parameters
 - All protected endpoints log access attempts for security auditing
-
-## 7. Status Mapping Table
-
-### Internal Status ↔ Directory ↔ UI Label Mapping
-
-| Internal Status | Directory Name | UI Label | Description |
-|----------------|----------------|----------|-------------|
-| `UPLOADED` | `Uploaded/` | "Uploaded" | Student submission received |
-| `PENDING` | `Pending/` | "Pending" | Awaiting student confirmation |
-| `READYTOPRINT` | `ReadyToPrint/` | "Ready to Print" | Approved and confirmed |
-| `PRINTING` | `Printing/` | "Printing" | Currently being printed |
-| `COMPLETED` | `Completed/` | "Completed" | Print finished |
-| `PAIDPICKEDUP` | `PaidPickedUp/` | "Paid & Picked Up" | Final state |
-| `REJECTED` | `Rejected/` | "Rejected" | Job rejected by staff |
-| `ARCHIVED` | `Archived/` | "Archived" | Archived for retention |
-
-### Status Progression Rules
-- **Normal Flow**: UPLOADED → PENDING → READYTOPRINT → PRINTING → COMPLETED → PAIDPICKEDUP → ARCHIVED
-- **Rejection Flow**: UPLOADED → REJECTED → ARCHIVED
-- **Revert Actions**: COMPLETED → PRINTING, PAIDPICKEDUP → COMPLETED
-- **Admin Override**: Any status can be changed via admin endpoints
-
-## 8. Revision Log
-
-### 2025-8-27 — Project Overview — Updated to reflect implemented status — Surgical
-- Changed "will build" to "builds" to reflect operational system
-- Updated "aims to replace" to "replaces" for current implementation
-
-### 2025-8-27 — Core Features — Added implemented advanced features section — Inserted
-- Added Section 2.2.5 with comprehensive list of implemented advanced features
-- Updated API communication section to reflect current status
-- Added monitoring, caching, validation, and error handling features
-
-### 2025-8-27 — System Architecture — Updated service architecture to reflect decomposition — Surgical
-- Updated project structure to show current service decomposition
-- Added Section 3.1.1 describing orchestration layer and business logic services
-- Updated services directory structure to reflect actual implementation
-
-### 2025-8-27 — Authentication Architecture — Updated implementation status — Surgical
-- Changed "will require" to "require" for API requirements
-- Updated "Implementation Requirements" to "Implementation Status"
-- Reflected current operational state of authentication system
-
-### 2025-8-27 — Job Lifecycle — Added implemented workflow enhancements — Inserted
-- Added Section 3.4.3 with comprehensive workflow enhancements
-- Updated system actions to reflect current implementation
-- Added concurrency control, file security, error handling, and performance optimization
-
-### 2025-8-27 — Technical Deep Dive — Updated protocol handler status — Surgical
-- Changed "will be registered" to "is registered" for protocol handler
-- Reflected current operational state of file opening system
-
-### 2025-8-27 — Operational Considerations — Added implemented deployment features — Inserted
-- Added Section 5.3.1 with comprehensive deployment features
-- Updated Docker compose file references to reflect separate dev/prod files
-- Added health monitoring, security hardening, and deployment optimization
-
-### 2025-8-27 — System Health — Updated implementation status — Surgical
-- Changed "will implement" to "uses" for job locking system
-- Updated "will provide" to "provides" for revert capabilities
-- Changed "will implement" to "implements" for duplicate detection
-- Reflected current operational state of advanced features
-
-### 2025-8-27 — Final Sections — Added status mapping and revision log — Inserted
-- Added comprehensive status mapping table for internal/directory/UI consistency
-- Added detailed revision log tracking all changes made during synchronization
-- Completed systematic alignment of masterplan with current codebase reality

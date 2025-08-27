@@ -33,9 +33,11 @@ class ErrorReportingService {
   };
 
   constructor() {
-    // Initialize error reporting
-    this.setupGlobalErrorHandlers();
-    this.setupUnhandledRejectionHandler();
+    // Initialize error reporting only on client side
+    if (typeof window !== 'undefined') {
+      this.setupGlobalErrorHandlers();
+      this.setupUnhandledRejectionHandler();
+    }
   }
 
   /**
@@ -53,8 +55,8 @@ class ErrorReportingService {
         action,
         error: this.formatError(error),
         stack: error instanceof Error ? error.stack : undefined,
-        userAgent: navigator.userAgent,
-        url: window.location.href,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
         timestamp: new Date().toISOString(),
         additionalData
       };
@@ -177,6 +179,8 @@ class ErrorReportingService {
    * Setup global error handlers
    */
   private setupGlobalErrorHandlers(): void {
+    if (typeof window === 'undefined') return;
+    
     // Handle unhandled errors
     window.addEventListener('error', (event) => {
       this.reportError(
@@ -211,6 +215,8 @@ class ErrorReportingService {
    * Setup unhandled promise rejection handler
    */
   private setupUnhandledRejectionHandler(): void {
+    if (typeof window === 'undefined') return;
+    
     window.addEventListener('unhandledrejection', (event) => {
       this.reportError(
         event.reason,
