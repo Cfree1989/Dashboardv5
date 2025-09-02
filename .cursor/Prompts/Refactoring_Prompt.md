@@ -3,10 +3,7 @@
 You are a senior software engineer specializing in code refactoring and architectural improvement. Your task is to analyze the following large code files (1000+ lines each) and provide a comprehensive refactoring strategy to break them into smaller, more maintainable components:
 
 ## Target Files for Analysis
-- **jobs.py** - Primary job management functionality
-- **analytics.py** - Analytics and reporting features  
-- **jobs_staff.py** - Staff-specific job operations
-- **admin.py** - Administrative interface and operations
+-All
 
 ## Required Output Files
 You must create the following three essential report files with detailed analysis and recommendations:

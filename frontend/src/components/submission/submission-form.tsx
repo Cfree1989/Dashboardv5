@@ -5,22 +5,45 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { apiRequest } from '../../lib/auth';
 import { handleApiError } from '../../lib/api-error-handling';
+import { useCatalog, filterMaterialsByMethod, filterPrintersByMethod, colorsForMaterial, getMaterialById } from '../../lib/use-catalog';
 
 const disciplineOptions = ['Art', 'Architecture', 'Landscape Architecture', 'Interior Design', 'Engineering', 'Hobby/Personal', 'Other'];
-const printMethodOptions = ['Filament', 'Resin'];
-const colorOptions: Record<string, string[]> = {
-  Filament: [
-    'True Red','True Orange','Light Orange','True Yellow','Dark Yellow','Lime Green','Green','Forest Green','Blue','Electric Blue','Midnight Purple','Light Purple','Clear','True White','Gray','True Black','Brown','Copper','Bronze','True Silver','True Gold','Glow in the Dark','Color Changing'
-  ],
-  Resin: ['Black','White','Gray','Clear']
-};
-const printerOptions: Record<string, string[]> = {
-  Filament: ['Prusa MK4S', 'Prusa XL', 'Raise3D Pro 2 Plus'],
-  Resin: ['Formlabs Form 3']
-};
 
 export default function SubmissionForm() {
   const router = useRouter();
+  const { catalog, isLoading: catalogLoading, error: catalogError } = useCatalog();
+  
+  // Show loading state if catalog is not ready
+  if (catalogLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading submission form...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if catalog fails to load
+  if (catalogError || !catalog) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p>Unable to load system configuration. Please try refreshing the page.</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [studentEmail, setStudentEmail] = useState('');
@@ -30,6 +53,7 @@ export default function SubmissionForm() {
   const [color, setColor] = useState('');
   const [printer, setPrinter] = useState('');
   const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
+  const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [minChargeConsent, setMinChargeConsent] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -50,14 +74,31 @@ export default function SubmissionForm() {
   const [scalingError, setScalingError] = useState('');
 
   React.useEffect(() => {
-    if (printMethod) {
-      setAvailablePrinters(printerOptions[printMethod] || []);
-      setPrinter(''); // Reset printer selection when method changes
+    if (printMethod && catalog) {
+      // Get materials for this method, then find colors and printers
+      const materials = filterMaterialsByMethod(catalog.materials, printMethod);
+      const printers = filterPrintersByMethod(catalog.printers, printMethod);
+      
+      // Set available printers
+      setAvailablePrinters(printers.map(p => p.name));
+      
+      // Set available colors (all colors from all materials for this method)
+      const allColors = new Set<string>();
+      materials.forEach(material => {
+        material.colors.forEach(color => allColors.add(color));
+      });
+      setAvailableColors(Array.from(allColors).sort());
+      
+      // Reset selections when method changes
+      setPrinter('');
+      setColor('');
     } else {
       setAvailablePrinters([]);
+      setAvailableColors([]);
       setPrinter('');
+      setColor('');
     }
-  }, [printMethod]);
+  }, [printMethod, catalog]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] ?? null;
@@ -203,7 +244,7 @@ export default function SubmissionForm() {
           className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground ${printMethodError ? 'border-red-600' : ''}`}
         >
           <option value="">Select print method</option>
-          {printMethodOptions.map(opt => (
+          {catalog?.methods.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
@@ -228,7 +269,7 @@ export default function SubmissionForm() {
           className={`mt-1 block w-full border border-input p-2 rounded transition-all duration-200 focus-ring text-sm text-foreground disabled:opacity-50 ${colorError ? 'border-red-600' : ''}`}
         >
           <option value="">Select color</option>
-          {printMethod && colorOptions[printMethod].map(opt => (
+          {availableColors.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>

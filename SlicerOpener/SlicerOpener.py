@@ -91,10 +91,10 @@ def parse_protocol_url(url_arg: str) -> str:
     url_str = url_arg.strip().strip('"')
     lower = url_str.lower()
     if "://" not in lower:
-        raise SlicerOpenerError("Invalid URL scheme. Expected print3d:// or 3dprint://")
+        raise SlicerOpenerError("Invalid URL scheme. Expected print3d://")
     scheme = lower.split("://", 1)[0]
-    if scheme not in {"print3d", "3dprint"}:
-        raise SlicerOpenerError("Invalid URL scheme. Expected print3d:// or 3dprint://")
+    if scheme != "print3d":
+        raise SlicerOpenerError("Invalid URL scheme. Expected print3d://")
     # Replace scheme with http for parsing
     tail = url_str[url_str.lower().find("://") + 3:]
     surrogate = "http://" + tail

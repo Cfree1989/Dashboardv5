@@ -8,8 +8,9 @@
 
 * **Default stance:** Preserve existing content unless code/configs prove it wrong
 * **Change trigger:** Only edit when you find concrete evidence of divergence
-* **Burden of proof:** Every change must be backed by specific file/line evidence
+* **Burden of proof:** Every change must be verified against actual implementation
 * **Surgical precision:** Change only what contradicts reality; keep the rest intact
+* **Clean Documentation:** Use evidence for verification but keep the documentation clean without cluttered citations
 
 ---
 
@@ -144,8 +145,7 @@ When you find implemented features not documented in the current section:
 ### Insert New Feature Documentation
 ```markdown
 ### [Feature Name] — **NEWLY DISCOVERED**
-**Implementation Status:** Live in production  
-**Evidence Source:** [specific files/routes/components]
+**Implementation Status:** Live in production
 
 **Purpose:** [what it does and business justification]
 
@@ -166,11 +166,6 @@ When you find implemented features not documented in the current section:
 - [ ] [Specific testable behavior 1]
 - [ ] [Specific testable behavior 2]
 - [ ] [Error handling verification]
-
-**Evidence Trail:** 
-- Backend: [file paths and line numbers]
-- Frontend: [component paths and key functions]
-- Tests: [test file names and scenarios]
 ```
 
 ---
@@ -196,10 +191,10 @@ When you receive **RUN AGAIN**, expand current section coverage:
    - Ensure consistent terminology across all sections
    - Check that state transitions align between different features
 
-4. **Evidence Audit Trail**
-   - Add specific file paths for every claim made
-   - Include test names that verify documented behaviors
-   - Reference configuration keys and database constraints
+4. **Evidence Verification**
+   - Verify every claim against specific file paths and implementations
+   - Cross-reference test names that verify documented behaviors
+   - Validate configuration keys and database constraints
 
 ---
 
@@ -208,9 +203,9 @@ When you receive **RUN AGAIN**, expand current section coverage:
 Before stopping after each section:
 
 - [ ] **Canon Compliance:** All terminology matches immutable facts
-- [ ] **Evidence Backing:** Every factual claim has specific file/line citation
+- [ ] **Evidence Verification:** Every factual claim verified against actual implementation
 - [ ] **Completeness:** All applicable depth requirements addressed or marked "N/A"
-- [ ] **Accuracy:** No speculative content; uncertainties marked "TBD - Evidence needed"
+- [ ] **Accuracy:** No speculative content; uncertainties marked "TBD - Verification needed"
 - [ ] **Rebuild Readiness:** Section contains sufficient detail for reimplementation
 
 ---
@@ -220,7 +215,7 @@ Before stopping after each section:
 After each section edit, append to revision log:
 
 ```
-YYYY-MM-DD — [Section] — [Change Type] — [Evidence Source] — [Brief Description]
+YYYY-MM-DD — [Section] — [Change Type] — [Brief Description]
 ```
 
 **Change Types:** 

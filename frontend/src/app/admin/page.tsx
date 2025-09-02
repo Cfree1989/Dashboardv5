@@ -2,18 +2,19 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle, BarChart3 } from "lucide-react";
+import { Settings, Users, Shield, Database, Activity, Mail, AlertTriangle, BarChart3, Package } from "lucide-react";
 import { StaffPanel } from "../../components/admin/staff-panel";
 import { SystemHealthPanel } from "../../components/admin/system-health";
 import { AdminSettingsPanel } from "../../components/admin/admin-settings";
 import { AdminOverridesPanel } from "../../components/admin/admin-overrides";
 import { DataManagementPanel } from "../../components/admin/data-management";
 import { EmailToolsPanel } from "../../components/admin/email-tools";
+import { CatalogManagement } from "../../components/admin/catalog-management";
 import MonitoringDashboard from "../../components/admin/monitoring-dashboard";
 import { checkAuthStatus } from "../../lib/auth";
 import { ErrorBoundary } from "../../components/error-boundary";
 
-type AdminSection = "settings" | "staff" | "overrides" | "data" | "health" | "email" | "monitoring";
+type AdminSection = "settings" | "staff" | "catalog" | "overrides" | "data" | "health" | "email" | "monitoring";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function AdminPage() {
   const sections: Array<{ id: AdminSection; label: string; icon: React.ComponentType<any>; devOnly?: boolean }> = [
     { id: "settings", label: "Settings", icon: Settings },
     { id: "staff", label: "Staff Management", icon: Users },
+    { id: "catalog", label: "Catalog Management", icon: Package },
     { id: "overrides", label: "Admin Overrides", icon: Shield },
     { id: "data", label: "Data Management", icon: Database },
     { id: "health", label: "System Health", icon: Activity },
@@ -48,6 +50,8 @@ export default function AdminPage() {
         return <AdminSettingsPanel />;
       case "staff":
         return <StaffPanel />;
+      case "catalog":
+        return <CatalogManagement />;
       case "overrides":
         return <AdminOverridesPanel />;
       case "data":
