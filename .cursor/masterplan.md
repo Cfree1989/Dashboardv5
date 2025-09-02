@@ -164,7 +164,11 @@ The system serves two primary user roles:
     -   **TypeScript**: Full type safety throughout the application
     -   **Tailwind CSS**: Utility-first styling with custom animations and themes
     -   **shadcn/ui**: Complete UI component library based on Radix UI primitives
-    -   **React Context**: Advanced state management for dashboard data and real-time updates
+    -   **Zustand State Management**: Global state management with focused stores eliminating prop drilling and centralizing shared state
+        - **AuthStore**: Global authentication state and session management
+        - **DashboardStore**: Dashboard state (search, refresh, job operations) with real-time updates
+        - **ModalStore**: Centralized modal management with type safety and queue control
+        - **JobOperationsStore**: Job-related operations, loading states, and optimistic updates
     -   **Sound System**: Background-only audio using the Browser Audio API; plays on new job submissions without UI toggles. Admin configuration is available.
     -   **Optimized API Layer**: Intelligent caching, request deduplication, and adaptive polling for performance
     -   **Error Boundaries**: Component-level error isolation with fallback UI and retry mechanisms
@@ -223,7 +227,7 @@ To ensure both ease of use in a chaotic lab environment and full accountability,
 -   **Time Input**: Hour-based time inputs with conservative rounding (always round UP to nearest 0.5 hours).
 -   **Critical Dependencies**:
     -   **Backend**: `Flask`, `Flask-SQLAlchemy`, `Flask-Migrate`, `Flask-CORS`, `Flask-Limiter`, `psycopg2-binary`, `python-dotenv`, `PyJWT`, `rq`, `openpyxl`, `pandas`, `itsdangerous` (for secure tokens).
-    -   **Frontend**: `next`, `react`, `react-dom`, `typescript`, `tailwindcss`, `@radix-ui/*`, `lucide-react`, `date-fns`, `class-variance-authority`, `clsx`, `tailwind-merge`, `recharts`.
+    -   **Frontend**: `next`, `react`, `react-dom`, `typescript`, `tailwindcss`, `@radix-ui/*`, `lucide-react`, `date-fns`, `class-variance-authority`, `clsx`, `tailwind-merge`, `recharts`, `zustand` (for global state management).
 
 #### 2.2.5 Implemented Advanced Features
 **System Monitoring & Health**:
@@ -514,6 +518,16 @@ DASHBOARDV5/
 │   │   ├── lib/                 # Utility functions
 │   │   │   ├── api.ts           # API client functions
 │   │   │   └── utils.ts         # General utilities
+│   │   ├── store/               # Zustand state management
+│   │   │   ├── index.ts         # Store exports and utilities
+│   │   │   ├── utils.ts         # Store utilities and patterns
+│   │   │   ├── types/           # Store type definitions
+│   │   │   │   └── index.ts     # Store interfaces and types
+│   │   │   └── slices/          # Individual store implementations
+│   │   │       ├── auth-store.ts         # Authentication store
+│   │   │       ├── dashboard-store.ts    # Dashboard state store
+│   │   │       ├── modal-store.ts        # Modal management store
+│   │   │       └── job-operations-store.ts # Job operations store
 │   │   └── types/               # TypeScript types
 │   │       └── index.ts         # Type definitions
 │   ├── .env.local               # Frontend environment variables
