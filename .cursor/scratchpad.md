@@ -18,7 +18,7 @@ Complete and deploy a production-ready 3D Print Management System for educationa
 **TASK 6 IMPLEMENTATION**: Standardize Error Response Formats across all API endpoints for better client-side error handling and improved user experience.
 
 ### **Immediate Motivation for This Session**
-Execute Task 6 from System Audit Tasks - Implement consistent error response formats across all API endpoints to improve client-side error handling and provide better error messages for users.
+Execute Task 3 from System Audit Tasks - Implement Global State Management using Zustand to eliminate prop drilling and centralize shared state across dashboard components.
 
 ## System Overview
 
@@ -28,64 +28,85 @@ Execute Task 6 from System Audit Tasks - Implement consistent error response for
 
 ## Key Challenges and Analysis
 
-### **TASK 6: Standardize Error Response Formats** 📋
-**Issue**: Inconsistent error response formats across API endpoints make client-side error handling difficult
-**Root Cause**: Each route handler implements its own error response format without standardization
-**Impact**: Poor user experience, difficult frontend error handling, inconsistent error messages
+### **TASK 3: Implement Global State Management** 🔧
+**Issue**: Complex prop drilling and scattered state management across dashboard components creates maintenance burden
+**Root Cause**: No centralized state management - each component manages its own state with excessive prop passing
+**Impact**: Difficult component maintenance, complex state synchronization, prop drilling through multiple levels
 
-**Analysis**:
-1. **Current State**: Each endpoint returns different error formats (some use ResponseService, others don't)
-2. **Frontend Impact**: Inconsistent error handling patterns across components
-3. **User Experience**: Unclear error messages, poor error recovery
-4. **Maintainability**: No standardized error handling patterns
+**Current State Analysis**:
+1. **Dashboard Page**: Already uses `useReducer` effectively with structured `DashboardState` (✅ Good pattern)
+2. **Job List**: Separate local state for jobs data, loading, error states
+3. **Job Card**: 20+ `useState` calls managing different concerns (❌ Major complexity)
+   - **Modal states**: 8 different modals each with separate state
+   - **Loading states**: 6 different loading states for various actions
+   - **Form states**: Notes editing, staff selection, form drafts
+   - **UI states**: Expand/collapse, error states, messages
+4. **Authentication**: Local state management, no global context
 
-**Required Action**: **Implement standardized error response schema and middleware**
+**Identified Prop Drilling**:
+- Dashboard → JobList: 9 props passed down
+- JobList → JobCard: 13+ props passed down  
+- Deep callback chains for state synchronization
 
-### **Task 6 Implementation Plan** (4-5 hours)
-**Step 1**: Define standard error response schema ✅ **COMPLETED**
-- ✅ Create consistent error response format with error codes, messages, and details
-- ✅ Define error categories (validation, authentication, business logic, system errors)
-- ✅ Implement error response data classes
+**Required Action**: **Implement Zustand stores for shared state with focused, single-responsibility stores**
 
-**Step 2**: Update all route handlers to use consistent format ✅ **COMPLETED**
-- ✅ Audit all route files for current error handling patterns
-- ✅ Update route handlers to use standardized error responses
-- ✅ Implement error response middleware for automatic formatting
+### **Task 3 Implementation Plan** (8-10 hours)
+**Architecture Decision**: Use Zustand with focused stores to avoid over-engineering while solving core prop drilling and complexity issues
 
-**Step 3**: Update frontend error handling ✅ **COMPLETED**
-- ✅ Update frontend components to handle standardized error format
-- ✅ Implement consistent error display patterns
-- ✅ Add user-friendly error messages
+**Step 1**: Install Zustand and setup store structure (30 minutes)
+- ✅ Install zustand dependency
+- ✅ Create `frontend/src/store/` directory structure
+- ✅ Setup TypeScript configuration for stores
 
-**Step 4**: Testing and validation (30 minutes) ✅ **COMPLETED**
+**Step 2**: Create Authentication Store (1 hour)
+- ✅ Move auth state from dashboard component to global store
+- ✅ Implement auth actions (login, logout, checkStatus)
+- ✅ Add authentication state persistence
+- ✅ Create auth hooks for components
 
-**Success Metrics**: All API endpoints return consistent error format, improved user experience
+**Step 3**: Create Dashboard State Store (1.5 hours) 
+- ✅ Extract dashboard state (search, refresh, job operations) from reducer to Zustand
+- ✅ Maintain current excellent state structure but make it global
+- ✅ Preserve all existing functionality while removing prop drilling
+- ✅ Create typed selectors and actions
 
-### **NEW ISSUE: Jobs Not Loading After Worker Fix** 🔍
-**Issue**: Dashboard jobs not loading despite all containers running successfully
-**Context**: Occurs after successful worker container and Redis authentication fix
+**Step 4**: Create Modal Management Store (2 hours)
+- ✅ Centralize modal state management (8 different modals from job-card)
+- ✅ Create modal registry with type safety
+- ✅ Implement modal queue for preventing multiple modals
+- ✅ Add modal context passing for job-specific modals
 
-**BFROS Backwards Analysis** (5-7 potential sources):
-1. **Frontend API proxy misconfiguration** - Next.js proxy not routing to backend correctly after container restart
-2. **Backend database connection failure** - PostgreSQL connection issues after container restart
-3. **Authentication token issues** - JWT cookies not being sent/validated correctly
-4. **API endpoint changes/failures** - Jobs endpoint returning errors after Redis configuration changes
-5. **CORS/Network connectivity** - Docker network connectivity between frontend and backend broken
-6. **Database migration state** - Database schema out of sync after container restart
-7. **Environment variable conflicts** - New Redis configuration conflicting with other services
+**Step 5**: Create Job Operations Store (1.5 hours)
+- ✅ Extract job-related loading states from job-card
+- ✅ Centralize job mutation operations (approve, reject, update, delete)
+- ✅ Add optimistic updates for better UX
+- ✅ Handle job cache invalidation
 
-**Most Likely Sources (Distilled to 2):**
-1. **PRIMARY**: Frontend API proxy or authentication flow broken after container restart
-2. **SECONDARY**: Backend API jobs endpoint failing due to database connectivity or configuration issues
+**Step 6**: Refactor Components (3 hours)
+- ✅ Update Dashboard page to use auth and dashboard stores
+- ✅ Refactor JobList to use global stores, eliminate prop drilling
+- ✅ Simplify JobCard by removing local state, using global stores
+- ✅ Update all modal components to use modal store
 
-**Evidence Collected** ✅:
-- ✅ **API Flow**: `/api/v1/auth/protected` (200 OK), `/api/v1/jobs/counts` (200 OK), `/api/v1/jobs?status=UPLOADED` (500 ERROR)
-- ✅ **Backend Error**: `psycopg2.errors.UndefinedColumn: column job.locked_by does not exist`
-- ✅ **Job Model**: Has `locked_by` and `locked_until` fields defined (lines 44-46)
-- ✅ **Migration Status**: Current DB version `211b02203aa4`, but migration `7d9a1e2f3b4c_add_lock_fields_to_job.py` not applied
+**Step 7**: Update TypeScript Types (30 minutes)
+- ✅ Update component prop interfaces to remove drilled props
+- ✅ Add store-specific type definitions  
+- ✅ Ensure type safety across all store interactions
 
-**ROOT CAUSE CONFIRMED**: 
-Database schema migration issue - Job model expects `locked_by`/`locked_until` columns that haven't been created by running the migration.
+**Step 8**: Testing and Integration (1 hour)
+- ✅ Test all existing functionality works with global state
+- ✅ Verify no performance regressions
+- ✅ Test modal management and state synchronization
+- ✅ Confirm authentication flows work correctly
+
+**Success Criteria**:
+- [ ] Prop drilling eliminated for shared state (Dashboard → JobList → JobCard)
+- [ ] Job card component simplified from 20+ useState to focused local state only
+- [ ] Modal state managed centrally with type safety
+- [ ] Authentication state available globally without prop passing
+- [ ] All existing functionality preserved
+- [ ] Performance improved from reduced re-renders
+- [ ] TypeScript support maintained throughout
 
 ### **Documentation Synchronization Challenge**
 **Challenge**: Project documentation has drifted from actual system state, with conflicting progress reports ranging from 85% complete to 60% functional.
@@ -2273,15 +2294,23 @@ The AnalyticsService implementation is **SUCCESSFULLY COMPLETE** and follows the
 ### **Project Status Board** (Following markdown todo format)
 
 #### **Active Tasks** 
-- [ ] **TASK 6: Standardize Error Response Formats** (System Audit Task) 🔄 **IN PROGRESS**
-  - [x] Task 6.1: Define standard error response schema (1 hour) ✅ **COMPLETED**
-  - [x] Task 6.2: Audit and update route handlers (2 hours) ✅ **COMPLETED**
-  - [ ] Task 6.3: Update frontend error handling (1 hour) 🔄 **IN PROGRESS**
-  - [ ] Task 6.4: Testing and validation (30 minutes)
-  - **Success Criteria**: All API endpoints return consistent error format, improved user experience
-  - **Estimated Time**: 4.5 hours
-  - **Risk**: Medium (updating existing endpoints)
+- [ ] **TASK 3: Implement Global State Management** (System Audit Task) 🔄 **PLANNED**
+  - [ ] Task 3.1: Install Zustand and setup store structure (30 minutes)
+  - [ ] Task 3.2: Create Authentication Store (1 hour) 
+  - [ ] Task 3.3: Create Dashboard State Store (1.5 hours)
+  - [ ] Task 3.4: Create Modal Management Store (2 hours)
+  - [ ] Task 3.5: Create Job Operations Store (1.5 hours)
+  - [ ] Task 3.6: Refactor Components (3 hours)
+  - [ ] Task 3.7: Update TypeScript Types (30 minutes)
+  - [ ] Task 3.8: Testing and Integration (1 hour)
+  - **Success Criteria**: Eliminate prop drilling, simplify job-card, centralize modal/auth state
+  - **Estimated Time**: 8-10 hours
+  - **Risk**: High (major architectural refactoring)
 
+#### **Recently Completed Tasks**
+- [x] **TASK 1: Standardize API Patterns** (System Audit Task) ✅ **COMPLETED**
+- [x] **TASK 2: Fix Status Name Consistency** (System Audit Task) ✅ **COMPLETED**
+- [x] **TASK 6: Standardize Error Response Formats** (System Audit Task) ✅ **COMPLETED**
 - [x] **TASK 5: Remove Debug Code from Production** (System Audit Task) ✅ **COMPLETED**
   - [x] Task 5.1: Identify all console.log and debug statements (15 minutes) ✅ **COMPLETED**
   - [x] Task 5.2: Remove console.error and console.warn statements (10 minutes) ✅ **COMPLETED**
