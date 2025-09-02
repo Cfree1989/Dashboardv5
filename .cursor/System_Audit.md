@@ -1,316 +1,399 @@
 # System Audit Report
 
 ## 🚨 URGENT ISSUES
-[Any critical security, data loss, or production-breaking bugs found]
+[To be populated if critical issues are discovered]
 
 ## Executive Summary
-
-Your 3D print job management system demonstrates solid architectural foundations with good separation of concerns and proper containerization. The codebase is well-structured overall but has some areas that need attention to prevent technical debt accumulation.
-
-**Key Strengths**:
-- Clean layered architecture with proper separation between routes, business logic, and infrastructure
-- Good use of modern technologies (Next.js, Flask, Docker, PostgreSQL, Redis)
-- Comprehensive file handling with atomic operations and proper locking
-- Proper environment variable management and configuration
-- Good test coverage and development practices
-
-**Key Areas for Improvement**:
-- File handling is in transition between legacy and atomic operations (needs completion)
-- Frontend state management has become complex and could benefit from simplification
-- Some circular import issues in the backend services layer
-- Inconsistent error handling patterns across the application
-- Some hardcoded values and magic strings that should be externalized
-
-**Overall Assessment**: Your codebase is in good health (6.5/10 complexity) but needs focused attention on the critical and high-priority items to maintain long-term maintainability. The architecture is sound and the system is production-ready, but addressing the identified issues will significantly improve developer experience and system reliability.
-
-**Recommended Next Steps**: Start with the critical file handling migration, then address the high-priority items in parallel. The medium and low-priority items can be tackled incrementally as part of ongoing development.
+[Brief overview - to be completed after all passes]
 
 ## Pass 1: Flask Backend Analysis
 
 ### Health Snapshot
-- **Complexity Score**: 7/10 (Moderately complex with layered architecture)
-- **Maintainability**: Medium - Good separation of concerns but some coupling issues
-- **Overall Risk**: Medium - Well-structured but has some architectural inconsistencies
-- **Bus Factor**: 3/5 - Requires understanding of the layered architecture
+- **Complexity Score**: 7/10 (High complexity, multiple layers but organized)
+- **Maintainability**: Medium-Hard (extensive service architecture but heavy coupling)
+- **Overall Risk**: Medium-High (well-structured but complex dependencies)
+- **Bus Factor**: 2/5 (requires deep domain knowledge to modify safely)
 
 ### Technical Findings
 
 **Architecture Mapping**:
-- **Entry Points**: Well-organized blueprint structure with 12 route modules
-- **Dependency Analysis**: Clean separation between routes, business logic, and infrastructure layers
-- **Data Flow**: Clear flow from routes → business logic → infrastructure services
-- **State Management**: SQLAlchemy ORM with proper session management
+- **Entry Points**: Clean Flask factory pattern in `create_app()` with 11 registered blueprints
+- **Route Organization**: 15 route files handling: auth, jobs, admin, submit, payment, analytics, staff, monitoring, etc.
+- **Service Architecture**: 3-layer structure:
+  - `business_logic/` - Domain logic (24 files: admin_operations, analytics, job_lifecycle, shared_services)
+  - `services/` - Infrastructure services (28 files: atomic operations, file handling, orchestration)
+  - `models/` - 5 SQLAlchemy models (Job, Event, Staff, Payment, CatalogStore)
 
-**Code Quality Assessment**:
-- **Configuration**: Good environment variable usage with fallback protection
-- **Mixed Concerns**: Business logic properly separated from routes
-- **Status Consistency**: Uses canonical status values (UPLOADED, PENDING, etc.)
-- **Error Handling**: Comprehensive error handling with dedicated services
-- **Naming**: Consistent naming conventions throughout
+**Data Model Analysis**:
+- **Job Model**: 50+ fields covering full lifecycle, file management, student confirmation, staff operations
+- **Event Model**: Audit trail system for tracking all changes
+- **Staff Model**: Simple name-based authentication
+- **Payment Model**: Financial transaction tracking
+- **CatalogStore**: JSON configuration storage with versioning
 
-**Technical Debt Indicators**:
-- **Code Archaeology**: Some TODO comments in routes/jobs.py
-- **Duplicate Logic**: Minimal duplication due to service layer abstraction
-- **God Classes**: No obvious god classes - good service decomposition
-- **Coupling**: Some circular import issues noted in services/__init__.py
-- **Abstraction**: Good abstraction layers with interfaces
+**Status Flow Discovery**:
+- **Canonical Flow**: UPLOADED → PENDING → READYTOPRINT → PRINTING → COMPLETED → PAIDPICKEDUP
+- **Terminal States**: REJECTED, ARCHIVED
+- **Implementation**: Status-driven file movement with atomic operations
+- **File Organization**: Physical directories mirror status states (Uploaded/, Pending/, ReadyToPrint/, etc.)
 
-**Deployment & Production Readiness**:
-- **Configuration**: Proper environment variable management
-- **Environment-Specific**: Good separation of dev/prod configurations
-- **Resource Handling**: Proper file I/O handling with atomic operations
-- **Logging**: Basic logging setup but could be enhanced
+**Configuration Management**:
+- Environment-based config with sensible defaults
+- Comprehensive logging setup (JSON structured for production)
+- Rate limiting, CORS, email integration
+- Database guardrails (prevents SQLite fallback in production)
 
 ### Issues by Severity
 
-**Critical Issues**: None identified
+**Critical Issues**:
+- **None identified during analysis**
 
 **High Priority**:
-- Circular import issues in services/__init__.py (lines 25-30)
-- Some hardcoded values in submit.py (ALLOWED_EXTENSIONS, MAX_FILE_SIZE)
-- Mixed file handling logic across different services
+1. **Heavy Import Dependencies** (`routes/jobs.py:1-31`): 31 imports in single file indicate tight coupling
+2. **Circular Import Risk** (`routes/submit.py:12`): Imports from jobs route `_sync_authoritative_metadata` 
+3. **Status Inconsistency** (Multiple files): Documentation says "ReadyToPrint" but code uses "READYTOPRINT"
+4. **Mixed Service Patterns**: Some routes use orchestration services, others direct model manipulation
 
 **Medium Priority**:
-- TODO comments in routes/jobs.py indicating incomplete implementation
-- Some magic strings in status handling
-- Inconsistent error response formats in some routes
+1. **Duplicate Code**: Status validation logic repeated across route files
+2. **God Class Tendency**: Job model has 50+ fields and extensive business logic
+3. **File Path Hardcoding**: Storage paths constructed in multiple locations
+4. **Error Handling Inconsistency**: Mix of ResponseService and direct JSON responses
 
 **Low Priority**:
-- Minor code style inconsistencies
-- Some redundant imports in route files
+1. **Import Organization**: Some unused imports in route files
+2. **Commented Code**: Legacy code references in comments
+3. **Magic Numbers**: Hardcoded retention periods (45 days)
 
 ### Cross-Cutting Concerns Identified
-- File handling logic scattered across multiple services
-- Status validation logic duplicated in some places
-- Error response formatting not fully standardized
-- Configuration management could be more centralized
+- **Status Management**: Inconsistent status name casing (READYTOPRINT vs ReadyToPrint)
+- **File Operations**: Atomic file service used inconsistently across different operations  
+- **Validation Patterns**: ValidationService exists but not used universally
+- **Response Formatting**: Mix of ResponseService and direct jsonify() calls
+- **Event Logging**: Event service available but manual event creation still present
 
 ## Pass 2: React Frontend Analysis  
 
 ### Health Snapshot
-- **Complexity Score**: 6/10 (Moderate complexity with good component organization)
-- **Maintainability**: Medium - Good component structure but some state management complexity
-- **Overall Risk**: Medium - Well-structured but has some performance and state management concerns
-- **Bus Factor**: 3/5 - Requires understanding of Next.js patterns and state management
+- **Complexity Score**: 6/10 (Medium-high complexity with many components but organized structure)
+- **Maintainability**: Medium (well-organized but heavy local state management) 
+- **Overall Risk**: Medium (modern stack but multiple API patterns)
+- **Bus Factor**: 3/5 (React patterns are standard but domain-specific knowledge needed)
 
 ### Technical Findings
 
 **Architecture Mapping**:
-- **Entry Points**: Next.js App Router with well-organized page structure
-- **Dependency Analysis**: Good separation between pages, components, and utilities
-- **Data Flow**: SWR for data fetching with proper error boundaries
-- **State Management**: Local state with some complex state interactions
+- **Framework**: Next.js 14 with App Router pattern
+- **Component Count**: 51 components across organized directories (admin/, dashboard/, analytics/, ui/)
+- **Client/Server Split**: 36 client components ("use client" directives) - heavy client-side orientation
+- **Layout System**: Nested layouts with shared components and proper routing structure
 
-**Code Quality Assessment**:
-- **Configuration**: Good Next.js configuration with API proxy setup
-- **Mixed Concerns**: Components properly separated by functionality
-- **Status Consistency**: Uses same status values as backend
-- **Error Handling**: Error boundaries implemented for component isolation
-- **Naming**: Consistent naming conventions and TypeScript usage
+**State Management Analysis**:
+- **Hook Usage**: 178 React hooks across 32 files (heavy local state management)
+- **Global State**: No centralized state management (Redux/Zustand/Context) - all component-level
+- **Data Fetching**: Mixed patterns: SWR for some APIs, direct fetch for others
+- **Caching**: API cache service implemented but inconsistently used
 
-**Technical Debt Indicators**:
-- **Code Archaeology**: Some console.log statements for debugging
-- **Duplicate Logic**: Minimal duplication due to good component abstraction
-- **God Classes**: No obvious god classes - good component decomposition
-- **Coupling**: Some tight coupling between dashboard components
-- **Abstraction**: Good abstraction with reusable UI components
+**Component Architecture**:
+- **Organization**: Domain-driven folder structure (admin/, dashboard/, submission/, analytics/)  
+- **Modal System**: Dedicated modal components with proper props interfaces
+- **Form Handling**: Local state management with validation patterns
+- **Error Boundaries**: Implemented with comprehensive error handling system
 
-**Deployment & Production Readiness**:
-- **Configuration**: Proper Next.js configuration for production
-- **Environment-Specific**: Good API proxy configuration
-- **Resource Handling**: Proper image handling and optimization
-- **Logging**: Basic console logging but could be enhanced
+**API Communication Patterns**:
+- **Authentication**: Cookie-based auth with legacy token support (transition period)
+- **Error Handling**: Sophisticated 3-layer error system (api-error-handling, error-handling, error-reporting)
+- **Request Patterns**: Multiple coexisting approaches - apiRequest, optimized-api, direct fetch
+- **Caching**: ApiCacheService available but not universally adopted
+
+**UI/UX Implementation**:
+- **Design System**: Tailwind CSS with Radix UI components (modern accessibility-first)
+- **Responsive Design**: Mobile-responsive patterns throughout
+- **Loading States**: Skeleton components and loading indicators
+- **Toast Notifications**: Centralized toast system for user feedback
 
 ### Issues by Severity
 
-**Critical Issues**: None identified
+**Critical Issues**:
+- **None identified during analysis**
 
 **High Priority**:
-- Complex state management in dashboard page (multiple useState hooks)
-- Some performance concerns with frequent API calls
-- Debug console.log statements in production code
+1. **State Management Chaos** (Multiple files): No global state management leads to prop drilling and duplicated state
+2. **API Pattern Inconsistency** (lib/): 3 different API request patterns used across components
+3. **Missing Type Safety** (Multiple files): Mix of any types and proper TypeScript interfaces
+4. **Heavy Client Components** (36 files): Excessive "use client" usage limits Next.js optimization benefits
 
 **Medium Priority**:
-- Tight coupling between JobList and JobCard components
-- Some prop drilling in component hierarchy
-- Inconsistent error handling patterns
+1. **Modal State Complexity** (dashboard/job-card.tsx): Single component manages 10+ modal states
+2. **Duplicate API Calls** (Multiple components): Same data fetched across multiple components
+3. **Error State Duplication** (Components): Each component implements own error handling patterns
+4. **Form Validation Inconsistency** (Form components): Different validation approaches across forms
 
 **Low Priority**:
-- Minor TypeScript type inconsistencies
-- Some redundant re-renders in components
+1. **Component Size** (job-card.tsx): 1000+ line component handling multiple concerns
+2. **Magic Numbers**: Hardcoded timeouts and limits in various components
+3. **Console Logging**: Development console.log statements still present
 
 ### Cross-Cutting Concerns Identified
-- State management complexity across dashboard components
-- API call patterns not fully standardized
-- Error handling could be more consistent
-- Performance optimization opportunities in data fetching
+- **Authentication State**: Multiple auth checks scattered across components instead of centralized
+- **API Error Handling**: Sophisticated error system exists but not consistently implemented
+- **Loading State Management**: Different loading patterns across similar components
+- **Form State Management**: Each form implements own validation and submission logic
+- **Modal Management**: Complex modal state management repeated across components
 
 ## Pass 3: Infrastructure Analysis
 
 ### Health Snapshot
-- **Complexity Score**: 5/10 (Well-structured infrastructure with good practices)
-- **Maintainability**: High - Clear Docker setup with good separation of concerns
-- **Overall Risk**: Low - Proper containerization and resource management
-- **Bus Factor**: 4/5 - Standard Docker/PostgreSQL/Redis setup
+- **Complexity Score**: 4/10 (Well-structured, moderate complexity with good practices)
+- **Maintainability**: Easy-Medium (standard Docker patterns with good documentation)
+- **Overall Risk**: Low (production-ready setup with security best practices)
+- **Bus Factor**: 4/5 (standard DevOps patterns, well-documented)
 
 ### Technical Findings
 
-**Architecture Mapping**:
-- **Entry Points**: Multi-service Docker Compose with proper networking
-- **Dependency Analysis**: Clear service dependencies (frontend → backend → db/redis)
-- **Data Flow**: Proper API proxy configuration in Next.js
-- **State Management**: PostgreSQL for persistence, Redis for caching/queues
+**Container Architecture**:
+- **Service Count**: 5 services (backend, frontend, db, redis, worker)
+- **Orchestration**: Docker Compose with separate dev/prod configurations
+- **Multi-stage Builds**: Production Dockerfiles use multi-stage builds for optimization
+- **Security**: Non-root users, `no-new-privileges`, proper resource limits
 
-**Code Quality Assessment**:
-- **Configuration**: Excellent environment variable management
-- **Mixed Concerns**: Good separation between services
-- **Status Consistency**: Database migrations properly managed
-- **Error Handling**: Health checks implemented for all services
-- **Naming**: Consistent naming conventions across services
+**Production Deployment**:
+- **Backend**: Gunicorn with 4 workers, proper Python production setup
+- **Frontend**: Next.js standalone build with Node.js runtime
+- **Database**: PostgreSQL 15 with health checks and persistent storage
+- **Caching**: Redis 7-alpine with password authentication
+- **Background Jobs**: RQ worker service for asynchronous processing
 
-**Technical Debt Indicators**:
-- **Code Archaeology**: Clean migration history
-- **Duplicate Logic**: No duplication in infrastructure setup
-- **God Classes**: No infrastructure god classes
-- **Coupling**: Proper service isolation with network separation
-- **Abstraction**: Good abstraction with Docker layers
+**Resource Management**:
+- **CPU Allocation**: Proper CPU limits (backend: 1.0, frontend: 0.5, db: 0.5, redis: 0.25, worker: 0.5)
+- **Memory Limits**: Conservative memory allocation (backend: 1GB, frontend: 512MB, db: 512MB, redis: 256MB)
+- **Storage**: Persistent volumes for database and storage data
+- **Network**: Internal bridge network with service discovery
 
-**Deployment & Production Readiness**:
-- **Configuration**: Production-ready Docker configurations
-- **Environment-Specific**: Separate dev/prod configurations
-- **Resource Handling**: Proper resource limits and health checks
-- **Logging**: Structured logging with rotation
+**Monitoring & Health Checks**:
+- **Health Endpoints**: Comprehensive health checking for all services
+- **Monitoring Scripts**: Production monitoring with alerting (`monitor_production.sh/bat`)
+- **Service Monitoring**: Detailed service status monitoring (`monitor_services.sh`)
+- **Health Check Scripts**: Multi-layered health verification system
+- **Graceful Shutdown**: Proper cleanup and shutdown procedures
+
+**Configuration Management**:
+- **Environment Variables**: Comprehensive env-based configuration
+- **Secrets Management**: Environment-based secret injection
+- **Service Dependencies**: Proper service startup ordering with health checks
+- **Logging**: Structured logging with rotation (JSON format, 10MB max, 3 files)
 
 ### Issues by Severity
 
-**Critical Issues**: None identified
+**Critical Issues**:
+- **None identified during analysis**
 
 **High Priority**:
-- Development ports exposed in docker-compose (commented out but present)
-- Some hardcoded values in Dockerfiles
+- **None identified during analysis** 
 
 **Medium Priority**:
-- Could benefit from more granular health check configurations
-- Some environment variables could be better documented
+1. **Missing Environment Files** (Root): No `.env.example` or documented environment setup
+2. **Hardcoded API URL** (docker-compose files): Frontend API URL hardcoded to localhost
+3. **Missing SSL/TLS Configuration** (Infrastructure): No HTTPS setup or reverse proxy configuration
+4. **No Backup Strategy** (Database): No documented backup/restore procedures for PostgreSQL
 
 **Low Priority**:
-- Minor optimization opportunities in Docker layer caching
-- Could add more comprehensive monitoring
+1. **Resource Over-allocation** (compose files): Conservative resource limits may be unnecessarily restrictive
+2. **TODO Comments** (monitoring scripts): Unfinished email/SMS alerting implementation
+3. **Development Port Exposure** (docker-compose.dev.yml): Commented ports could be documented better
 
 ### Cross-Cutting Concerns Identified
-- Good infrastructure patterns that could be templated
-- Consistent resource management across services
-- Proper security practices with no-new-privileges
-- Good separation of development and production concerns
+- **Environment Configuration**: Well-structured but missing documentation/examples
+- **Security Practices**: Excellent container security implementation
+- **Monitoring Coverage**: Comprehensive monitoring but alerting integration incomplete
+- **Service Orchestration**: Proper dependency management and health checking
+- **Production Readiness**: Well-prepared for production deployment
 
 ## Pass 4: File Handling Analysis
 
 ### Health Snapshot
-- **Complexity Score**: 8/10 (Complex file handling with multiple services and atomic operations)
-- **Maintainability**: Medium - Good abstraction but complex interactions
-- **Overall Risk**: Medium - Sophisticated file handling with proper safety measures
-- **Bus Factor**: 2/5 - Requires deep understanding of file operations and locking
+- **Complexity Score**: 8/10 (Very sophisticated file handling with multiple safety layers)
+- **Maintainability**: Medium-Hard (complex but well-architected safety mechanisms)
+- **Overall Risk**: Low-Medium (excellent safety measures but high complexity)
+- **Bus Factor**: 2/5 (requires deep understanding of atomic operations and file safety)
 
 ### Technical Findings
 
-**Architecture Mapping**:
-- **Entry Points**: Multiple file services with clear responsibilities
-- **Dependency Analysis**: Good separation between atomic operations, discovery, and locking
-- **Data Flow**: Proper file movement with status-based directory organization
-- **State Management**: Redis-based file locking with fallback mechanisms
+**File Security Architecture**:
+- **Filename Validation**: Comprehensive security checks (path traversal, dangerous chars, reserved names)
+- **Content Validation**: File header validation to prevent malicious uploads disguised as valid files
+- **Size Limits**: Configurable min/max file size validation (1KB-50MB default)
+- **Extension Filtering**: Allow-list based with priority ranking (.3mf preferred over .stl/.obj)
+- **File Sanitization**: Automatic filename sanitization removing dangerous characters
 
-**Code Quality Assessment**:
-- **Configuration**: Environment-based configuration for file types and priorities
-- **Mixed Concerns**: Well-separated file handling concerns
-- **Status Consistency**: Proper status-to-directory mapping
-- **Error Handling**: Comprehensive error handling with rollback capabilities
-- **Naming**: Consistent naming with clear service boundaries
+**Storage Organization**:
+- **Status-Based Directories**: Physical directories mirror job lifecycle (Uploaded/, Pending/, ReadyToPrint/, etc.)
+- **Dual File System**: Both physical files and metadata JSON files stored per job
+- **Metadata Consistency**: Metadata contains authoritative filename, status, and job details
+- **File Discovery**: Intelligent candidate file matching based on job tokens and relevance
 
-**Technical Debt Indicators**:
-- **Code Archaeology**: Deprecated functions marked for replacement
-- **Duplicate Logic**: Some overlap between atomic and legacy file services
-- **God Classes**: No obvious god classes - good service decomposition
-- **Coupling**: Proper service isolation with clear interfaces
-- **Abstraction**: Excellent abstraction with atomic operation patterns
+**Atomic File Operations**:
+- **Prepare/Commit/Rollback Pattern**: Sophisticated transaction-like file operations
+- **Staging Directories**: Temporary staging prevents partial failures
+- **Redis File Locking**: Distributed locking prevents concurrent file operations
+- **Fallback Systems**: Atomic operations with fallback to legacy mode
+- **Context Managers**: Safe file operation patterns with automatic cleanup
 
-**Deployment & Production Readiness**:
-- **Configuration**: Feature flags for atomic operations
-- **Environment-Specific**: Configurable file types and priorities
-- **Resource Handling**: Proper file locking and cleanup
-- **Logging**: Comprehensive logging for debugging file operations
+**File Processing Pipeline**:
+- **Upload Validation**: 4-layer validation (filename, extension, size, content)
+- **Duplicate Detection**: Hash-based duplicate detection for active jobs
+- **File Movement**: Atomic file moves between status directories
+- **Catalog Validation**: Job configuration validated against printer/material catalog
+- **Authoritative File Logic**: Preference system for .3mf over other formats
+
+**Concurrency Control**:
+- **Redis-Based Locking**: Distributed file locks with TTL and metadata
+- **Operation IDs**: Unique operation tracking for debugging and safety
+- **Lock Extensions**: Ability to extend lock timeouts for long operations
+- **Automatic Cleanup**: Expired lock cleanup and orphan detection
 
 ### Issues by Severity
 
-**Critical Issues**: None identified
+**Critical Issues**:
+- **None identified during analysis**
 
 **High Priority**:
-- Deprecated file service functions still in use (move_authoritative)
-- Complex file discovery logic that could be simplified
-- Some hardcoded file extensions in submit.py
+1. **File Lock Fallback Risk** (backend/app/services/infrastructure/file_lock_service.py): In-memory fallback locks not shared across processes/containers
+2. **Atomic Operations Feature Flag** (atomic_file_service.py:23): Production deployments could disable atomic operations creating data corruption risk
 
 **Medium Priority**:
-- Transition period between legacy and atomic file operations
-- Some file path handling could be more robust
-- Error handling could be more granular
+1. **File Path Inconsistency** (Multiple files): Mix of relative and absolute paths in different contexts  
+2. **Missing File Integrity Checks** (Storage): No checksums or file corruption detection after moves
+3. **Storage Path Hardcoding** (Various services): Storage paths constructed in multiple locations instead of centralized
+4. **Large File Memory Usage** (submit.py:73): Full file loaded into memory for hashing could cause OOM
 
 **Low Priority**:
-- Minor optimization opportunities in file scanning
-- Could add more comprehensive file validation
+1. **File Discovery Performance** (file_discovery_service.py): Full directory scans could be slow with many files
+2. **Metadata File Redundancy** (Storage structure): Job data duplicated between database and metadata files
+3. **File Extension Priority Logic** (file_configuration_service.py): Complex priority logic could be simplified
+4. **Lock Cleanup Frequency** (file_lock_service.py): No scheduled cleanup of expired locks
 
 ### Cross-Cutting Concerns Identified
-- File handling logic properly abstracted but complex
-- Good atomic operation patterns that could be extended
-- Proper file locking mechanisms with Redis fallback
-- Status-based file organization working well
+- **File Path Management**: Inconsistent path handling patterns across services
+- **Storage Configuration**: Path configuration scattered across multiple services
+- **Error Recovery**: Excellent rollback mechanisms but limited corruption detection
+- **Performance Scaling**: File operations may not scale well with large file counts
+- **Monitoring Coverage**: Limited visibility into file operation performance and failures
 
 ## Overall Health Assessment
 
-**System-wide complexity score**: 6.5/10 (Average across all areas)
-**Maintainability rating**: Medium - Good architecture but some complexity in file handling and state management
-**Breaking point warning**: File handling complexity and state management could become unmaintainable if not addressed
-**Top 5 cross-cutting issues**:
-1. File handling logic scattered across multiple services with transition period
-2. State management complexity in frontend dashboard components
-3. Circular import issues in backend services
-4. Inconsistent error handling patterns across layers
-5. Some hardcoded values and magic strings
+### System-wide Analysis
+- **System-wide Complexity Score**: 6.25/10 (Average across all areas - moderate to high complexity)
+- **Maintainability Rating**: Medium-Hard (Well-structured but requires domain expertise)
+- **Breaking Point Warning**: System approaching complexity threshold where changes become risky
+- **Architecture Coherence**: Good - pieces work together but coupling issues emerging
 
-**Architecture coherence**: Good overall architecture with clear separation of concerns, but some areas need consolidation and standardization.
+### Top 5 Cross-Cutting Issues
+1. **Inconsistent Service Patterns**: Mix of orchestration services, direct model access, and ResponseService usage
+2. **Status Management Chaos**: Status name inconsistencies (READYTOPRINT vs ReadyToPrint) across layers
+3. **API Pattern Fragmentation**: 3 different API request patterns in frontend, multiple response formats in backend
+4. **File Path Management**: Scattered path construction and configuration across multiple services  
+5. **State Management Complexity**: No global state management leading to prop drilling and duplicate state
+
+### Architecture Assessment
+The system demonstrates **solid architectural thinking** with clear separation of concerns, but is **accumulating technical debt** that threatens maintainability. The backend shows excellent service architecture patterns, while the frontend lacks cohesive state management. File handling is exceptionally sophisticated but perhaps over-engineered for current needs.
+
+**Strengths**: Security-first design, comprehensive error handling, production-ready infrastructure, atomic operations
+**Weaknesses**: Coupling issues, pattern inconsistency, complexity approaching maintainability limits
 
 ## Task Board
 
 ### 🚨 CRITICAL (Do Immediately)
-- [ ] **Task**: Complete migration from deprecated file service functions to atomic operations | **Risk**: Critical | **Effort**: M | **Files**: backend/app/services/infrastructure/file_service.py, backend/app/routes/jobs.py | **Why Critical**: Deprecated functions have multiple failure points and don't provide atomic guarantees
+*No critical issues identified - system is production stable*
 
 ### 🔥 HIGH PRIORITY (This Week)
-- [ ] **Task**: Resolve circular import issues in services/__init__.py | **Risk**: High | **Effort**: S | **Files**: backend/app/services/__init__.py | **Dependencies**: None
-- [ ] **Task**: Consolidate file handling configuration into centralized service | **Risk**: High | **Effort**: M | **Files**: backend/app/routes/submit.py, backend/app/services/infrastructure/file_discovery_service.py | **Dependencies**: Complete atomic file operations migration
-- [ ] **Task**: Simplify state management in dashboard page | **Risk**: High | **Effort**: M | **Files**: frontend/src/app/dashboard/page.tsx | **Dependencies**: None
-- [ ] **Task**: Remove debug console.log statements from production code | **Risk**: High | **Effort**: S | **Files**: frontend/src/app/dashboard/page.tsx, frontend/src/components/dashboard/job-list.tsx | **Dependencies**: None
+
+- [ ] **Standardize API Patterns** | **Risk**: High | **Effort**: L | **Files**: frontend/src/lib/, backend routes | **Why Critical**: 3 different API patterns causing maintenance confusion and bugs
+
+- [ ] **Fix Status Name Consistency** | **Risk**: High | **Effort**: M | **Files**: Multiple - STATUS_TO_DIR mappings, frontend components | **Dependencies**: Requires coordinated backend/frontend changes
+
+**Implementation Details**:
+The masterplan defines a **three-tier naming convention** that must be enforced consistently:
+
+1. **Internal Identifiers (API/Code/Database)**: UPPERCASE
+   - `READYTOPRINT`, `PAIDPICKEDUP` (not ReadyToPrint, PaidPickedUp)
+   - Used in: API endpoints, TypeScript types, database values, conditional logic
+
+2. **Directory Names**: PascalCase
+   - `ReadyToPrint/`, `PaidPickedUp/` (not ReadyToPrint/, READYTOPRINT/)
+   - Used in: File system organization
+
+3. **User Interface**: Title Case with spaces
+   - "Ready to Print", "Paid & Picked Up" (not READYTOPRINT, ReadyToPrint)
+   - Used in: Dashboard displays, modals, status indicators
+
+**Specific Files to Update**:
+- `backend/app/services/infrastructure/atomic_file_service.py:26-35` - STATUS_TO_DIR mapping
+- `frontend/src/types/index.ts` - JobStatus enum/types  
+- `frontend/src/components/dashboard/status-tabs.tsx` - UI display labels
+- All route files using status string literals
+- Any hardcoded status references in business logic services
+
+**Success Criteria**:
+- All database/API references use UPPERCASE: `READYTOPRINT`, `PAIDPICKEDUP`
+- All directory operations use PascalCase: `ReadyToPrint/`, `PaidPickedUp/`
+- All UI displays use Title Case: "Ready to Print", "Paid & Picked Up"
+- No mixed casing found in codebase search for status references
+
+- [ ] **Implement Global State Management** | **Risk**: High | **Effort**: L | **Files**: frontend/src/ - Add Zustand/Context | **Why Critical**: Current prop drilling and duplicate state causing bugs and poor UX
+
+- [ ] **Centralize File Path Configuration** | **Risk**: High | **Effort**: M | **Files**: backend/app/services/infrastructure/ | **Dependencies**: None | **Why Critical**: Path construction scattered across services risks inconsistency
 
 ### 📋 MEDIUM PRIORITY (Next 2 Weeks)
-- [ ] **Task**: Standardize error response formats across all API endpoints | **Risk**: Medium | **Effort**: M | **Files**: backend/app/routes/*.py | **Dependencies**: None
-- [ ] **Task**: Implement consistent error handling patterns in frontend components | **Risk**: Medium | **Effort**: M | **Files**: frontend/src/components/dashboard/*.tsx | **Dependencies**: None
-- [ ] **Task**: Add comprehensive file validation to file discovery service | **Risk**: Medium | **Effort**: S | **Files**: backend/app/services/infrastructure/file_discovery_service.py | **Dependencies**: File handling consolidation
-- [ ] **Task**: Optimize API call patterns in frontend with better caching | **Risk**: Medium | **Effort**: M | **Files**: frontend/src/lib/auth.ts, frontend/src/components/dashboard/*.tsx | **Dependencies**: None
-- [ ] **Task**: Complete TODO items in routes/jobs.py | **Risk**: Medium | **Effort**: S | **Files**: backend/app/routes/jobs.py | **Dependencies**: None
+
+- [ ] **Refactor Job Card Component** | **Risk**: Medium | **Effort**: M | **Files**: frontend/src/components/dashboard/job-card.tsx | **Dependencies**: Global state management | **Why**: 1000+ line component managing 10+ concerns
+
+- [ ] **Implement Service Pattern Consistency** | **Risk**: Medium | **Effort**: L | **Files**: backend/app/routes/ | **Dependencies**: None | **Why**: Mix of direct model access and service patterns
+
+- [ ] **Add File Integrity Checks** | **Risk**: Medium | **Effort**: M | **Files**: backend/app/services/infrastructure/atomic_file_service.py | **Dependencies**: None | **Why**: No corruption detection after file moves
+
+- [ ] **Create Environment Documentation** | **Risk**: Medium | **Effort**: S | **Files**: Create .env.example, deployment docs | **Dependencies**: None | **Why**: Missing environment setup guidance
+
+- [ ] **Add SSL/TLS Configuration** | **Risk**: Medium | **Effort**: M | **Files**: docker-compose.prod.yml, nginx config | **Dependencies**: None | **Why**: Production needs HTTPS
 
 ### 🔧 LOW PRIORITY (Technical Debt)
-- [ ] **Task**: Add more granular health check configurations in Docker | **Risk**: Low | **Effort**: S | **Files**: docker-compose.dev.yml, docker-compose.prod.yml | **Nice-to-have because**: Better monitoring and debugging capabilities
-- [ ] **Task**: Optimize Docker layer caching for faster builds | **Risk**: Low | **Effort**: S | **Files**: backend/Dockerfile, frontend/Dockerfile | **Nice-to-have because**: Faster development and deployment cycles
-- [ ] **Task**: Add comprehensive monitoring and logging | **Risk**: Low | **Effort**: M | **Files**: backend/app/__init__.py, frontend/src/lib/error-reporting.ts | **Nice-to-have because**: Better production debugging and performance monitoring
-- [ ] **Task**: Standardize TypeScript types across frontend components | **Risk**: Low | **Effort**: S | **Files**: frontend/src/types/*.ts | **Nice-to-have because**: Better type safety and developer experience
+
+- [ ] **Optimize File Discovery Performance** | **Risk**: Low | **Effort**: S | **Files**: backend/app/services/infrastructure/file_discovery_service.py | **Nice-to-have because**: Will improve performance with large file counts
+
+- [ ] **Consolidate Error Handling Patterns** | **Risk**: Low | **Effort**: S | **Files**: frontend/src/components/ | **Nice-to-have because**: More consistent error UX
+
+- [ ] **Add Database Backup Strategy** | **Risk**: Low | **Effort**: M | **Files**: scripts/, documentation | **Nice-to-have because**: Production data protection
+
+- [ ] **Implement Email/SMS Alerting** | **Risk**: Low | **Effort**: M | **Files**: scripts/monitor_production.sh | **Nice-to-have because**: Complete monitoring solution
 
 ## Success Metrics
 
 After completing the task board, you should be able to:
-- [ ] Add a new file status without touching more than 2 files
-- [ ] Add a new file type (.step, .iges) in under 30 minutes  
-- [ ] Trace the complete request flow from upload to completion
-- [ ] Deploy changes without fear of breaking production
-- [ ] Onboard a new developer who can be productive within 2-3 days
-- [ ] Run tests that actually validate core business logic
-- [ ] Understand which components own which responsibilities
-- [ ] Make file handling changes without risk of data corruption
-- [ ] Modify state management without breaking other components
-- [ ] Add new API endpoints with consistent error handling
+
+- [ ] **Add a new file status without touching more than 2 files** 
+  - *Current*: Requires changes across 6+ files (models, services, routes, frontend) 
+  - *Target*: Centralized status configuration with automatic propagation
+
+- [ ] **Add a new file type (.step, .iges) in under 30 minutes**  
+  - *Current*: ~45-60 minutes due to scattered configuration
+  - *Target*: Single configuration change in FileConfigurationService
+
+- [ ] **Trace the complete request flow from upload to completion**
+  - *Current*: Complex due to mixed service patterns
+  - *Target*: Clear service orchestration with consistent patterns
+
+- [ ] **Deploy changes without fear of breaking production**
+  - *Current*: Good (comprehensive monitoring and health checks exist)
+  - *Target*: Maintain current high confidence level
+
+- [ ] **Onboard a new developer who can be productive within 2-3 days**
+  - *Current*: ~5-7 days due to complexity and coupling
+  - *Target*: Clear architecture patterns reduce learning curve
+
+- [ ] **Run tests that actually validate core business logic**
+  - *Current*: Limited business logic test coverage
+  - *Target*: Comprehensive test coverage for job lifecycle and file operations  
+
+- [ ] **Understand which components own which responsibilities**
+  - *Current*: Some confusion due to mixed patterns
+  - *Target*: Clear service boundaries and single responsibility
