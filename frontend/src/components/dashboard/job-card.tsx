@@ -9,7 +9,8 @@ import StatusChangeModal from './modals/status-change-modal';
 import PaymentModal from './modals/payment-modal';
 import ConfirmDialog from './modals/confirm-dialog';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
-import { apiRequest, getLegacyToken } from '../../lib/auth';
+import { getLegacyToken } from '../../lib/auth';
+import { apiClient } from '../../lib/unified-api-client';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { InlineError } from '../ui/error-display';
 import { Job, JobCardProps, JobStatus, JobStatusAction, StatusChangeModalConfig, ReviewModalState } from '../../types';
@@ -106,7 +107,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
     const loadStaff = async () => {
       try {
         setLoadingStaff(true);
-        const data = await apiRequest<any>('/api/v1/staff');
+        const data = await apiClient.get<any>('/api/v1/staff');
         const activeStaff = (data?.staff || []).filter((s: any) => s.is_active);
         setStaff(activeStaff); // Set staff state for all modals
         if (activeStaff.length > 0) {
@@ -137,14 +138,14 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
     let intervalId: NodeJS.Timeout;
     const lockJob = async () => {
       try {
-        await apiRequest(`/api/v1/jobs/${job.id}/lock`, { method: 'POST' });
+        await apiClient.post(`/api/v1/jobs/${job.id}/lock`);
       } catch (err) {
         // Silently handle lock request failures
       }
     };
     const extendLock = async () => {
       try {
-        await apiRequest(`/api/v1/jobs/${job.id}/extend`, { method: 'POST' });
+        await apiClient.post(`/api/v1/jobs/${job.id}/extend`);
       } catch (err) {
         // Silently handle extend lock failures
       }
@@ -154,14 +155,14 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
       lockJob();
       intervalId = setInterval(extendLock, 4 * 60 * 1000);
     } else {
-      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(() => {
+      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {
         // Silently handle unlock failures
       });
     }
 
     return () => {
       clearInterval(intervalId);
-      apiRequest(`/api/v1/jobs/${job.id}/unlock`, { method: 'POST' }).catch(() => {
+      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {
         // Silently handle unlock failures
       });
     };
@@ -272,10 +273,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
   const copyFilePath = async () => {
     // Log the action regardless
     try {
-      await apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
+      await apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {});
     } catch {}
 
     if (job.file_path) {
@@ -308,10 +306,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
       setSavingNotes(true);
       setSaveError(clearErrorState());
       setSaveMessage("Saving...");
-      const data = await apiRequest<{ notes?: string }>(`/api/v1/jobs/${job.id}/notes`, {
-        method: 'POST',
-        body: JSON.stringify({ text: notesDraft, staff_name: notesStaffName })
-      });
+      const data = await apiClient.post<{ notes?: string }>(`/api/v1/jobs/${job.id}/notes`, { text: notesDraft, staff_name: notesStaffName });
       setJobNotes(data?.notes || (jobNotes ? `${jobNotes}\n${notesDraft}` : notesDraft));
       setSaveMessage('Saved');
       setIsEditingNotes(false);
@@ -681,7 +676,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
                    <span className="hidden sm:inline">Resend</span>
                  </button>
                )}
-              {currentStatus === "READYTOPRINT" && (
+              {currentStatus === JobStatus.READYTOPRINT && (
                                 <button
                    onClick={() => {
                      setShowStatusChangeModal({
@@ -824,18 +819,12 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
                   
                   // Log the action regardless
                   try {
-                    await apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
-                      method: 'POST',
-                      body: JSON.stringify({})
-                    });
+                    await apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {});
                   } catch {}
                   
                   // Fire-and-forget logging (don't block the protocol launch)
                   try {
-                    apiRequest(`/api/v1/jobs/${job.id}/log-file-open`, {
-                      method: 'POST',
-                      body: JSON.stringify({})
-                    }).catch(() => {});
+                    apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {}).catch(() => {});
                   } catch {
                     // ignore
                   }
@@ -866,9 +855,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
           onConfirm={async () => {
             try {
               setIsDeleting(true);
-              await apiRequest(`/api/v1/jobs/${job.id}`, {
-                method: 'DELETE'
-              });
+              await apiClient.delete(`/api/v1/jobs/${job.id}`);
               show('Job archived');
               onReject?.(job.id);
             } catch (e) {
@@ -929,10 +916,7 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
                      
                      try {
                        setIsResendingConfirm(true);
-                       const response = await apiRequest<any>(`/api/v1/jobs/${job.id}/admin/resend-email`, {
-                         method: 'POST',
-                         body: JSON.stringify({ staff_name: resendStaffName })
-                       });
+                       const response = await apiClient.post<any>(`/api/v1/jobs/${job.id}/admin/resend-email`, { staff_name: resendStaffName });
                        
                        // Check if email was actually sent
                        if (response && (response as any).message) {

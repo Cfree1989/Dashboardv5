@@ -4,9 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
-import { apiRequest, getLegacyToken } from '../../lib/auth';
+import { getLegacyToken } from '../../lib/auth';
 import { playNewUploadSound } from '../../lib/sound-utils';
-import { optimizedApi } from '../../lib/optimized-api';
+import { apiClient } from '../../lib/unified-api-client';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
@@ -158,7 +158,7 @@ export default function DashboardPage() {
     }
     
     try {
-      const counts = await optimizedApi.request<Record<string, number>>(
+      const counts = await apiClient.request<Record<string, number>>(
         '/api/v1/jobs/counts?search=' + encodeURIComponent(debouncedSearch),
         {},
         { ttl: 30 * 1000 } // 30 seconds for search results
@@ -172,7 +172,7 @@ export default function DashboardPage() {
 
   const fetchCounts = useCallback(async () => {
     try {
-      const data = await optimizedApi.request<Record<string, number>>(
+      const data = await apiClient.request<Record<string, number>>(
         '/api/v1/jobs/counts',
         {},
         { 
@@ -215,7 +215,7 @@ export default function DashboardPage() {
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
         // Test authentication by making a request to a protected endpoint
-        await apiRequest('/api/v1/auth/protected');
+        await apiClient.get('/api/v1/auth/protected');
         // If we get here, authentication is successful, so load counts
         await fetchCounts();
       } catch {
@@ -239,7 +239,7 @@ export default function DashboardPage() {
     fetchSearchMatchCounts();
   }, [fetchSearchMatchCounts]);
 
-  // Intelligent polling is now handled by optimizedApi
+  // Intelligent polling is now handled by apiClient
   // Manual interval removed in favor of adaptive polling
   
   const refreshPage = useCallback(async () => {

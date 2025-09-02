@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { AlertTriangle, Unlock, CheckCircle, RotateCcw, XCircle } from "lucide-react";
 import { useToast } from "../ui/toast";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 import { JobStatus } from '../../types';
 
 export function AdminOverridesPanel() {
@@ -66,10 +66,7 @@ export function AdminOverridesPanel() {
           setIsProcessing(false);
           return;
       }
-      await apiRequest(path, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      await apiClient.post(path, body);
       setSuccessMsg("Override executed successfully.");
       show("Admin override completed");
       setJobId("");

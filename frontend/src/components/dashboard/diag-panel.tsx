@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 
 type DiagInfo = {
   db_engine?: string | null;
@@ -24,7 +24,7 @@ export function DiagPanel() {
     setLoading(true);
     setError("");
     try {
-      const data = await apiRequest<DiagInfo>("/api/v1/_diag");
+      const data = await apiClient.get<DiagInfo>("/api/v1/_diag");
       setInfo(data);
     } catch (e) {
       setError("Failed to fetch diagnostics");

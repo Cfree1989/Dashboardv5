@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useToast } from "../../ui/toast";
-import { apiRequest } from "../../../lib/auth";
+import { apiClient } from "../../../lib/unified-api-client";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -26,7 +26,7 @@ export default function ReviewModal({ jobId, reviewed, onClose, onUpdated }: Rev
       try {
         setLoadingStaff(true);
         setError("");
-        const data = await apiRequest<any>("/api/v1/staff");
+        const data = await apiClient.get<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -47,10 +47,7 @@ export default function ReviewModal({ jobId, reviewed, onClose, onUpdated }: Rev
     try {
       setSubmitting(true);
       setError("");
-      const updated = await apiRequest(`/api/v1/jobs/${jobId}/review`, {
-        method: "POST",
-        body: JSON.stringify({ reviewed, staff_name: staffName }),
-      });
+      const updated = await apiClient.post(`/api/v1/jobs/${jobId}/review`, { reviewed, staff_name: staffName });
       show(reviewed ? 'Marked as reviewed' : 'Marked as unreviewed');
       onUpdated(updated);
       onClose();

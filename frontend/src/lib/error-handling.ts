@@ -13,12 +13,11 @@
 import { reportError } from './error-reporting';
 import { 
   ApiError, 
-  isApiError, 
-  extractApiError, 
-  getUserFriendlyMessage, 
+  extractApiError,
+  getUserFriendlyMessage,
   getErrorCategory, 
-  isRetryableError,
   getErrorStyling,
+  isRetryableError,
   handleApiError as handleApiErrorBase
 } from './api-error-handling';
 
@@ -130,58 +129,8 @@ export function handleApiError(
   }
 }
 
-/**
- * API request wrapper with automatic error handling
- */
-export async function apiRequestWithErrorHandling<T>(
-  url: string,
-  options: RequestInit = {},
-  errorHandler: (error: any) => void
-): Promise<T | null> {
-  try {
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    // Handle authentication errors
-    if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-      throw new Error('Unauthorized');
-    }
-
-    const data = await response.json();
-
-    // Check if response contains standardized error
-    if (isApiError(data)) {
-      const error = data.error;
-      const userMessage = getUserFriendlyMessage(error);
-      
-      const enhancedError = new Error(userMessage);
-      (enhancedError as any).apiError = error;
-      (enhancedError as any).isRetryable = isRetryableError(error);
-      (enhancedError as any).category = getErrorCategory(error);
-      
-      throw enhancedError;
-    }
-
-    // Handle non-standardized errors
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} - ${data.message || 'Unknown error'}`);
-    }
-
-    return data;
-  } catch (error) {
-    errorHandler(error);
-    return null;
-  }
-}
+// API request functionality moved to unified-api-client.ts
+// All error handling is now centralized in the unified client
 
 // ============================================================================
 // Error Display Components

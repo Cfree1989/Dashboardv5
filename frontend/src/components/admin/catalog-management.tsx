@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useCatalog } from '../../lib/use-catalog';
-import { apiRequest } from '../../lib/auth';
+import { apiClient } from '../../lib/unified-api-client';
 import { useToast } from '../ui/toast';
 import { Plus, Edit2, Trash2, Package, Settings, Palette } from 'lucide-react';
 
@@ -63,10 +63,7 @@ export function CatalogManagement() {
   const updateCatalog = async (updatedData: any) => {
     try {
       setIsUpdating(true);
-      await apiRequest('/api/v1/catalog', {
-        method: 'PUT',
-        body: JSON.stringify({ data: updatedData })
-      });
+      await apiClient.put('/api/v1/catalog', { data: updatedData });
       await mutate();
       show('Catalog updated successfully!');
       resetForms();

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Archive, Trash2, AlertTriangle, CheckCircle, Settings } from "lucide-react";
 import { useToast } from "../ui/toast";
 import { CatalogEditor } from "./catalog-editor";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 
 interface ArchiveResponse {
   message: string;
@@ -44,10 +44,7 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const data = await apiRequest<ArchiveResponse>(`/api/v1/admin/archive`, {
-        method: "POST",
-        body: JSON.stringify({ retention_days: archiveDays, staff_name: staffName.trim() }),
-      });
+      const data = await apiClient.post<ArchiveResponse>(`/api/v1/admin/archive`, { retention_days: archiveDays, staff_name: staffName.trim() });
       const count = Number(data?.jobs_archived ?? 0);
       setPreviewCounts((p) => ({ ...p, archive: isNaN(count) ? 0 : count }));
       setSuccessMsg(`Archived ${count} job(s).`);
@@ -63,10 +60,7 @@ export function DataManagementPanel() {
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const data = await apiRequest<PruneResponse>(`/api/v1/admin/prune`, {
-        method: "POST",
-        body: JSON.stringify({ retention_days: pruneDays, staff_name: staffName.trim() }),
-      });
+      const data = await apiClient.post<PruneResponse>(`/api/v1/admin/prune`, { retention_days: pruneDays, staff_name: staffName.trim() });
       const count = Number(data?.jobs_deleted ?? 0);
       setPreviewCounts((p) => ({ ...p, prune: isNaN(count) ? 0 : count }));
       setSuccessMsg(`Deleted ${count} archived job(s).`);
@@ -102,7 +96,7 @@ export function DataManagementPanel() {
           <div>
             <label htmlFor="archive-days" className="text-sm text-gray-700">Archive jobs older than (days)</label>
             <input id="archive-days" type="number" min={0} value={archiveDays} onChange={(e) => setArchiveDays(Number(e.target.value))} className="mt-1 w-40 border border-gray-300 rounded px-3 py-2 text-sm" />
-            <p className="text-sm text-gray-500 mt-1">Jobs in COMPLETED or PAIDPICKEDUP older than this will be archived.</p>
+            <p className="text-sm text-gray-500 mt-1">Jobs in Completed or Paid & Picked Up older than this will be archived.</p>
           </div>
           <button onClick={openArchiveConfirm} disabled={!staffName.trim()} className="w-full px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-black disabled:opacity-50">Review & Archive</button>
         </div>
@@ -134,7 +128,7 @@ export function DataManagementPanel() {
             <h3 className="font-semibold mb-2">Confirm Archive Operation</h3>
             {errorMsg && (<div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3" role="alert">{errorMsg}</div>)}
             {successMsg && (<div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mb-3" role="status">{successMsg}</div>)}
-            <p className="text-sm text-gray-600 mb-2">Jobs older than <strong>{archiveDays}</strong> days in COMPLETED or PAIDPICKEDUP will be archived.</p>
+            <p className="text-sm text-gray-600 mb-2">Jobs older than <strong>{archiveDays}</strong> days in Completed or Paid & Picked Up will be archived.</p>
             {typeof previewCounts.archive === 'number' && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-3">Archived {previewCounts.archive} job(s).</div>
             )}

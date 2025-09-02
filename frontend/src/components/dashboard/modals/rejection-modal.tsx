@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../ui/toast";
-import { apiRequest } from "../../../lib/auth";
+import { apiClient } from "../../../lib/unified-api-client";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -35,7 +35,7 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
       try {
         setLoadingStaff(true);
         setError("");
-        const data = await apiRequest<any>("/api/v1/staff");
+        const data = await apiClient.get<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -60,13 +60,10 @@ export default function RejectionModal({ jobId, onClose, onRejected }: Rejection
     try {
       setSubmitting(true);
       setError("");
-      await apiRequest(`/api/v1/jobs/${jobId}/reject`, {
-        method: "POST",
-        body: JSON.stringify({
-          staff_name: staffName,
-          reasons: selectedReasons,
-          custom_reason: customReason.trim(),
-        }),
+      await apiClient.post(`/api/v1/jobs/${jobId}/reject`, {
+        staff_name: staffName,
+        reasons: selectedReasons,
+        custom_reason: customReason.trim(),
       });
       show('Job rejected');
       onRejected();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useCatalog } from '../../lib/use-catalog';
-import { apiRequest } from '../../lib/auth';
+import { apiClient } from '../../lib/unified-api-client';
 
 interface CatalogEditorProps {
   featureFlag?: boolean;
@@ -40,10 +40,7 @@ export function CatalogEditor({ featureFlag = false }: CatalogEditorProps) {
       setIsUpdating(true);
       setUpdateStatus({ type: null, message: '' });
 
-      const result = await apiRequest<{ version: string }>('/api/v1/catalog', {
-        method: 'PUT',
-        body: JSON.stringify({ data: parsedData })
-      });
+      const result = await apiClient.put<{ version: string }>('/api/v1/catalog', { data: parsedData });
       
       setUpdateStatus({
         type: 'success',

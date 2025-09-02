@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useToast } from "../../ui/toast";
-import { apiRequest } from "../../../lib/auth";
+import { apiClient } from "../../../lib/unified-api-client";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -29,7 +29,7 @@ export default function StatusChangeModal({ jobId, action, title, description, c
       try {
         setLoadingStaff(true);
         setError("");
-        const data = await apiRequest<any>("/api/v1/staff");
+        const data = await apiClient.get<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -47,10 +47,7 @@ export default function StatusChangeModal({ jobId, action, title, description, c
     try {
       setSubmitting(true);
       setError("");
-      await apiRequest(`/api/v1/jobs/${jobId}/${action}`, {
-        method: "POST",
-        body: JSON.stringify({ staff_name: staffName }),
-      });
+      await apiClient.post(`/api/v1/jobs/${jobId}/${action}`, { staff_name: staffName });
       const msg = action === 'mark-printing'
         ? 'Marked Printing'
         : action === 'mark-complete'

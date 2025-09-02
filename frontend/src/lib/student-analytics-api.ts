@@ -1,5 +1,5 @@
 import type { StudentAnalyticsData, StudentAnalyticsFilters } from '../types/analytics';
-import { apiRequest } from './auth';
+import { apiClient } from './unified-api-client';
 
 export async function fetchStudentAnalyticsData(filters: StudentAnalyticsFilters): Promise<StudentAnalyticsData> {
   const qp = new URLSearchParams();
@@ -16,11 +16,11 @@ export async function fetchStudentAnalyticsData(filters: StudentAnalyticsFilters
     qp.set('end_date', filters.endDate);
   }
 
-  // Fetch all student analytics data using apiRequest
+  // Fetch all student analytics data using apiClient.get
   const [overviewJson, performanceJson, trendsJson] = await Promise.all([
-    apiRequest<any>(`/api/v1/analytics/student/overview?${qp.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/student/performance?${qp.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/student/trends?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/student/overview?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/student/performance?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/student/trends?${qp.toString()}`),
   ]);
   
   // Map snake_case JSON to camelCase TypeScript types

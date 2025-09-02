@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useToast } from "../../ui/toast";
-import { apiRequest } from "../../../lib/auth";
+import { apiClient } from "../../../lib/unified-api-client";
 
 type Staff = { name: string; is_active: boolean };
 
@@ -48,7 +48,7 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
       try {
         setLoadingStaff(true);
         setError("");
-        const data = await apiRequest<any>("/api/v1/staff");
+        const data = await apiClient.get<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -66,7 +66,7 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
   async function doRescan(forceShowChooser: boolean) {
     try {
       setRescanning(true);
-      const data = await apiRequest<any>(`/api/v1/jobs/${jobId}/candidate-files`);
+      const data = await apiClient.get<any>(`/api/v1/jobs/${jobId}/candidate-files`);
       // Support both shapes: files_detailed (preferred) or files (strings or objects)
       const raw = (data?.files_detailed ?? data?.files ?? []) as any[];
       let parsed: { name: string; mtime: number }[];
@@ -113,16 +113,13 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
     try {
       setSubmitting(true);
       setError("");
-      await apiRequest(`/api/v1/jobs/${jobId}/approve`, {
-        method: "POST",
-        body: JSON.stringify({
-          staff_name: staffName,
-          weight_g: parseFloat(weightG),
-          time_hours: parseFloat(timeHours),
-          authoritative_filename: authoritativeFilename || undefined,
-          // send only if changed or explicitly set
-          printer: printer && printer !== (currentPrinter || '') ? printer : undefined,
-        }),
+      await apiClient.post(`/api/v1/jobs/${jobId}/approve`, {
+        staff_name: staffName,
+        weight_g: parseFloat(weightG),
+        time_hours: parseFloat(timeHours),
+        authoritative_filename: authoritativeFilename || undefined,
+        // send only if changed or explicitly set
+        printer: printer && printer !== (currentPrinter || '') ? printer : undefined,
       });
       show('Approval sent');
       onApproved();

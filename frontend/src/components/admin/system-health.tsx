@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle, Clock, Trash2, ActivitySquare, Database, Mail } from "lucide-react";
 import { useToast } from "../ui/toast";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 import { createErrorState, updateErrorState, clearErrorState } from "../../lib/error-handling";
 import { InlineError } from "../ui/error-display";
 
@@ -27,7 +27,7 @@ export function SystemHealthPanel() {
     try {
       setLoadingReport(true);
       setError(clearErrorState());
-      const data: ServerAuditReport = await apiRequest("/api/v1/admin/audit/report");
+      const data: ServerAuditReport = await apiClient.get("/api/v1/admin/audit/report");
       setLastReport(data);
       setCurrentAudit(null);
     } catch (e) {
@@ -41,7 +41,7 @@ export function SystemHealthPanel() {
     fetchReport();
     (async () => {
       try {
-        const d = await apiRequest('/api/v1/_diag');
+        const d = await apiClient.get('/api/v1/_diag');
         setDiag(d);
       } catch {}
       try {
@@ -66,9 +66,9 @@ export function SystemHealthPanel() {
   const cleanUpOrphans = async () => {
     if (!lastReport) return;
     for (const path of lastReport.orphaned_files) {
-      await apiRequest("/api/v1/admin/audit/orphaned-file", {
+      await apiClient.request("/api/v1/admin/audit/orphaned-file", {
         method: "DELETE",
-        body: JSON.stringify({ file_path: path, staff_name: "Admin User" }),
+        body: JSON.stringify({ file_path: path, staff_name: "Admin User" })
       });
     }
     // refresh
@@ -77,9 +77,9 @@ export function SystemHealthPanel() {
 
   const deleteStale = async (path: string) => {
     try {
-      await apiRequest("/api/v1/admin/audit/stale-file", {
+      await apiClient.request("/api/v1/admin/audit/stale-file", {
         method: "DELETE",
-        body: JSON.stringify({ file_path: path, staff_name: "Admin User" }),
+        body: JSON.stringify({ file_path: path, staff_name: "Admin User" })
       });
       // refresh
       await fetchReport();
@@ -90,10 +90,7 @@ export function SystemHealthPanel() {
 
   const markReviewed = async (jobId: string, issues: string[]) => {
     try {
-      await apiRequest("/api/v1/admin/audit/mark-reviewed", {
-        method: "POST",
-        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", issues }),
-      });
+      await apiClient.post("/api/v1/admin/audit/mark-reviewed", { job_id: jobId, staff_name: "Admin User", issues });
       show("Marked reviewed");
       // Refresh the report so the UI can reflect any state (if desired in future)
       await fetchReport();
@@ -104,10 +101,7 @@ export function SystemHealthPanel() {
 
   const repairMetadata = async (jobId: string) => {
     try {
-      await apiRequest("/api/v1/admin/audit/repair-metadata", {
-        method: "POST",
-        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
-      });
+      await apiClient.post("/api/v1/admin/audit/repair-metadata", { job_id: jobId, staff_name: "Admin User" });
       show("Metadata repaired");
       await fetchReport();
     } catch (e) {
@@ -117,10 +111,7 @@ export function SystemHealthPanel() {
 
   const repairLocation = async (jobId: string) => {
     try {
-      await apiRequest("/api/v1/admin/audit/repair-location", {
-        method: "POST",
-        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User" })
-      });
+      await apiClient.post("/api/v1/admin/audit/repair-location", { job_id: jobId, staff_name: "Admin User" });
       show("Location repaired");
       await fetchReport();
     } catch (e) {
@@ -132,10 +123,7 @@ export function SystemHealthPanel() {
     const path = prompt('Enter full path to the authoritative file (under storage):');
     if (!path) return;
     try {
-      await apiRequest("/api/v1/admin/audit/relink-file", {
-        method: "POST",
-        body: JSON.stringify({ job_id: jobId, staff_name: "Admin User", file_path: path })
-      });
+      await apiClient.post("/api/v1/admin/audit/relink-file", { job_id: jobId, staff_name: "Admin User", file_path: path });
       show("File relinked");
       await fetchReport();
     } catch (e) {

@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { apiRequest } from '../../lib/auth';
+import { apiClient } from '../../lib/unified-api-client';
 import { handleApiError } from '../../lib/api-error-handling';
 import { useCatalog, filterMaterialsByMethod, filterPrintersByMethod, colorsForMaterial, getMaterialById } from '../../lib/use-catalog';
 

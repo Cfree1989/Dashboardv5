@@ -1,5 +1,5 @@
 import type { StaffAnalyticsData, StaffAnalyticsFilters, StaffOverviewData, StaffPerformanceData, StaffComparisonResult, StaffPerformance } from '../types/analytics';
-import { apiRequest } from './auth';
+import { apiClient } from './unified-api-client';
 
 export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Promise<StaffAnalyticsData> {
   // Build query parameters
@@ -18,8 +18,8 @@ export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Pr
 
   // Fetch all staff analytics data
   const [overviewJson, comparisonJson] = await Promise.all([
-    apiRequest<any>(`/api/v1/analytics/staff/overview?${qp.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/staff/comparison?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/staff/overview?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/staff/comparison?${qp.toString()}`),
   ]);
 
   // Parse overview data and map staff_performance to camelCase
@@ -63,7 +63,7 @@ export async function fetchStaffAnalyticsData(params: StaffAnalyticsFilters): Pr
   let performance: StaffPerformanceData | undefined;
   if (params.staff) {
     try {
-      const performanceJson = await apiRequest<any>(`/api/v1/analytics/staff/performance?${qp.toString()}`);
+      const performanceJson = await apiClient.get<any>(`/api/v1/analytics/staff/performance?${qp.toString()}`);
       
       performance = {
         staffName: performanceJson.staff_name ?? '',

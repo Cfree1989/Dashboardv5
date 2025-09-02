@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 
 interface StaffMember {
   name: string;
@@ -22,7 +22,7 @@ export function StaffPanel() {
     try {
       const params = new URLSearchParams();
       if (includeInactive) params.set("include_inactive", "true");
-      const data = await apiRequest<any>(`/api/v1/staff?${params.toString()}`);
+      const data = await apiClient.get<any>(`/api/v1/staff?${params.toString()}`);
       setStaff(data.staff || []);
     } catch (e) {
       setError("Failed to load staff");
@@ -41,10 +41,7 @@ export function StaffPanel() {
     const trimmed = newName.trim();
     if (!trimmed) return;
     try {
-      await apiRequest(`/api/v1/staff`, {
-        method: "POST",
-        body: JSON.stringify({ name: trimmed }),
-      });
+      await apiClient.post(`/api/v1/staff`, { name: trimmed });
       setNewName("");
       fetchStaff();
     } catch (e: any) {
@@ -59,10 +56,7 @@ export function StaffPanel() {
   const toggleActive = async (name: string, isActive: boolean) => {
     setError("");
     try {
-      await apiRequest(`/api/v1/staff/${encodeURIComponent(name)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_active: !isActive }),
-      });
+      await apiClient.put(`/api/v1/staff/${encodeURIComponent(name)}`, { is_active: !isActive });
       fetchStaff();
     } catch (e) {
       setError("Failed to update staff");

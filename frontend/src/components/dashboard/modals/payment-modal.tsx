@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
 import { useToast } from "../../ui/toast";
-import { apiRequest } from "../../../lib/auth";
+import { apiClient } from "../../../lib/unified-api-client";
 import { Staff } from '../../../types';
 
 type JobDetails = {
@@ -34,7 +34,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
       try {
         setLoadingStaff(true);
         setError("");
-        const data = await apiRequest<any>("/api/v1/staff");
+        const data = await apiClient.get<any>("/api/v1/staff");
         const list: Staff[] = (data?.staff || []).filter((s: Staff) => s.is_active);
         setStaff(list);
       } catch (e) {
@@ -48,7 +48,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
       try {
         setLoadingJob(true);
         setError("");
-        const data = await apiRequest<any>(`/api/v1/jobs/${jobId}`);
+        const data = await apiClient.get<any>(`/api/v1/jobs/${jobId}`);
         setJobDetails({
           material: data.material || 'filament',
           cost_usd: data.cost_usd || 0
@@ -92,10 +92,7 @@ export default function PaymentModal({ jobId, onClose, onSuccess }: PaymentModal
     try {
       setSubmitting(true);
       setError("");
-      await apiRequest(`/api/v1/jobs/${jobId}/payment`, {
-        method: "POST",
-        body: JSON.stringify({ staff_name: staffName, grams: parseFloat(grams), txn_no: txnNo, picked_up_by: pickedUpBy }),
-      });
+      await apiClient.post(`/api/v1/jobs/${jobId}/payment`, { staff_name: staffName, grams: parseFloat(grams), txn_no: txnNo, picked_up_by: pickedUpBy });
       show('Payment recorded');
       onSuccess();
       onClose();

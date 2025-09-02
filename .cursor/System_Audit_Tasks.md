@@ -40,11 +40,11 @@ This document contains all actionable tasks identified in the System Audit, orga
 6. Update TypeScript types for consistent responses
 
 **Success Criteria**:
-- [ ] All API calls use single, consistent pattern
-- [ ] No direct fetch() calls remain except in unified client
-- [ ] Consistent error handling across all requests
-- [ ] All deprecated API utilities removed
-- [ ] TypeScript compilation without API-related warnings
+- [x] All API calls use single, consistent pattern
+- [x] No direct fetch() calls remain except in unified client
+- [x] Consistent error handling across all requests
+- [x] All deprecated API utilities removed
+- [x] TypeScript compilation without API-related warnings
 
 **Dependencies**: None
 
@@ -85,11 +85,11 @@ The masterplan defines a **three-tier naming convention** that must be enforced 
 7. Test file operations work with corrected directory names
 
 **Success Criteria**:
-- [ ] All database/API references use UPPERCASE: `READYTOPRINT`, `PAIDPICKEDUP`
-- [ ] All directory operations use PascalCase: `ReadyToPrint/`, `PaidPickedUp/`
-- [ ] All UI displays use Title Case: "Ready to Print", "Paid & Picked Up"
-- [ ] No mixed casing found in codebase search for status references
-- [ ] File operations work correctly with updated directory structure
+- [x] All database/API references use UPPERCASE: `READYTOPRINT`, `PAIDPICKEDUP`
+- [x] All directory operations use PascalCase: `ReadyToPrint/`, `PaidPickedUp/`
+- [x] All UI displays use Title Case: "Ready to Print", "Paid & Picked Up"
+- [x] No mixed casing found in codebase search for status references
+- [x] File operations work correctly with updated directory structure
 
 **Dependencies**: Requires coordinated backend/frontend changes
 
@@ -586,8 +586,8 @@ After completing all tasks, you should be able to:
 ## Progress Tracking
 
 ### Current Task Status
-- [ ] Task 1: Standardize API Patterns
-- [ ] Task 2: Fix Status Name Consistency ⭐ (Critical for masterplan compliance)
+- [x] Task 1: Standardize API Patterns ✅ **COMPLETED**
+- [x] Task 2: Fix Status Name Consistency ✅ **COMPLETED** ⭐ (Critical for masterplan compliance)
 - [ ] Task 3: Implement Global State Management
 - [ ] Task 4: Centralize File Path Configuration
 - [ ] Task 5: Refactor Job Card Component

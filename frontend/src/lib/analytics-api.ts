@@ -1,5 +1,5 @@
 import type { AnalyticsData, OverviewData, TrendData, ResourcesData, FinancialData, AnalyticsFilters } from '../types/analytics';
-import { apiRequest } from './auth';
+import { apiClient } from './unified-api-client';
 
 export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<AnalyticsData> {
   // Build query parameters
@@ -25,10 +25,10 @@ export async function fetchAnalyticsData(params: AnalyticsFilters): Promise<Anal
   }
 
   const [overviewJson, trendsJson, resourcesJson, financialJson] = await Promise.all([
-    apiRequest<any>(`/api/v1/analytics/overview?${qp.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/trends?${qpTrends.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/resources?${qp.toString()}`),
-    apiRequest<any>(`/api/v1/analytics/financial?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/overview?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/trends?${qpTrends.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/resources?${qp.toString()}`),
+    apiClient.get<any>(`/api/v1/analytics/financial?${qp.toString()}`),
   ]);
 
   const overview: OverviewData = {

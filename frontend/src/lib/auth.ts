@@ -1,7 +1,7 @@
 // Authentication utilities for cookie-based JWT tokens
 // This replaces localStorage-based token storage for security
 
-import { apiRequestWithErrorHandling } from './api-error-handling';
+// All API requests now use unified API client instead of individual utilities
 
 export interface AuthUser {
   workstation_id: string;
@@ -92,28 +92,11 @@ export async function logout(): Promise<void> {
   }
 }
 
-// API request helper that includes cookies
-export async function apiRequest<T>(
-  url: string,
-  options: RequestInit = {}
-): Promise<T> {
-  return apiRequestWithErrorHandling<T>(url, options);
-}
+// All API requests now use unified API client (frontend/src/lib/unified-api-client.ts)
+// Legacy API request functions have been removed
 
-// Legacy support: Get token for components that still expect it
-// This will be removed once all components are updated
+// Legacy support: Get token for components that still expect it  
+// TODO: Remove once all remaining usages are updated
 export function getLegacyToken(): string | null {
   return getClientToken();
-}
-
-// Legacy support: Set token (no-op for cookie-based auth)
-// This will be removed once all components are updated
-export function setLegacyToken(token: string): void {
-  // No-op: tokens are now handled by cookies
-}
-
-// Legacy support: Remove token (no-op for cookie-based auth)
-// This will be removed once all components are updated
-export function removeLegacyToken(): void {
-  // No-op: tokens are now handled by cookies
 }

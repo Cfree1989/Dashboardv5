@@ -2,9 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import JobCard from './job-card';
-import { apiRequest } from '../../lib/auth';
 import { handleApiError } from '../../lib/error-handling';
-import { optimizedApi } from '../../lib/optimized-api';
+import { apiClient } from '../../lib/unified-api-client';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
@@ -113,7 +112,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
 
-      const response = await optimizedApi.request<any[]>(`/api/v1/jobs?${params.toString()}`, {
+      const response = await apiClient.request<any[]>(`/api/v1/jobs?${params.toString()}`, {
         signal: controller.signal
       }, {
         ttl: 60 * 1000 // 1 minute for job lists
@@ -181,10 +180,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   const handleJobUpdate = useCallback(async (jobId: string, updates: any) => {
     try {
-      await apiRequest(`/api/v1/jobs/${jobId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-      });
+      await apiClient.put(`/api/v1/jobs/${jobId}`, updates);
       handleJobMutation();
     } catch (error) {
       throw error;
@@ -193,9 +189,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   const handleJobDelete = useCallback(async (jobId: string) => {
     try {
-      await apiRequest(`/api/v1/jobs/${jobId}`, {
-        method: 'DELETE',
-      });
+      await apiClient.delete(`/api/v1/jobs/${jobId}`);
       handleJobMutation();
     } catch (error) {
       throw error;

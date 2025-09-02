@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Mail, Clock, AlertCircle, Edit3, Save, X } from "lucide-react";
-import { apiRequest } from "../../lib/auth";
+import { apiClient } from "../../lib/unified-api-client";
 
 export function EmailToolsPanel() {
   const [jobId, setJobId] = useState("");
@@ -16,10 +16,7 @@ export function EmailToolsPanel() {
     if (!jobId.trim() || !emailType) return;
     setIsResending(true);
     try {
-      await apiRequest(`/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin/resend-email`, {
-        method: 'POST',
-        body: JSON.stringify({ staff_name: 'Admin User' }),
-      });
+      await apiClient.post(`/api/v1/jobs/${encodeURIComponent(jobId.trim())}/admin/resend-email`, { staff_name: 'Admin User' });
       setLastSent(new Date());
       setRateLimit((prev) => ({ remaining: Math.max(0, prev.remaining - 1), resetTime: new Date(Date.now() + 60000) }));
       setJobId("");
