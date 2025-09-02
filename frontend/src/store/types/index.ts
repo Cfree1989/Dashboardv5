@@ -1,6 +1,7 @@
 // Store type definitions for Zustand state management
 
-import { JobStatus, Job, AuthUser } from '../../types';
+import { JobStatus, Job } from '../../types';
+import { AuthUser } from '../../lib/auth';
 
 // Authentication Store Types
 export interface AuthState {

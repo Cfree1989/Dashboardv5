@@ -103,13 +103,9 @@ export interface JobCardProps {
 }
 
 /**
- * Dashboard state management
+ * Dashboard state management (auth moved to global store)
  */
 export interface DashboardState {
-  auth: {
-    loading: boolean;
-    error: string;
-  };
   search: {
     value: string;
     debounced: string;
@@ -133,11 +129,9 @@ export interface DashboardState {
 }
 
 /**
- * Dashboard action types for useReducer
+ * Dashboard action types for useReducer (auth actions removed - managed globally)
  */
 export type DashboardAction =
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string }
   | { type: 'SET_SEARCH_VALUE'; payload: string }
   | { type: 'SET_DEBOUNCED_SEARCH'; payload: string }
   | { type: 'SET_MATCH_COUNTS'; payload: Record<string, number> }

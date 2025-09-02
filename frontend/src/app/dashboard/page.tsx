@@ -11,13 +11,10 @@ import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
 import { DashboardState, DashboardAction, JobStatus } from '../../types';
+import { useAuthStore } from '../../store';
 
-// Initial state
+// Initial state (auth removed - now managed globally)
 const initialState: DashboardState = {
-  auth: {
-    loading: true,
-    error: '',
-  },
   search: {
     value: '',
     debounced: '',
@@ -40,19 +37,9 @@ const initialState: DashboardState = {
   },
 };
 
-// Reducer function
+// Reducer function (auth cases removed - managed globally)
 function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
   switch (action.type) {
-    case 'SET_LOADING':
-      return {
-        ...state,
-        auth: { ...state.auth, loading: action.payload }
-      };
-    case 'SET_ERROR':
-      return {
-        ...state,
-        auth: { ...state.auth, error: action.payload }
-      };
     case 'SET_SEARCH_VALUE':
       return {
         ...state,
@@ -122,6 +109,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  // Global auth state
+  const { loading, error, isAuthenticated, checkAuthStatus } = useAuthStore();
+  
   // Use reducer for consolidated state management
   const [state, dispatch] = useReducer(dashboardReducer, {
     ...initialState,
@@ -135,8 +125,7 @@ export default function DashboardPage() {
   const previousCountsRef = useRef<Record<string, number>>({});
   const isFirstLoadRef = useRef(true);
 
-  // Memoized selectors for better performance
-  const { loading, error } = state.auth;
+  // Memoized selectors for better performance  
   const { value: searchValue, debounced: debouncedSearch, matchCounts } = state.search;
   const { tick: refreshTick, isRefreshing, pauseRefresh, lastUpdated } = state.refresh;
   const { isJobOperation, expandSignal, collapseSignal } = state.jobOps;
@@ -212,20 +201,21 @@ export default function DashboardPage() {
   // Check authentication on mount and load initial data
   useEffect(() => {
     const checkAuthAndLoad = async () => {
-      dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        // Test authentication by making a request to a protected endpoint
-        await apiClient.get('/api/v1/auth/protected');
-        // If we get here, authentication is successful, so load counts
-        await fetchCounts();
+        await checkAuthStatus();
+        // Auth status is now managed globally, check if authenticated
+        const currentState = useAuthStore.getState();
+        if (currentState.isAuthenticated) {
+          await fetchCounts();
+        } else {
+          router.push('/login');
+        }
       } catch {
         router.push('/login');
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
     checkAuthAndLoad();
-  }, [router, fetchCounts]);
+  }, [router, fetchCounts, checkAuthStatus]);
 
   // Recompute counts when search changes
   useEffect(() => {
