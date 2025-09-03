@@ -41,6 +41,7 @@ export default function SubmissionForm() {
   const [scalingConfirmed, setScalingConfirmed] = useState(false);
   const [scalingError, setScalingError] = useState('');
 
+  // HOOKS FIX: All hooks must be at top level before any conditional returns
   React.useEffect(() => {
     if (printMethod && catalog) {
       // Get materials for this method, then find colors and printers
@@ -67,70 +68,6 @@ export default function SubmissionForm() {
       setColor('');
     }
   }, [printMethod, catalog]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0] ?? null;
-    if (selected) {
-      const ext = selected.name.slice(selected.name.lastIndexOf('.')).toLowerCase();
-      const validExts = ['.stl', '.obj', '.3mf'];
-      if (!validExts.includes(ext)) {
-        setFileError('Invalid file type. Only .stl, .obj, .3mf allowed.');
-        setFile(null);
-        return;
-      }
-      if (selected.size > 50 * 1024 * 1024) {
-        setFileError('File too large. Maximum size is 50MB.');
-        setFile(null);
-        return;
-      }
-      setFileError('');
-      setFile(selected);
-    } else {
-      setFile(null);
-      setFileError('');
-    }
-    setUploadProgress(0);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Clear previous errors
-    setFirstNameError('');
-
-    if (!file) {
-      setSubmitError('Please select a file to upload');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append('student_first_name', firstName);
-      formData.append('student_last_name', lastName);
-      formData.append('student_email', studentEmail);
-      formData.append('discipline', discipline);
-      formData.append('class_number', classNumber);
-      formData.append('print_method', printMethod);
-      formData.append('color', color);
-      formData.append('printer', printer);
-      formData.append('min_charge_consent', String(minChargeConsent));
-      if (file) formData.append('file', file);
-      
-      const res = await fetch('/api/v1/submit', { method: 'POST', body: formData });
-      const data = await res.json();
-      
-      if (res.ok) {
-        router.push(`/submit/success?job=${data.id}`);
-      } else {
-        // Use standardized error handling
-        handleApiError({ message: data.message || 'Submission failed' }, setSubmitError);
-      }
-    } catch (err: any) {
-      handleApiError(err, setSubmitError);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Show loading state if catalog is not ready
   if (catalogLoading) {
@@ -162,6 +99,144 @@ export default function SubmissionForm() {
       </div>
     );
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0] ?? null;
+    if (selected) {
+      const ext = selected.name.slice(selected.name.lastIndexOf('.')).toLowerCase();
+      const validExts = ['.stl', '.obj', '.3mf'];
+      if (!validExts.includes(ext)) {
+        setFileError('Invalid file type. Only .stl, .obj, .3mf allowed.');
+        setFile(null);
+        return;
+      }
+      if (selected.size > 50 * 1024 * 1024) {
+        setFileError('File too large. Maximum size is 50MB.');
+        setFile(null);
+        return;
+      }
+      setFileError('');
+      setFile(selected);
+    } else {
+      setFile(null);
+      setFileError('');
+    }
+    setUploadProgress(0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Clear all previous errors
+    setFirstNameError('');
+    setLastNameError('');
+    setDisciplineError('');
+    setClassNumberError('');
+    setPrintMethodError('');
+    setColorError('');
+    setPrinterError('');
+    setMinChargeError('');
+    setScalingError('');
+    setEmailError('');
+    setFileError('');
+    setSubmitError('');
+
+    // Comprehensive validation
+    let hasErrors = false;
+
+    // Validate required text fields
+    if (!firstName.trim()) {
+      setFirstNameError('First name is required');
+      hasErrors = true;
+    }
+
+    if (!lastName.trim()) {
+      setLastNameError('Last name is required');
+      hasErrors = true;
+    }
+
+    if (!studentEmail.trim()) {
+      setEmailError('Student email is required');
+      hasErrors = true;
+    } else if (!/^\S+@\S+\.\S+$/.test(studentEmail)) {
+      setEmailError('Please enter a valid email address');
+      hasErrors = true;
+    }
+
+    if (!discipline) {
+      setDisciplineError('Please select your discipline/major');
+      hasErrors = true;
+    }
+
+    if (!classNumber.trim()) {
+      setClassNumberError('Class number is required (enter "N/A" if not applicable)');
+      hasErrors = true;
+    }
+
+    if (!printMethod) {
+      setPrintMethodError('Please select a print method');
+      hasErrors = true;
+    }
+
+    if (!color) {
+      setColorError('Please select a color preference');
+      hasErrors = true;
+    }
+
+    if (!printer) {
+      setPrinterError('Please select which printer your model fits on');
+      hasErrors = true;
+    }
+
+    if (!minChargeConsent) {
+      setMinChargeError('You must acknowledge the minimum $3.00 charge');
+      hasErrors = true;
+    }
+
+    if (!scalingConfirmed) {
+      setScalingError('Please confirm you have properly scaled your model');
+      hasErrors = true;
+    }
+
+    if (!file) {
+      setFileError('Please select a 3D model file to upload');
+      hasErrors = true;
+    }
+
+    // If any validation errors, don't submit
+    if (hasErrors) {
+      setSubmitError('Please correct the errors above and try again');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('student_first_name', firstName);
+      formData.append('student_last_name', lastName);
+      formData.append('student_email', studentEmail);
+      formData.append('discipline', discipline);
+      formData.append('class_number', classNumber);
+      formData.append('print_method', printMethod);
+      formData.append('color', color);
+      formData.append('printer', printer);
+      formData.append('min_charge_consent', String(minChargeConsent));
+      if (file) formData.append('file', file);
+      
+      const res = await fetch('/api/v1/submit', { method: 'POST', body: formData });
+      const data = await res.json();
+      
+      if (res.ok) {
+        router.push(`/submit/success?job=${data.id}`);
+      } else {
+        // Use standardized error handling
+        handleApiError({ message: data.message || 'Submission failed' }, setSubmitError);
+      }
+    } catch (err: any) {
+      handleApiError(err, setSubmitError);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
