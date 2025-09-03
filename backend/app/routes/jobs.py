@@ -22,6 +22,7 @@ from app.business_logic.shared_services.validation_service import ValidationServ
 from app.business_logic.shared_services.response_service import ResponseService
 from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from app.business_logic.job_lifecycle.job_approval_service import JobApprovalData, JobRejectionData, JobReviewData
+from app.business_logic.job_lifecycle.job_status_service import JobStatusTransitionData
 from app.business_logic.admin_operations.job_notes_service import JobNoteData, JobUpdateNotesData
 from app.business_logic.admin_operations.job_admin_service import JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
 from app.business_logic.shared_services.job_locking_service import JobLockData
@@ -181,7 +182,7 @@ def _sync_metadata_content(job: Job, authoritative_filename: str, staff_name: st
 @bp.route('/<job_id>', methods=['GET'])
 @token_required
 def get_job(job_id):
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         abort(404, description='Job not found')
     return jsonify(job.to_dict()), 200
@@ -189,10 +190,10 @@ def get_job(job_id):
 @bp.route('/<job_id>/events', methods=['GET'])
 @token_required
 def get_job_events(job_id):
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         abort(404, description='Job not found')
-    events = Event.query.filter(Event.job_id == job_id).order_by(Event.timestamp).all()
+    events = orchestration_service.get_job_events(job_id)
     return jsonify([e.to_dict() for e in events]), 200
 
 
@@ -220,7 +221,7 @@ def log_file_open(job_id):
     """Stub endpoint for protocol handler touchpoint. Logs FileOpenedInSlicer.
     Body: { } (staff_name no longer required)
     """
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         abort(404, description='Job not found')
     data = request.get_json(silent=True) or {}
@@ -349,7 +350,7 @@ def mark_printing(job_id):
         return ResponseService.error(staff_result.error_message)
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -398,7 +399,7 @@ def admin_force_confirm(job_id):
         return ResponseService.error('reason is required')
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name, reason=reason)
         job = orchestration_service.admin_force_confirm(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -462,7 +463,7 @@ def admin_mark_failed(job_id):
         return ResponseService.error('reason is required')
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name, reason=reason)
         job = orchestration_service.mark_failed(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -481,7 +482,7 @@ def mark_complete(job_id):
         return ResponseService.error(staff_result.error_message)
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_complete(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -500,7 +501,7 @@ def mark_picked_up(job_id):
         return ResponseService.error(staff_result.error_message)
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_picked_up(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -535,8 +536,7 @@ def record_payment(job_id):
         payment = payment_service.record_payment(job_id, payment_data)
         
         # Get the updated job data
-        from app.models.job import Job
-        job = Job.query.get(job_id)
+        job = orchestration_service.get_job_by_id(job_id)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -595,7 +595,7 @@ def revert_completion(job_id):
         return ResponseService.error(staff_result.error_message)
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_printing(job_id, transition_data)
         return ResponseService.success(job.to_dict())
@@ -614,7 +614,7 @@ def revert_pickup(job_id):
         return ResponseService.error(staff_result.error_message)
     
     try:
-        from app.services.job_orchestration_service import JobStatusTransitionData
+
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_completed(job_id, transition_data)
         return ResponseService.success(job.to_dict())

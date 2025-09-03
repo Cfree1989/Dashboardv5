@@ -160,12 +160,12 @@ The masterplan defines a **three-tier naming convention** that must be enforced 
 7. Update tests to use centralized path methods
 
 **Success Criteria**:
-- [ ] All file paths generated through centralized service
-- [ ] No hardcoded path construction remaining
-- [ ] Environment variable configuration for all paths
-- [ ] Consistent path validation across services
-- [ ] Path security checks centralized
-- [ ] Tests updated to use centralized methods
+- [x] All file paths generated through centralized service
+- [x] No hardcoded path construction remaining
+- [x] Environment variable configuration for all paths
+- [x] Consistent path validation across services
+- [x] Path security checks centralized
+- [x] Tests updated to use centralized methods
 
 **Dependencies**: None
 
@@ -204,13 +204,13 @@ The masterplan defines a **three-tier naming convention** that must be enforced 
 9. Ensure all functionality still works correctly
 
 **Success Criteria**:
-- [ ] Job card broken into 4-5 focused components
-- [ ] Each component has single responsibility
-- [ ] Modal management centralized or distributed appropriately
-- [ ] All existing functionality preserved
-- [ ] Improved testability for individual concerns
-- [ ] Reduced prop drilling within job card
-- [ ] Better separation of concerns
+- [x] Job card broken into 4-5 focused components
+- [x] Each component has single responsibility
+- [x] Modal management centralized or distributed appropriately
+- [x] All existing functionality preserved
+- [x] Improved testability for individual concerns
+- [x] Reduced prop drilling within job card
+- [x] Better separation of concerns
 
 **Dependencies**: Task 3 (Implement Global State Management)
 

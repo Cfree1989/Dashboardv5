@@ -14,6 +14,7 @@ from app.business_logic.shared_services import JobLockingService, JobEventServic
 # Import data classes for type hints
 from app.business_logic.job_lifecycle.job_approval_service import JobApprovalData, JobRejectionData, JobReviewData
 from app.business_logic.job_lifecycle.job_status_service import JobStatusTransitionData
+from app.business_logic.job_lifecycle.job_submission_data import JobSubmissionData, JobConfirmationData, JobResendConfirmationData
 from app.business_logic.admin_operations.job_admin_service import JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
 from app.business_logic.admin_operations.job_notes_service import JobNoteData, JobUpdateNotesData
 from app.business_logic.shared_services.job_locking_service import JobLockData
@@ -170,3 +171,164 @@ class JobOrchestrationService:
                                    event_type: str) -> None:
         """Sync metadata - delegates to JobEventService"""
         return self.events.sync_authoritative_metadata(job, filename, staff_name, event_type)
+    
+    # --- Query Operations ---
+    
+    def get_job_by_id(self, job_id: str) -> Optional[Job]:
+        """Get a job by ID - centralizes Job.query.get() operations"""
+        return Job.query.get(job_id)
+    
+    def get_all_jobs(self) -> list[Job]:
+        """Get all jobs - centralizes Job.query.all() operations"""
+        return Job.query.all()
+    
+    def get_job_events(self, job_id: str) -> list[Event]:
+        """Get all events for a job - centralizes Event.query operations"""
+        return Event.query.filter(Event.job_id == job_id).order_by(Event.timestamp).all()
+    
+    # --- Job Submission Operations ---
+    
+    def create_job_with_upload(self, submission_data: JobSubmissionData) -> Job:
+        """Create a new job with file upload - centralizes job creation logic"""
+        from app import db
+        from uuid import uuid4
+        from pathlib import Path
+        from datetime import datetime
+        import json
+        
+        # Generate IDs
+        new_id = str(uuid4())
+        
+        # Generate unique short_id  
+        short_id = None
+        for attempt in range(100):
+            candidate_short = str(uuid4())[:8]
+            existing_short = db.session.query(Job.id).filter_by(short_id=candidate_short).first()
+            if not existing_short:
+                short_id = candidate_short
+                break
+        
+        if not short_id:
+            raise ValueError("Could not generate unique short_id after 100 attempts")
+        
+        # Setup file paths
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        storage_root = file_config.get_storage_root()
+        upload_dir = storage_root / "Uploaded"
+        upload_dir.mkdir(exist_ok=True)
+        
+        # Generate file paths
+        candidate_name = submission_data.display_name
+        candidate_path = upload_dir / f"{candidate_name}_{submission_data.color}_{short_id}.{submission_data.file.filename.rsplit('.', 1)[1]}"
+        metadata_path = upload_dir / f"{candidate_name}_{submission_data.color}_{short_id}_metadata.json"
+        
+        # Save file
+        submission_data.file.save(candidate_path)
+        
+        # Save metadata
+        with open(metadata_path, 'w') as meta_f:
+            json.dump(submission_data.metadata, meta_f)
+        
+        # Create job record
+        job = Job(
+            id=new_id,
+            short_id=short_id,
+            student_name=submission_data.student_name,
+            student_email=submission_data.student_email,
+            discipline=submission_data.discipline,
+            class_number=submission_data.class_number,
+            original_filename=submission_data.file.filename,
+            display_name=submission_data.display_name,
+            file_path=str(Path(candidate_path).resolve()),
+            metadata_path=str(Path(metadata_path).resolve()),
+            file_hash=submission_data.file_hash,
+            printer=submission_data.printer,
+            color=submission_data.color,
+            material=submission_data.material
+        )
+        
+        # Save to database
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event
+        self.log_event(job.id, 'JobCreated', {'original_filename': job.original_filename}, 'system')
+        
+        return job
+    
+    def confirm_job_submission(self, job_id: str, confirmation_data: JobConfirmationData) -> Job:
+        """Confirm job submission and move files - centralizes confirmation logic"""
+        from app import db
+        from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+        from app.business_logic.shared_services import token_service
+        
+        job = self.get_job_by_id(job_id)
+        if not job:
+            raise ValueError("Job not found")
+        
+        # Verify token (allow expired for confirmation)
+        token_valid, _ = token_service.verify_confirmation_token(confirmation_data.token)
+        if not token_valid:
+            raise ValueError("Invalid confirmation token")
+        
+        # Transition to READYTOPRINT + move file/metadata
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.move_job_files(job.id, 'UPLOADED', 'READYTOPRINT')
+        
+        if not success:
+            raise RuntimeError("File operation failed during confirmation")
+        
+        # Update job status
+        job.status = 'READYTOPRINT'
+        job.student_confirmed = True
+        job.student_confirmed_at = db.func.now()
+        
+        db.session.commit()
+        
+        # Sync metadata and log event
+        from app.routes.jobs import _sync_authoritative_metadata
+        _sync_authoritative_metadata(job, job.original_filename, 'system', 'StudentConfirmed')
+        self.log_event(job.id, 'StudentConfirmed', {'status': job.status}, 'system')
+        
+        return job
+    
+    def resend_confirmation_email(self, resend_data: JobResendConfirmationData) -> Job:
+        """Resend confirmation email - centralizes resend logic"""
+        from app import db
+        from app.business_logic.shared_services import token_service, email_service
+        from datetime import datetime
+        
+        # Resolve job_id from token if provided
+        job_id = resend_data.job_id
+        if resend_data.token and not job_id:
+            try:
+                job_id = token_service.get_job_id_from_token(resend_data.token)
+            except Exception:
+                raise ValueError("Invalid token")
+        
+        job = self.get_job_by_id(job_id)
+        if not job:
+            raise ValueError("Job not found")
+        
+        if job.student_confirmed:
+            raise ValueError("Job already confirmed")
+        
+        # Generate fresh token and send email
+        confirmation_token = token_service.generate_confirmation_token(job.id)
+        email_result = email_service.send_confirmation_email(
+            job.student_email,
+            job.student_name,
+            job.display_name,
+            job.short_id,
+            confirmation_token
+        )
+        
+        if not email_result.success:
+            raise RuntimeError(f"Failed to send confirmation email: {email_result.error}")
+        
+        # Update last sent timestamp
+        job.confirmation_last_sent_at = datetime.utcnow()
+        db.session.commit()
+        
+        return job

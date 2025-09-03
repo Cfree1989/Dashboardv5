@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, abort
 from app import db, limiter
 from app.models.job import Job
+from app.business_logic.shared_services.response_service import ResponseService
+from app.services.orchestration.job_orchestration_service import JobOrchestrationService
+from app.business_logic.job_lifecycle.job_submission_data import JobSubmissionData, JobConfirmationData, JobResendConfirmationData
 import os, hashlib, json
 from datetime import datetime
 from uuid import uuid4
@@ -19,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('submit', __name__, url_prefix='/api/v1/submit')
 
-# Get file configuration service instance
+# Get service instances
 file_config = get_file_configuration_service()
+orchestration_service = JobOrchestrationService()
 
 
 def allowed_file(filename):
@@ -48,26 +52,26 @@ def submit_job():
     try:
         # Validate file presence
         if 'file' not in request.files:
-            return jsonify({'error': 'file is required'}), 400
+            return ResponseService.validation_error('file is required')
         file = request.files['file']
         if file.filename == '':
-            return jsonify({'error': 'no file selected'}), 400
+            return ResponseService.validation_error('no file selected')
         
         # Enhanced file validation
         # 1. Validate filename security
         is_valid_filename, filename_error = file_config.validate_filename_security(file.filename)
         if not is_valid_filename:
-            return jsonify({'error': f'Invalid filename: {filename_error}'}), 400
+            return ResponseService.validation_error(f'Invalid filename: {filename_error}')
         
         # 2. Validate file extension
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type'}), 400
+            return ResponseService.validation_error('Invalid file type')
         
         # 3. Validate file size
         if request.content_length:
             size_error = file_config.get_file_size_validation_error(request.content_length)
             if size_error:
-                return jsonify({'error': size_error}), 413
+                return ResponseService.validation_error(size_error, status=413)
 
         # Read file for hash and saving
         file_bytes = file.read()
@@ -76,7 +80,7 @@ def submit_job():
         # 4. Validate file header (content validation)
         is_valid_header, header_error = file_config.validate_file_header(file_bytes, file.filename)
         if not is_valid_header:
-            return jsonify({'error': f'Invalid file content: {header_error}'}), 400
+            return ResponseService.validation_error(f'Invalid file content: {header_error}')
 
         # Duplicate detection in active statuses (only select id, avoid extra columns)
         active_statuses = ['UPLOADED', 'PENDING', 'READYTOPRINT']
@@ -87,7 +91,7 @@ def submit_job():
         ).first()
         existing = existing_record[0] if existing_record else None
         if existing:
-            return jsonify({'message': 'duplicate active job exists', 'existing_job_id': existing}), 409
+            return ResponseService.conflict('duplicate active job exists', {'existing_job_id': existing})
 
         # Prepare storage directory
         # Use centralized file configuration service
@@ -133,10 +137,7 @@ def submit_job():
         )
         
         if not is_valid:
-            return jsonify({
-                'error': 'Invalid job configuration',
-                'details': validation_errors
-            }), 400
+            return ResponseService.validation_error('Invalid job configuration', {'details': validation_errors})
 
         # Use centralized filename construction and unique path generation
         standardized_name = file_config.construct_standardized_filename(
@@ -206,12 +207,12 @@ def submit_job():
             )
             logger.warning(f"Failed to send submission confirmation email for job {job.id}: {e}")
 
-        return jsonify(job.to_dict()), 201
+        return ResponseService.success(job.to_dict(), status=201)
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         logger.error(f"Job submission failed: {str(e)}\n{tb}")
-        return jsonify({'error': str(e)}), 500 
+        return ResponseService.error(f'Job submission failed: {str(e)}', status=500) 
 
 
 @bp.route('/confirm/<token>', methods=['POST'])
