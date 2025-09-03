@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useReducer, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
@@ -10,100 +10,10 @@ import { apiClient } from '../../lib/unified-api-client';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../../components/error-boundary';
-import { DashboardState, DashboardAction, JobStatus } from '../../types';
-import { useAuthStore } from '../../store';
+import { JobStatus } from '../../types';
+import { useAuthStore, useDashboardStore } from '../../store';
 
-// Initial state (auth removed - now managed globally)
-const initialState: DashboardState = {
-  search: {
-    value: '',
-    debounced: '',
-    matchCounts: {},
-  },
-  refresh: {
-    tick: 0,
-    isRefreshing: false,
-    pauseRefresh: false,
-    lastUpdated: '',
-  },
-  jobOps: {
-    isJobOperation: false,
-    expandSignal: 0,
-    collapseSignal: 0,
-  },
-  data: {
-    status: JobStatus.UPLOADED,
-    counts: {},
-  },
-};
-
-// Reducer function (auth cases removed - managed globally)
-function dashboardReducer(state: DashboardState, action: DashboardAction): DashboardState {
-  switch (action.type) {
-    case 'SET_SEARCH_VALUE':
-      return {
-        ...state,
-        search: { ...state.search, value: action.payload }
-      };
-    case 'SET_DEBOUNCED_SEARCH':
-      return {
-        ...state,
-        search: { ...state.search, debounced: action.payload }
-      };
-    case 'SET_MATCH_COUNTS':
-      return {
-        ...state,
-        search: { ...state.search, matchCounts: action.payload }
-      };
-    case 'INCREMENT_REFRESH_TICK':
-      return {
-        ...state,
-        refresh: { ...state.refresh, tick: state.refresh.tick + 1 }
-      };
-    case 'SET_REFRESHING':
-      return {
-        ...state,
-        refresh: { ...state.refresh, isRefreshing: action.payload }
-      };
-    case 'SET_PAUSE_REFRESH':
-      return {
-        ...state,
-        refresh: { ...state.refresh, pauseRefresh: action.payload }
-      };
-    case 'SET_LAST_UPDATED':
-      return {
-        ...state,
-        refresh: { ...state.refresh, lastUpdated: action.payload }
-      };
-    case 'SET_JOB_OPERATION':
-      return {
-        ...state,
-        jobOps: { ...state.jobOps, isJobOperation: action.payload }
-      };
-    case 'INCREMENT_EXPAND_SIGNAL':
-      return {
-        ...state,
-        jobOps: { ...state.jobOps, expandSignal: state.jobOps.expandSignal + 1 }
-      };
-    case 'INCREMENT_COLLAPSE_SIGNAL':
-      return {
-        ...state,
-        jobOps: { ...state.jobOps, collapseSignal: state.jobOps.collapseSignal + 1 }
-      };
-    case 'SET_STATUS':
-      return {
-        ...state,
-        data: { ...state.data, status: action.payload }
-      };
-    case 'SET_COUNTS':
-      return {
-        ...state,
-        data: { ...state.data, counts: action.payload }
-      };
-    default:
-      return state;
-  }
-}
+// Dashboard state is now managed globally with Zustand stores
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -112,37 +22,69 @@ export default function DashboardPage() {
   // Global auth state
   const { loading, error, isAuthenticated, checkAuthStatus } = useAuthStore();
   
-  // Use reducer for consolidated state management
-  const [state, dispatch] = useReducer(dashboardReducer, {
-    ...initialState,
-    data: {
-      ...initialState.data,
-      status: searchParams.get('status') || JobStatus.UPLOADED,
-    }
-  });
+  // Global dashboard state
+  const {
+    // Search state
+    searchValue,
+    debouncedSearch,
+    matchCounts,
+    setSearchValue,
+    setDebouncedSearch,
+    setMatchCounts,
+    
+    // Refresh state
+    refreshTick,
+    isRefreshing,
+    pauseRefresh,
+    lastUpdated,
+    incrementRefreshTick,
+    setRefreshing,
+    setPauseRefresh,
+    setLastUpdated,
+    
+    // Job operations state
+    isJobOperation,
+    expandSignal,
+    collapseSignal,
+    setJobOperation,
+    incrementExpandSignal,
+    incrementCollapseSignal,
+    
+    // Data state
+    currentStatus,
+    counts,
+    setCurrentStatus,
+    setCounts,
+    refreshData,
+  } = useDashboardStore();
   
   // Use ref to track previous counts for sound comparison
   const previousCountsRef = useRef<Record<string, number>>({});
   const isFirstLoadRef = useRef(true);
+  
+  // Initialize status from URL params on mount
+  useEffect(() => {
+    const urlStatus = searchParams.get('status');
+    if (urlStatus && urlStatus !== currentStatus) {
+      setCurrentStatus(urlStatus);
+    }
+  }, [searchParams, currentStatus, setCurrentStatus]);
 
-  // Memoized selectors for better performance  
-  const { value: searchValue, debounced: debouncedSearch, matchCounts } = state.search;
-  const { tick: refreshTick, isRefreshing, pauseRefresh, lastUpdated } = state.refresh;
-  const { isJobOperation, expandSignal, collapseSignal } = state.jobOps;
-  const { status, counts } = state.data;
+  // Use currentStatus instead of status
+  const status = currentStatus;
 
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
-      dispatch({ type: 'SET_DEBOUNCED_SEARCH', payload: searchValue });
+      setDebouncedSearch(searchValue);
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchValue]);
+  }, [searchValue, setDebouncedSearch]);
 
   // Calculate search match counts by status
   const fetchSearchMatchCounts = useCallback(async () => {
     if (!debouncedSearch.trim()) {
-      dispatch({ type: 'SET_MATCH_COUNTS', payload: {} });
+      setMatchCounts({});
       return;
     }
     
@@ -152,10 +94,10 @@ export default function DashboardPage() {
         {},
         { ttl: 30 * 1000 } // 30 seconds for search results
       );
-      dispatch({ type: 'SET_MATCH_COUNTS', payload: counts });
+      setMatchCounts(counts);
     } catch (err) {
       // Silently handle search match count failures
-      dispatch({ type: 'SET_MATCH_COUNTS', payload: {} });
+      setMatchCounts({});
     }
   }, [debouncedSearch]);
 
@@ -175,7 +117,7 @@ export default function DashboardPage() {
           }
         }
       );
-      dispatch({ type: 'SET_COUNTS', payload: data });
+      setCounts(data);
       
       // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
           const currentUploaded = data[JobStatus.UPLOADED] || 0;
@@ -191,12 +133,12 @@ export default function DashboardPage() {
       isFirstLoadRef.current = false;
       
       // Reset job operation flag after counts update
-      dispatch({ type: 'SET_JOB_OPERATION', payload: false });
+      setJobOperation(false);
     } catch (err) {
       // Silently handle count fetch failures
-      dispatch({ type: 'SET_JOB_OPERATION', payload: false });
+      setJobOperation(false);
     }
-  }, [pauseRefresh, isJobOperation]);
+  }, [pauseRefresh, isJobOperation, setCounts, setJobOperation]);
 
   // Check authentication on mount and load initial data
   useEffect(() => {
@@ -233,46 +175,46 @@ export default function DashboardPage() {
   // Manual interval removed in favor of adaptive polling
   
   const refreshPage = useCallback(async () => {
-    dispatch({ type: 'SET_REFRESHING', payload: true });
+    setRefreshing(true);
     const ts = new Date().toLocaleTimeString();
-    dispatch({ type: 'SET_LAST_UPDATED', payload: ts });
+    setLastUpdated(ts);
     try { localStorage.setItem('lastUpdated', ts); } catch {}
-    dispatch({ type: 'INCREMENT_REFRESH_TICK' });
+    incrementRefreshTick();
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));
-    dispatch({ type: 'SET_REFRESHING', payload: false });
-  }, [fetchCounts]);
+    setRefreshing(false);
+  }, [fetchCounts, setRefreshing, setLastUpdated, incrementRefreshTick]);
   
   const updateStatus = useCallback((newStatus: string) => {
-    dispatch({ type: 'SET_STATUS', payload: newStatus });
+    setCurrentStatus(newStatus);
     const params = new URLSearchParams();
     params.set('status', newStatus);
     router.replace(`${window.location.pathname}?${params.toString()}`);
     fetchCounts(); // keep counts in sync on tab change
-  }, [router, fetchCounts]);
+  }, [router, fetchCounts, setCurrentStatus]);
 
   const toggleExpandCollapse = useCallback(() => {
     // Toggle between expand and collapse modes
     if (expandSignal > collapseSignal) {
       // Currently expanded, so collapse
-      dispatch({ type: 'INCREMENT_COLLAPSE_SIGNAL' });
+      incrementCollapseSignal();
     } else {
       // Currently collapsed, so expand
-      dispatch({ type: 'INCREMENT_EXPAND_SIGNAL' });
+      incrementExpandSignal();
     }
-  }, [expandSignal, collapseSignal]);
+  }, [expandSignal, collapseSignal, incrementCollapseSignal, incrementExpandSignal]);
 
-  const setSearchValue = useCallback((value: string) => {
-    dispatch({ type: 'SET_SEARCH_VALUE', payload: value });
-  }, []);
+  const setSearchInput = useCallback((value: string) => {
+    setSearchValue(value);
+  }, [setSearchValue]);
 
-  const setPauseRefresh = useCallback((pause: boolean) => {
-    dispatch({ type: 'SET_PAUSE_REFRESH', payload: pause });
-  }, []);
+  const setPauseRefreshState = useCallback((pause: boolean) => {
+    setPauseRefresh(pause);
+  }, [setPauseRefresh]);
 
   const setIsJobOperation = useCallback((isOperation: boolean) => {
-    dispatch({ type: 'SET_JOB_OPERATION', payload: isOperation });
-  }, []);
+    setJobOperation(isOperation);
+  }, [setJobOperation]);
 
   if (loading) {
     return (
