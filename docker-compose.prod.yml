@@ -7,8 +7,9 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile.prod
-    ports:
-      - "5000:5000"
+    # Remove external port exposure - only accessible via nginx
+    expose:
+      - "5000"
     networks:
       - app-network
     deploy:
@@ -66,8 +67,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-    ports:
-      - "3000:3000"
+    # Remove external port exposure - only accessible via nginx
+    expose:
+      - "3000"
     networks:
       - app-network
     deploy:
@@ -85,7 +87,7 @@ services:
       retries: 3
       start_period: 30s
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
     logging:
       driver: "json-file"
@@ -207,6 +209,147 @@ services:
     security_opt:
       - "no-new-privileges:true"
 
+  # =============================================================================
+  # NGINX REVERSE PROXY SERVICE (SSL/TLS Termination)
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"    # HTTP (redirects to HTTPS)
+      - "443:443"  # HTTPS
+    networks:
+      - app-network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Environment variables for nginx configuration
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - SSL_EMAIL=${SSL_EMAIL}
+    
+    # Volume mounts
+    volumes:
+      # Nginx configuration
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # SSL certificates
+      - ssl_certs:/etc/ssl/certs:ro
+      - ssl_private:/etc/ssl/private:ro
+      
+      # Let's Encrypt certificates (if using)
+      - letsencrypt_certs:/etc/letsencrypt:ro
+      - letsencrypt_webroot:/var/www/certbot:ro
+      
+      # Static files (optional)
+      - static_files:/var/www/static:ro
+      
+      # Logs
+      - nginx_logs:/var/log/nginx
+    
+    # Dependencies
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security
+    security_opt:
+      - "no-new-privileges:true"
+    
+    restart: unless-stopped
+    stop_grace_period: 10s
+
+  # =============================================================================
+  # SSL CERTIFICATE MANAGER (Let's Encrypt)
+  # =============================================================================
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["ssl"]  # Only run when ssl profile is active
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - letsencrypt_webroot:/var/www/certbot
+    command: >
+      sh -c "
+      echo 'Waiting for nginx to start...' &&
+      sleep 30 &&
+      certbot certonly --webroot 
+      -w /var/www/certbot 
+      -d ${DOMAIN_NAME} 
+      --email ${SSL_EMAIL} 
+      --agree-tos 
+      --non-interactive 
+      --expand &&
+      echo 'Certificate obtained successfully' ||
+      echo 'Certificate generation failed'
+      "
+    depends_on:
+      - nginx
+
+  # =============================================================================
+  # SSL CERTIFICATE RENEWAL SERVICE
+  # =============================================================================
+  ssl-renew:
+    image: certbot/certbot:latest
+    profiles: ["ssl"]  # Only run when ssl profile is active
+    volumes:
+      - letsencrypt_certs:/etc/letsencrypt
+      - letsencrypt_webroot:/var/www/certbot
+    command: >
+      sh -c "
+      trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet &&
+        echo 'Certificate renewed successfully' &&
+        nginx -s reload;
+        sleep 12h & wait $${!};
+      done
+      "
+    depends_on:
+      - nginx
+      - certbot
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   storage_data:
+  
+  # SSL certificate volumes
+  ssl_certs:
+    driver: local
+  ssl_private:
+    driver: local
+  letsencrypt_certs:
+    driver: local
+  letsencrypt_webroot:
+    driver: local
+  
+  # Static files and logs
+  static_files:
+    driver: local
+  nginx_logs:
+    driver: local

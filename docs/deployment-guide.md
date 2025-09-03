@@ -367,7 +367,9 @@ echo "0 2 * * * /opt/3d-print-system/scripts/backup_db.sh >> /var/log/db_backup.
 
 ## SSL/TLS Configuration
 
-### Using nginx as Reverse Proxy
+**Note**: The system now includes comprehensive SSL/TLS support with nginx reverse proxy. See the dedicated [SSL Setup Guide](ssl-setup.md) for detailed configuration instructions.
+
+### Quick SSL Setup
 
 #### Install nginx
 
@@ -461,16 +463,25 @@ sudo systemctl reload nginx
 
 ### SSL Certificate with Let's Encrypt
 
+The system includes automated Let's Encrypt integration:
+
 ```bash
-# Install certbot
-sudo apt install certbot python3-certbot-nginx -y
+# Configure SSL in .env
+DOMAIN_NAME=yourdomain.com
+SSL_TYPE=letsencrypt
+SSL_EMAIL=admin@yourdomain.com
 
-# Obtain SSL certificate
-sudo certbot --nginx -d print.yourdomain.com -d api.yourdomain.com
+# Start with SSL profile
+docker-compose -f docker-compose.prod.yml --profile ssl up -d
 
-# Test automatic renewal
-sudo certbot renew --dry-run
+# Monitor certificate generation
+docker-compose -f docker-compose.prod.yml logs certbot
+
+# Check SSL health
+./docker/nginx/scripts/ssl-health-check.sh check
 ```
+
+For detailed SSL configuration, see [SSL Setup Guide](ssl-setup.md).
 
 ## Health Verification
 
