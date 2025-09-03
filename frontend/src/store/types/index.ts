@@ -101,6 +101,21 @@ export interface ModalActions {
   getModalConfig: (modalId: string) => ModalConfig | undefined;
   queueModal: (config: ModalConfig) => void;
   processModalQueue: () => void;
+  
+  // Helper methods for specific modal types
+  openReviewModal: (jobId: string, reviewed: boolean) => string;
+  openRejectionModal: (jobId: string) => string;
+  openApprovalModal: (jobId: string, material?: string, currentPrinter?: string) => string;
+  openStatusChangeModal: (jobId: string, action: string, title: string, description: string, confirmVerb: string) => string;
+  openPaymentModal: (jobId: string) => string;
+  openFileModal: (jobId: string) => string;
+  openDeleteConfirmModal: (jobId: string) => string;
+  openResendModal: (jobId: string) => string;
+  
+  // Utility methods
+  hasActiveModals: () => boolean;
+  getActiveModalIds: () => string[];
+  getActiveModalsByType: (type: ModalType) => [string, ModalConfig][];
 }
 
 export interface ModalStore extends ModalState, ModalActions {}
@@ -150,6 +165,14 @@ export interface JobOperationActions {
   clearMessage: (jobId: string) => void;
   clearError: (jobId: string) => void;
   clearJobState: (jobId: string) => void;
+  
+  // Utility getters
+  isJobLoading: (jobId: string, operation?: string) => boolean;
+  getJobMessage: (jobId: string) => string | undefined;
+  getJobError: (jobId: string) => string | undefined;
+  isEditingNotes: (jobId: string) => boolean;
+  getNotesDraft: (jobId: string) => string;
+  isSavingNotes: (jobId: string) => boolean;
 }
 
 export interface JobOperationStore extends JobOperationState, JobOperationActions {}

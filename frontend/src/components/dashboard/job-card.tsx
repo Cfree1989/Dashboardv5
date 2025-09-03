@@ -14,6 +14,7 @@ import { apiClient } from '../../lib/unified-api-client';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { InlineError } from '../ui/error-display';
 import { Job, JobCardProps, JobStatus, JobStatusAction, StatusChangeModalConfig, ReviewModalState } from '../../types';
+import { useModalStore, useJobOperationsStore } from '../../store';
 
 /**
  * Convert database file paths to Windows paths for SlicerOpener
@@ -46,27 +47,56 @@ function convertToWindowsPath(filePath: string): string {
 export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApprove, onReject, onMarkReviewed, onStatusAction, onUpdate, onDelete, onModalOpenChange, expandSignal, collapseSignal }: JobCardProps) {
   const isLocked = typeof job.locked_by === 'string' && job.locked_until !== undefined && new Date(job.locked_until) > new Date();
   
+  // Global state stores (demonstration of centralized state management)
+  const modalStore = useModalStore();
+  const jobOpsStore = useJobOperationsStore();
+  
   const [showMore, setShowMore] = useState(false);
   const MAX_NOTES_LEN = 5000;
   const [jobNotes, setJobNotes] = useState<string>(job.notes || "");
+  // DEMO: Notes management can now be managed globally
+  // These useState lines would be removed in full migration:
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState<string>("");
+  // Global alternatives available:
+  // const isEditingNotes = jobOpsStore.isEditingNotes(job.id);
+  // const notesDraft = jobOpsStore.getNotesDraft(job.id);
+  // END DEMO SECTION
   const [staff, setStaff] = useState<{ name: string; is_active: boolean }[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [notesStaffName, setNotesStaffName] = useState<string>("");
+  // DEMO: Notes saving state and messages can now be managed globally
+  // These useState lines would be removed in full migration:
   const [savingNotes, setSavingNotes] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [saveError, setSaveError] = useState(createErrorState());
+  // Global alternatives available:
+  // const savingNotes = jobOpsStore.isSavingNotes(job.id);
+  // const saveMessage = jobOpsStore.getJobMessage(job.id);
+  // const saveError = jobOpsStore.getJobError(job.id);
+  // END DEMO SECTION
+  // DEMO: Job operation loading states can now be managed globally
+  // These useState lines would be removed in full migration:
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isMarkingReviewed, setIsMarkingReviewed] = useState(false);
   const [isResendingConfirm, setIsResendingConfirm] = useState(false);
+  // Global alternatives available:
+  // const isApproving = jobOpsStore.isJobLoading(job.id, 'approve');
+  // const isRejecting = jobOpsStore.isJobLoading(job.id, 'reject');
+  // const isMarkingReviewed = jobOpsStore.isJobLoading(job.id, 'review');
+  // END DEMO SECTION
+  
+  // DEMO: Modal state can now be managed globally
+  // These useState lines would be removed in full migration:
   const [showReviewModal, setShowReviewModal] = useState<null | { reviewed: boolean }>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showStatusChangeModal, setShowStatusChangeModal] = useState<null | { action: string, title: string, description: string, confirmVerb: string }>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
+  // END DEMO SECTION
+  
   const { show } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -227,22 +257,32 @@ export default function JobCard({ job, currentStatus = JobStatus.UPLOADED, onApp
   };
 
   const handleApprove = async () => {
+    // DEMO: Global modal store method (alternative to local state)
+    // modalStore.openApprovalModal(job.id, job.material, job.printer);
     setShowApprovalModal(true);
   };
 
   const handleReject = async () => {
+    // DEMO: Global modal store method (alternative to local state)
+    // modalStore.openRejectionModal(job.id);
     setShowRejectModal(true);
   };
 
   const handleMarkReviewed = () => {
+    // DEMO: Global modal store method (alternative to local state)
+    // modalStore.openReviewModal(job.id, true);
     setShowReviewModal({ reviewed: true });
   };
 
   const handleReapplyNew = () => {
+    // DEMO: Global modal store method (alternative to local state)
+    // modalStore.openReviewModal(job.id, false);
     setShowReviewModal({ reviewed: false });
   };
 
   const beginEditNotes = async () => {
+    // DEMO: Global job operations store method (alternative to local state)
+    // jobOpsStore.startEditingNotes(job.id, job.notes || '');
     setIsEditingNotes(true);
     setNotesDraft("");
     setSaveMessage("");
