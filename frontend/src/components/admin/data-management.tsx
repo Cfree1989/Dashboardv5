@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Archive, Trash2, AlertTriangle, CheckCircle, Settings } from "lucide-react";
 import { useToast } from "../ui/toast";
 import { CatalogEditor } from "./catalog-editor";
@@ -15,6 +15,10 @@ interface PruneResponse {
   jobs_deleted: number;
 }
 
+interface Staff {
+  name: string;
+}
+
 export function DataManagementPanel() {
   const [archiveDays, setArchiveDays] = useState(45);
   const [pruneDays, setPruneDays] = useState(365);
@@ -23,9 +27,28 @@ export function DataManagementPanel() {
   const [previewCounts, setPreviewCounts] = useState<{ archive?: number | null; prune?: number | null }>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [staffName, setStaffName] = useState("");
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const { show } = useToast();
+
+  // Load staff list on component mount
+  useEffect(() => {
+    const loadStaff = async () => {
+      setLoadingStaff(true);
+      try {
+        const response = await apiClient.get<{staff: Staff[]}>('/api/v1/staff');
+        setStaff(response?.staff || []);
+      } catch (error) {
+        console.error('Failed to load staff:', error);
+        setStaff([]);
+      } finally {
+        setLoadingStaff(false);
+      }
+    };
+    loadStaff();
+  }, []);
 
   const openArchiveConfirm = () => {
     setErrorMsg("");
@@ -88,9 +111,24 @@ export function DataManagementPanel() {
         </div>
         <div className="p-5 space-y-3">
           <div>
-            <label htmlFor="staff-name" className="text-sm text-gray-700">Performing Action As (Staff Name)</label>
-            <input id="staff-name" type="text" value={staffName} onChange={(e) => setStaffName(e.target.value)} placeholder="Enter your staff name"
-              className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm" />
+            <label htmlFor="staff-name" className="text-sm text-gray-700">Performing Action As</label>
+            <select
+              id="staff-name"
+              className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={staffName}
+              onChange={(e) => setStaffName(e.target.value)}
+              disabled={loadingStaff}
+              required
+            >
+              <option value="" disabled>
+                {loadingStaff ? "Loading staff..." : "Select your name"}
+              </option>
+              {staff.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-gray-500 mt-1">All admin actions are audited with this name.</p>
           </div>
           <div>
@@ -125,17 +163,43 @@ export function DataManagementPanel() {
       {isArchiveOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg p-5">
-            <h3 className="font-semibold mb-2">Confirm Archive Operation</h3>
+            <h3 className="font-semibold mb-4">Confirm Archive Operation</h3>
             {errorMsg && (<div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3" role="alert">{errorMsg}</div>)}
             {successMsg && (<div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mb-3" role="status">{successMsg}</div>)}
-            <p className="text-sm text-gray-600 mb-2">Jobs older than <strong>{archiveDays}</strong> days in Completed or Paid & Picked Up will be archived.</p>
+            
+            {!successMsg && (
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label htmlFor="archive-staff" className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
+                  <select
+                    id="archive-staff"
+                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={staffName}
+                    onChange={(e) => setStaffName(e.target.value)}
+                    disabled={loadingStaff}
+                    required
+                  >
+                    <option value="" disabled>
+                      {loadingStaff ? "Loading staff..." : "Select your name"}
+                    </option>
+                    {staff.map((s) => (
+                      <option key={s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-sm text-gray-600">Jobs older than <strong>{archiveDays}</strong> days in Completed or Paid & Picked Up will be archived.</p>
+              </div>
+            )}
+            
             {typeof previewCounts.archive === 'number' && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-3">Archived {previewCounts.archive} job(s).</div>
             )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setIsArchiveOpen(false)} className="px-3 py-2 text-sm rounded border border-gray-300">{successMsg ? "Close" : "Cancel"}</button>
               {!successMsg && (
-                <button onClick={executeArchive} disabled={isProcessing} className="px-3 py-2 text-sm rounded bg-gray-800 text-white disabled:opacity-50 flex items-center gap-1">
+                <button onClick={executeArchive} disabled={isProcessing || !staffName.trim()} className="px-3 py-2 text-sm rounded bg-gray-800 text-white disabled:opacity-50 flex items-center gap-1">
                   {isProcessing ? (<><span className="inline-block h-3 w-3 rounded-full border border-white border-t-transparent animate-spin" /> Archiving…</>) : (<>Archive Jobs <CheckCircle className="w-4 h-4" /></>)}
                 </button>
               )}
@@ -148,17 +212,43 @@ export function DataManagementPanel() {
       {isPruneOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg p-5">
-            <div className="flex items-center gap-2 text-red-600 mb-2"><AlertTriangle className="w-5 h-5" /><h3 className="font-semibold">Confirm Prune Operation</h3></div>
+            <div className="flex items-center gap-2 text-red-600 mb-4"><AlertTriangle className="w-5 h-5" /><h3 className="font-semibold">Confirm Prune Operation</h3></div>
             {errorMsg && (<div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3" role="alert">{errorMsg}</div>)}
             {successMsg && (<div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mb-3" role="status">{successMsg}</div>)}
-            <p className="text-sm text-gray-600 mb-2">Archived jobs older than <strong>{pruneDays}</strong> days will be permanently removed.</p>
+            
+            {!successMsg && (
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label htmlFor="prune-staff" className="block text-sm font-medium text-gray-700 mb-1">Performing Action As</label>
+                  <select
+                    id="prune-staff"
+                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={staffName}
+                    onChange={(e) => setStaffName(e.target.value)}
+                    disabled={loadingStaff}
+                    required
+                  >
+                    <option value="" disabled>
+                      {loadingStaff ? "Loading staff..." : "Select your name"}
+                    </option>
+                    {staff.map((s) => (
+                      <option key={s.name} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-sm text-gray-600">Archived jobs older than <strong>{pruneDays}</strong> days will be permanently removed.</p>
+              </div>
+            )}
+            
             {typeof previewCounts.prune === 'number' && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 mb-3">Deleted {previewCounts.prune} archived job(s).</div>
             )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setIsPruneOpen(false)} className="px-3 py-2 text-sm rounded border border-gray-300">{successMsg ? "Close" : "Cancel"}</button>
               {!successMsg && (
-                <button onClick={executePrune} disabled={isProcessing} className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50">{isProcessing ? "Deleting…" : "Delete Jobs"}</button>
+                <button onClick={executePrune} disabled={isProcessing || !staffName.trim()} className="px-3 py-2 text-sm rounded bg-red-600 text-white disabled:opacity-50">{isProcessing ? "Deleting…" : "Delete Jobs"}</button>
               )}
             </div>
           </div>

@@ -284,7 +284,7 @@ class JobOrchestrationService:
         if not student_name:
             first_name = form_data.get('student_first_name')
             last_name = form_data.get('student_last_name')
-            student_name = f"{first_name or ''} {last_name or ''}.".strip()
+            student_name = f"{first_name or ''} {last_name or ''}".strip()
             
         candidate_name = display_name
         candidate_path = os.path.join(storage_dir, f"{candidate_name}.{ext}")
