@@ -13,37 +13,6 @@ export default function SubmissionForm() {
   const router = useRouter();
   const { catalog, isLoading: catalogLoading, error: catalogError } = useCatalog();
   
-  // Show loading state if catalog is not ready
-  if (catalogLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading submission form...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if catalog fails to load
-  if (catalogError || !catalog) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p>Unable to load system configuration. Please try refreshing the page.</p>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [studentEmail, setStudentEmail] = useState('');
@@ -61,7 +30,6 @@ export default function SubmissionForm() {
   const [fileError, setFileError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  // Validation error states
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [disciplineError, setDisciplineError] = useState('');
@@ -163,6 +131,37 @@ export default function SubmissionForm() {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading state if catalog is not ready
+  if (catalogLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading submission form...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if catalog fails to load
+  if (catalogError || !catalog) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p>Unable to load system configuration. Please try refreshing the page.</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

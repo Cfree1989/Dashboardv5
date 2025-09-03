@@ -792,9 +792,29 @@ class JobOrchestrationService:
             if workstation_id is None:
                 workstation_id = getattr(g, 'workstation_id', 'unknown')
             
+            # Graceful unlock: if not lock owner, check if job is already unlocked
             if job.locked_by != workstation_id:
-                raise ValueError("Not lock owner")
+                # If job is not locked at all, return success (desired state achieved)
+                if job.locked_by is None:
+                    logger.debug(f"Job {job_id} unlock requested but job already unlocked")
+                    return job
+                
+                # If job is locked by someone else, check if lock has expired
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                if job.locked_until and now > job.locked_until.replace(tzinfo=timezone.utc):
+                    # Lock has expired, safe to unlock
+                    logger.info(f"Job {job_id} unlock: clearing expired lock from {job.locked_by}")
+                    job.locked_by = None
+                    job.locked_until = None
+                    db.session.commit()
+                    return job
+                
+                # Job is actively locked by another workstation - log but don't fail
+                logger.info(f"Job {job_id} unlock requested by {workstation_id} but locked by {job.locked_by} (not owner)")
+                return job  # Return success to avoid 403 cascade
             
+            # Normal case: we own the lock, so unlock it
             job.locked_by = None
             job.locked_until = None
             

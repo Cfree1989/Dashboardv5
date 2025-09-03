@@ -42,6 +42,20 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   const router = useRouter();
   const controllerRef = useRef<AbortController | null>(null);
 
+  // React Strict Mode compatibility: Skip cleanup in development
+  useEffect(() => {
+    return () => {
+      // Skip cleanup in development mode to prevent React Strict Mode interference
+      if (process.env.NODE_ENV === 'development') {
+        return;
+      }
+      // Only cleanup in production
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // Memoized sorted jobs for better performance
   const sortedJobs = useMemo(() => {
     // Safety check: ensure jobs is an array before spreading
@@ -89,10 +103,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   // Memoized fetch jobs function
   const fetchJobs = useCallback(async () => {
-    // cancel any in-flight
-    if (controllerRef.current) {
-      controllerRef.current.abort();
-    }
+    // Always create a fresh controller - don't try to abort existing ones in development
     const controller = new AbortController();
     controllerRef.current = controller;
 
@@ -106,16 +117,19 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     try {
       // Build query string based on filters
       const params = new URLSearchParams();
-      if (filters?.status) params.append('status', filters.status);
+      if (filters?.status) {
+        params.append('status', filters.status);
+      }
       const qSearch = (filters?.search || "").trim();
       if (qSearch) params.append('search', qSearch);
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
 
-      const response = await apiClient.request<any[]>(`/api/v1/jobs?${params.toString()}`, {
+      const apiUrl = `/api/v1/jobs?${params.toString()}`;
+      const response = await apiClient.request<any[]>(apiUrl, {
         signal: controller.signal
       }, {
-        ttl: 60 * 1000 // 1 minute for job lists
+        ttl: state.data.hasLoaded ? 60 * 1000 : 0 // No caching for initial load, cache subsequent loads
       });
 
       if (!controller.signal.aborted) {
@@ -136,7 +150,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         }));
       }
     }
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, state.data.hasLoaded]);
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
 
   // Fetch jobs when filters change
   useEffect(() => {
@@ -150,9 +164,13 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
   }, [refreshToken, fetchJobs, state.data.hasLoaded]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - React Strict Mode compatibility
   useEffect(() => {
     return () => {
+      // Skip cleanup in development mode to prevent React Strict Mode interference  
+      if (process.env.NODE_ENV === 'development') {
+        return;
+      }
       if (controllerRef.current) {
         controllerRef.current.abort();
       }
