@@ -7,7 +7,7 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
 from app.business_logic.shared_services import event_service
-from app.services.infrastructure.atomic_file_service import get_atomic_file_service, STATUS_TO_DIR
+from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
 from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
@@ -35,14 +35,15 @@ def _safe_read_json(path: Path) -> dict:
 
 
 def _storage_root() -> Path:
-    root = os.environ.get('STORAGE_PATH', 'storage')
-    return Path(root)
+    """Get storage root using centralized file configuration service"""
+    return get_file_configuration_service().get_storage_root()
 
 
 def _list_all_storage_files(root: Path) -> list[Path]:
     files: list[Path] = []
-    # Include all status directories plus any extra content under root for completeness
-    status_dirs = set(STATUS_TO_DIR.values()) | { 'Uploaded', 'Pending', 'ReadyToPrint', 'Printing', 'Completed', 'PaidPickedUp', 'Archived' }
+    # Use centralized status directory mapping
+    file_config = get_file_configuration_service()
+    status_dirs = set(file_config.status_to_dir_mapping.values())
     for dirname in status_dirs:
         d = root / dirname
         if not d.exists() or not d.is_dir():
@@ -61,7 +62,9 @@ def _list_all_storage_files(root: Path) -> list[Path]:
 
 
 def _expected_dir_for_status(status: str) -> str:
-    return STATUS_TO_DIR.get(status, 'Uploaded')
+    """Get expected directory name for a job status using centralized mapping"""
+    file_config = get_file_configuration_service()
+    return file_config.status_to_dir_mapping.get(status.upper().strip(), 'Uploaded')
 
 
 def perform_audit() -> dict:

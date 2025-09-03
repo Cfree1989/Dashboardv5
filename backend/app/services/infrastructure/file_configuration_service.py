@@ -8,7 +8,8 @@ from across the application to provide a single source of truth.
 
 import os
 import struct
-from typing import Set, Dict, Optional, Tuple, Union
+from typing import Set, Dict, Optional, Tuple, Union, Any
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class FileConfigurationService:
         self._max_file_size = self._load_max_file_size()
         self._storage_paths = self._load_storage_paths()
         self._min_file_size = self._load_min_file_size()
+        self._status_to_dir = self._load_status_to_dir_mapping()
     
     def _load_allowed_extensions(self) -> Set[str]:
         """Load allowed file extensions from environment configuration"""
@@ -107,6 +109,21 @@ class FileConfigurationService:
         
         logger.info(f"Loaded storage paths: {paths}")
         return paths
+    
+    def _load_status_to_dir_mapping(self) -> Dict[str, str]:
+        """Load centralized status to directory mapping"""
+        # Standard status to directory mapping for the application
+        # This centralizes the scattered STATUS_TO_DIR mappings
+        return {
+            'UPLOADED': 'Uploaded',
+            'PENDING': 'Pending', 
+            'READYTOPRINT': 'ReadyToPrint',
+            'PRINTING': 'Printing',
+            'COMPLETED': 'Completed',
+            'PAIDPICKEDUP': 'PaidPickedUp',
+            'REJECTED': 'Rejected',
+            'ARCHIVED': 'Archived',
+        }
     
     @property
     def allowed_extensions(self) -> Set[str]:
@@ -358,6 +375,201 @@ class FileConfigurationService:
         self._max_file_size = self._load_max_file_size()
         self._min_file_size = self._load_min_file_size()
         self._storage_paths = self._load_storage_paths()
+        self._status_to_dir = self._load_status_to_dir_mapping()
+
+    # ========================================================================
+    # CENTRALIZED PATH MANAGEMENT METHODS
+    # ========================================================================
+
+    @property
+    def status_to_dir_mapping(self) -> Dict[str, str]:
+        """Get the centralized status to directory mapping"""
+        return self._status_to_dir.copy()
+
+    def get_storage_root(self) -> Path:
+        """Get the storage root directory path"""
+        return Path(self._storage_paths['root'])
+
+    def get_status_directory(self, status: str) -> Path:
+        """Get the directory path for a specific job status"""
+        status_upper = status.upper().strip()
+        dir_name = self._status_to_dir.get(status_upper, 'Uploaded')
+        return self.get_storage_root() / dir_name
+
+    def get_job_file_path(self, filename: str, status: str = 'UPLOADED') -> Path:
+        """Get the complete file path for a job file"""
+        status_dir = self.get_status_directory(status)
+        sanitized_filename = self.sanitize_filename(filename)
+        return status_dir / sanitized_filename
+
+    def get_job_metadata_path(self, filename: str, status: str = 'UPLOADED') -> Path:
+        """Get the complete metadata path for a job file"""
+        status_dir = self.get_status_directory(status)
+        
+        # Generate metadata filename from job filename
+        if '.' in filename:
+            base_name = filename.rsplit('.', 1)[0]
+        else:
+            base_name = filename
+        
+        sanitized_base = self.sanitize_filename(base_name)
+        metadata_filename = f"{sanitized_base}_metadata.json"
+        return status_dir / metadata_filename
+
+    def get_unique_file_path(self, filename: str, status: str = 'UPLOADED') -> Tuple[Path, str]:
+        """Get a unique file path by appending counter if file exists"""
+        base_path = self.get_job_file_path(filename, status)
+        
+        # If file doesn't exist, return original path
+        if not base_path.exists():
+            return base_path, filename
+            
+        # Extract base name and extension
+        if '.' in filename:
+            base_name, extension = filename.rsplit('.', 1)
+        else:
+            base_name = filename
+            extension = ''
+            
+        # Find unique filename with counter
+        counter = 1
+        while True:
+            if extension:
+                candidate_filename = f"{base_name}_{counter}.{extension}"
+            else:
+                candidate_filename = f"{base_name}_{counter}"
+                
+            candidate_path = self.get_job_file_path(candidate_filename, status)
+            if not candidate_path.exists():
+                return candidate_path, candidate_filename
+            counter += 1
+            
+            # Safety check to prevent infinite loop
+            if counter > 9999:
+                raise RuntimeError("Cannot generate unique filename after 9999 attempts")
+
+    def construct_standardized_filename(self, student_name: str, method: str, color: str, job_id: str, extension: str) -> str:
+        """Construct a standardized filename following the application pattern"""
+        # Normalize components (similar to submit.py logic)
+        normalized_student = self._normalize_name_component(student_name or 'Student')
+        normalized_method = self._normalize_simple_label(method or 'Method')
+        normalized_color = self._normalize_simple_label(color or 'Color')
+        
+        # Ensure extension has dot prefix
+        if not extension.startswith('.'):
+            extension = f'.{extension}'
+        
+        return f"{normalized_student}_{normalized_method}_{normalized_color}_{job_id}{extension}"
+
+    def _normalize_name_component(self, name: str) -> str:
+        """Normalize a name component (from submit.py logic)"""
+        if not name or not name.strip():
+            return 'Student'
+        parts = name.strip().replace('-', ' ').split()
+        joined = ''.join(w.capitalize() for w in parts)
+        return ''.join(ch for ch in joined if ch.isalnum()) or 'Student'
+
+    def _normalize_simple_label(self, label: str) -> str:
+        """Normalize a simple label component (from submit.py logic)"""
+        if not label or not label.strip():
+            return 'Value'
+        parts = label.strip().replace('-', ' ').split()  
+        labeled = ''.join(w.capitalize() for w in parts)
+        return ''.join(ch for ch in labeled if ch.isalnum()) or 'Value'
+
+    def validate_path_security(self, file_path: Union[str, Path]) -> Tuple[bool, Optional[str]]:
+        """Validate that a file path is within the storage boundaries"""
+        try:
+            path_obj = Path(file_path).resolve()
+            storage_root = self.get_storage_root().resolve()
+            
+            # Check if path is within storage root
+            if not str(path_obj).startswith(str(storage_root)):
+                return False, f"Path '{file_path}' is outside storage boundaries"
+            
+            # Check if path exists and is a file
+            if path_obj.exists() and path_obj.is_dir():
+                return False, f"Path '{file_path}' is a directory, not a file"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"Invalid path: {e}"
+
+    def ensure_status_directory_exists(self, status: str) -> bool:
+        """Ensure the status directory exists, creating if necessary"""
+        try:
+            status_dir = self.get_status_directory(status)
+            status_dir.mkdir(parents=True, exist_ok=True)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create status directory for '{status}': {e}")
+            return False
+
+    def get_relative_path_from_storage_root(self, file_path: Union[str, Path]) -> Optional[str]:
+        """Get relative path from storage root for a given file path"""
+        try:
+            path_obj = Path(file_path).resolve()
+            storage_root = self.get_storage_root().resolve()
+            
+            if str(path_obj).startswith(str(storage_root)):
+                return str(path_obj.relative_to(storage_root))
+            return None
+        except Exception:
+            return None
+
+    def infer_status_from_path(self, file_path: Union[str, Path]) -> Optional[str]:
+        """Infer job status from file path location"""
+        try:
+            path_obj = Path(file_path)
+            dir_name = path_obj.parent.name
+            
+            # Look up status by directory name
+            for status, directory in self._status_to_dir.items():
+                if directory == dir_name:
+                    return status
+            return None
+        except Exception:
+            return None
+
+    def list_all_status_directories(self) -> Dict[str, Path]:
+        """Get all status directories and their paths"""
+        result = {}
+        for status, dir_name in self._status_to_dir.items():
+            result[status] = self.get_storage_root() / dir_name
+        return result
+
+    def get_storage_usage_info(self) -> Dict[str, Any]:
+        """Get storage usage information for all status directories"""
+        usage_info = {
+            'storage_root': str(self.get_storage_root()),
+            'directories': {},
+            'total_files': 0,
+            'total_size_bytes': 0
+        }
+        
+        for status, dir_path in self.list_all_status_directories().items():
+            dir_info = {
+                'path': str(dir_path),
+                'exists': dir_path.exists(),
+                'file_count': 0,
+                'size_bytes': 0
+            }
+            
+            if dir_path.exists():
+                try:
+                    for file_path in dir_path.iterdir():
+                        if file_path.is_file():
+                            dir_info['file_count'] += 1
+                            dir_info['size_bytes'] += file_path.stat().st_size
+                except Exception as e:
+                    logger.warning(f"Error scanning directory {dir_path}: {e}")
+            
+            usage_info['directories'][status] = dir_info
+            usage_info['total_files'] += dir_info['file_count']
+            usage_info['total_size_bytes'] += dir_info['size_bytes']
+        
+        return usage_info
 
 
 # Global instance for easy access

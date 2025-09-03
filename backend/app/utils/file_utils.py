@@ -7,15 +7,15 @@ from app.services.infrastructure.file_configuration_service import get_file_conf
 class FileUtils:
     @staticmethod
     def validate_storage_path(file_path: str) -> bool:
-        """Validate file path is within storage root"""
-        root = Path(os.environ.get('STORAGE_PATH', 'storage')).resolve()
-        target = Path(file_path).resolve()
-        return str(target).startswith(str(root))
+        """Validate file path is within storage root using centralized validation"""
+        file_config = get_file_configuration_service()
+        is_valid, _ = file_config.validate_path_security(file_path)
+        return is_valid
     
     @staticmethod
     def get_storage_root() -> Path:
-        """Get configured storage root path"""
-        return Path(os.environ.get('STORAGE_PATH', 'storage'))
+        """Get configured storage root path using centralized configuration"""
+        return get_file_configuration_service().get_storage_root()
     
     @staticmethod
     def ensure_directory_exists(directory_path: str) -> Path:

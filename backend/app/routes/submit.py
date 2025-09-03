@@ -90,9 +90,9 @@ def submit_job():
             return jsonify({'message': 'duplicate active job exists', 'existing_job_id': existing}), 409
 
         # Prepare storage directory
-        # Use STORAGE_PATH root and ensure status subdir
-        storage_root = os.environ.get('STORAGE_PATH', 'storage')
-        storage_dir = os.path.join(storage_root, 'Uploaded')
+        # Use centralized file configuration service
+        file_config = get_file_configuration_service()
+        storage_dir = file_config.get_status_directory('UPLOADED')
         os.makedirs(storage_dir, exist_ok=True)
 
         # Generate job ID and standardized filenames
@@ -138,21 +138,13 @@ def submit_job():
                 'details': validation_errors
             }), 400
 
-        # Short/simple Job ID
-        simple_id = short_id
-        standardized_base = f"{normalized_student}_{normalized_method}_{normalized_color}_{simple_id}"
-        standardized_name = f"{standardized_base}.{ext}"
-        file_path = os.path.join(storage_dir, standardized_name)
-
-        # Save file (ensure unique by appending counter if exists)
-        base_name = standardized_base
-        candidate_name = standardized_name
-        candidate_path = file_path
-        counter = 1
-        while os.path.exists(candidate_path):
-            candidate_name = f"{base_name}_{counter}.{ext}"
-            candidate_path = os.path.join(storage_dir, candidate_name)
-            counter += 1
+        # Use centralized filename construction and unique path generation
+        standardized_name = file_config.construct_standardized_filename(
+            student_name, raw_method, raw_color, short_id, ext
+        )
+        candidate_path, candidate_name = file_config.get_unique_file_path(standardized_name, 'UPLOADED')
+        # Ensure storage directory exists before writing
+        file_config.ensure_status_directory_exists('UPLOADED')
         with open(candidate_path, 'wb') as out_f:
             out_f.write(file_bytes)
 
@@ -172,8 +164,9 @@ def submit_job():
             'file_path': str(_P(candidate_path).resolve()),
             'created_at': datetime.utcnow().isoformat()
         }
-        metadata_base = base_name if counter == 1 else f"{base_name}_{counter-1}"
-        metadata_path = os.path.join(storage_dir, f"{metadata_base}_metadata.json")
+        # Get metadata path using centralized method
+        base_filename = candidate_name.rsplit('.', 1)[0] if '.' in candidate_name else candidate_name
+        metadata_path = file_config.get_job_metadata_path(base_filename, 'UPLOADED')
         with open(metadata_path, 'w') as meta_f:
             json.dump(metadata, meta_f)
 

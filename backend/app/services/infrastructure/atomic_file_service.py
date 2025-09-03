@@ -16,23 +16,14 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from app.services.infrastructure.file_lock_service import get_file_lock_service
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 
 logger = logging.getLogger(__name__)
 
 # Feature flag for atomic file operations
 ATOMIC_FILE_OPERATIONS_ENABLED = os.getenv('ATOMIC_FILE_OPERATIONS_ENABLED', 'true').lower() == 'true'
 
-# Status to directory mapping for file organization
-STATUS_TO_DIR = {
-    'UPLOADED': 'Uploaded',
-    'PENDING': 'Pending',
-    'READYTOPRINT': 'ReadyToPrint',
-    'PRINTING': 'Printing',
-    'COMPLETED': 'Completed',
-    'PAIDPICKEDUP': 'PaidPickedUp',
-    'REJECTED': 'Rejected',
-    'ARCHIVED': 'Archived',
-}
+# STATUS_TO_DIR mapping now centralized in FileConfigurationService
 
 class AtomicFileOperation:
     """Base class for atomic file operations with prepare/commit/rollback pattern."""
@@ -228,6 +219,7 @@ class AtomicFileService:
     
     def __init__(self):
         self.lock_service = get_file_lock_service()
+        self.file_config = get_file_configuration_service()
         
     def atomic_move_authoritative(self, job, target_status: str) -> bool:
         """Atomic version of move_authoritative with fallback to legacy system."""
@@ -359,10 +351,8 @@ class AtomicFileService:
         if not source_path:
             return None
             
-        # Determine storage root and target directory
-        storage_root = self._get_storage_root_from_path(source_path)
-        target_dir = storage_root / STATUS_TO_DIR.get(target_status, 'Uploaded')
-        return target_dir / source_path.name
+        # Use centralized path management
+        return self.file_config.get_job_file_path(source_path.name, target_status)
         
     def _get_metadata_path(self, job) -> Optional[Path]:
         """Get the metadata path for a job."""
@@ -376,17 +366,18 @@ class AtomicFileService:
         if not metadata_path:
             return None
             
-        # Determine storage root and target directory
-        storage_root = self._get_storage_root_from_path(metadata_path)
-        target_dir = storage_root / STATUS_TO_DIR.get(target_status, 'Uploaded')
-        return target_dir / metadata_path.name
+        # Use centralized path management
+        # Extract base filename from metadata path (remove "_metadata.json" suffix)
+        if metadata_path.name.endswith('_metadata.json'):
+            base_filename = metadata_path.name[:-len('_metadata.json')]
+        else:
+            base_filename = metadata_path.stem
+        return self.file_config.get_job_metadata_path(base_filename, target_status)
         
     def _get_storage_root_from_path(self, file_path: Path) -> Path:
         """Infer storage root from an existing file path."""
-        parent = file_path.parent
-        if parent.name in STATUS_TO_DIR.values():
-            return parent.parent
-        return Path(os.environ.get('STORAGE_PATH', parent.as_posix()))
+        # Use centralized storage root
+        return self.file_config.get_storage_root()
 
 # Global service instance
 _atomic_file_service = None
