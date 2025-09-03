@@ -481,7 +481,13 @@ DASHBOARDV5/
 │   │   │   └── page.tsx         # Home page (redirect to dashboard)
 │   │   ├── components/          # UI Components
 │   │   │   ├── dashboard/       # Dashboard-specific components
-│   │   │   │   ├── job-card.tsx
+│   │   │   │   ├── job-card.tsx              # Main job card component (refactored)
+│   │   │   │   ├── job-card-header.tsx       # Job info display & review states
+│   │   │   │   ├── job-card-notes.tsx        # Notes editing & management
+│   │   │   │   ├── job-card-actions.tsx      # Action buttons & status changes
+│   │   │   │   ├── job-card-details.tsx      # Expandable job details
+│   │   │   │   ├── job-card-original-backup.tsx # Archived original (1,028 lines)
+│   │   │   │   ├── index.ts                  # Clean component exports
 │   │   │   │   ├── job-list.tsx
 │   │   │   │   ├── status-tabs.tsx
 │   │   │   │   ├── diag-panel.tsx
