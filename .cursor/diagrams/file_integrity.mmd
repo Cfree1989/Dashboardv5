@@ -1,0 +1,36 @@
+flowchart TD
+    A["File Upload"] --> B["Calculate Checksum"]
+    B --> C["Store in Metadata"]
+    
+    C --> D["Atomic Move Operation"]
+    D --> E["Verify Staging Integrity"]
+    E --> F{"Staging Valid?"}
+    F -->|Yes| G["Move to Final Location"]
+    F -->|No| H["Rollback Operation"]
+    G --> I["Verify Final Integrity"]
+    I --> J["Update Metadata with Checksum"]
+    
+    J --> K["Health Check Monitoring"]
+    K --> L["Sample Files from Storage"]
+    L --> M["Compare Checksums"]
+    M --> N{"Integrity OK?"}
+    N -->|Yes| O["Report Healthy Status"]
+    N -->|No| P["Corruption Detected"]
+    
+    P --> Q["Attempt Recovery"]
+    Q --> R{"Recovery Successful?"}
+    R -->|Yes| S["File Restored"]
+    R -->|No| T["Quarantine Corrupted File"]
+    T --> U["Log Corruption Event"]
+    S --> V["Update Integrity Status"]
+    U --> V
+    
+    H --> W["Log Operation Failure"]
+    
+    style A fill:#e1f5fe
+    style P fill:#ffebee
+    style T fill:#fff3e0
+    style S fill:#e8f5e8
+    style O fill:#e8f5e8
+    style H fill:#ffebee
+    style W fill:#ffebee

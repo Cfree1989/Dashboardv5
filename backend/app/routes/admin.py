@@ -7,10 +7,13 @@ from app.models.event import Event
 from app.models.payment import Payment
 from app.models.staff import Staff
 from app.business_logic.shared_services import event_service
+from app.business_logic.shared_services.event_service import log_event
 from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+from app.services.infrastructure.file_configuration_service import get_file_configuration_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
 from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
+from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from pathlib import Path
 import os
 import json
@@ -25,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 
 bp = Blueprint('admin', __name__, url_prefix='/api/v1/admin')
+
+# Get orchestration service instance
+orchestration_service = JobOrchestrationService()
 
 
 def _safe_read_json(path: Path) -> dict:
@@ -72,8 +78,8 @@ def perform_audit() -> dict:
     all_files = _list_all_storage_files(root)
     all_files_set = {str(p.resolve()) for p in all_files}
 
-    # Collect known paths from DB
-    jobs: list[Job] = Job.query.all()
+    # Collect known paths from DB using orchestration service
+    jobs: list[Job] = orchestration_service.get_all_jobs()
     known_paths: set[str] = set()
     for j in jobs:
         if j.file_path:
@@ -258,7 +264,7 @@ def mark_reviewed():
             message='job_id and staff_name are required',
             error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
         )
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     log_event('AuditIssueReviewed', {'issues': issues}, triggered_by=staff_name, job_id=job.id)
@@ -276,7 +282,7 @@ def repair_metadata():
             message='job_id and staff_name are required',
             error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
         )
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     try:
@@ -309,7 +315,7 @@ def repair_location():
             message='job_id and staff_name are required',
             error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
         )
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     try:
@@ -349,7 +355,7 @@ def relink_file():
             message='job_id, file_path and staff_name are required',
             error_code=ErrorCode.MISSING_REQUIRED_FIELD.value
         )
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
         return ResponseService.not_found('Job', ErrorCode.JOB_NOT_FOUND.value)
     # Validate target path
@@ -482,34 +488,22 @@ def archive_jobs():
             error_code=ErrorCode.INVALID_VALUE.value
         )
     cutoff = datetime.utcnow() - timedelta(days=retention_days)
-    # Eligible: PaidPickedUp or Rejected older than cutoff
-    eligible = Job.query.filter(
-        Job.status.in_(['PAIDPICKEDUP', 'REJECTED']),
-    ).all()
+    # Get eligible jobs using orchestration service
+    eligible = orchestration_service.get_archivable_jobs(cutoff)
     count = 0
     for job in eligible:
         try:
-            if job.created_at and job.created_at > cutoff:
-                continue
-        except Exception:
-            pass
-        # Move to Archived and update status
-        try:
-            atomic_service = get_atomic_file_service()
-            atomic_service.atomic_move_authoritative(job, 'ARCHIVED')
-        except Exception:
-            pass  # Continue processing even if file move fails
-        job.status = 'ARCHIVED'
-        db.session.add(job)
-        db.session.commit()
-        # Sync metadata fields minimally
-        try:
-            _update_metadata_status(Path(job.metadata_path), 'ARCHIVED', job.file_path)
-        except Exception:
-            pass
-        # Log per-job event
-        log_event('JobArchived', {'retention_days': retention_days}, triggered_by=staff_name, job_id=job.id)
-        count += 1
+            # Use orchestration service to archive job
+            orchestration_service.archive_job(job.id, staff_name, retention_days)
+            # Sync metadata fields minimally
+            try:
+                _update_metadata_status(Path(job.metadata_path), 'ARCHIVED', job.file_path)
+            except Exception:
+                pass
+            count += 1
+        except Exception as e:
+            logger.warning(f"Failed to archive job {job.id}: {e}")
+            continue
     # Batch admin action event (system-level)
     log_event('AdminAction', {'action': 'archive', 'jobs_archived': count, 'retention_days': retention_days}, triggered_by=staff_name)
     return ResponseService.success({'message': 'Archival process completed', 'jobs_archived': count})
@@ -538,7 +532,7 @@ def prune_jobs():
             error_code=ErrorCode.INVALID_VALUE.value
         )
     cutoff = datetime.utcnow() - timedelta(days=retention_days)
-    archived = Job.query.filter(Job.status == 'ARCHIVED').all()
+    archived = orchestration_service.get_jobs_by_status(['ARCHIVED'])
     deleted = 0
     for job in archived:
         try:
@@ -781,5 +775,292 @@ def report_error():
     except Exception as e:
         logger.error(f"Failed to process error report: {e}")
         return ResponseService.error('Failed to process error report', status=500)
+
+
+# --- File Integrity Endpoints ---
+
+@bp.route('/integrity/verify-file', methods=['POST'])
+@token_required
+def verify_file_integrity():
+    """Verify integrity of a single file"""
+    try:
+        data = request.get_json() or {}
+        file_path = data.get('file_path', '').strip()
+        expected_checksum = data.get('expected_checksum', '').strip()
+        
+        if not file_path:
+            return ResponseService.validation_error('file_path is required')
+            
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        
+        # Validate path security first
+        is_secure, security_error = file_config.validate_path_security(file_path)
+        if not is_secure:
+            return ResponseService.validation_error(f'Invalid file path: {security_error}')
+            
+        # If expected checksum provided, verify against it
+        if expected_checksum:
+            is_valid, error = file_config.verify_file_integrity(file_path, expected_checksum)
+            status = 'valid' if is_valid else 'invalid'
+            return ResponseService.success({
+                'file_path': file_path,
+                'status': status,
+                'error': error,
+                'expected_checksum': expected_checksum
+            })
+        else:
+            # No expected checksum, just calculate current integrity
+            integrity_info = file_config.get_file_integrity_info(file_path)
+            if integrity_info:
+                return ResponseService.success({
+                    'file_path': file_path,
+                    'status': 'calculated',
+                    'integrity_info': integrity_info
+                })
+            else:
+                return ResponseService.not_found('File not found or could not calculate integrity')
+                
+    except Exception as e:
+        logger.error(f"Failed to verify file integrity: {e}")
+        return ResponseService.error('Failed to verify file integrity', status=500)
+
+
+@bp.route('/integrity/verify-directory', methods=['POST'])
+@token_required
+def verify_directory_integrity():
+    """Verify integrity of all files in a directory"""
+    try:
+        data = request.get_json() or {}
+        directory_path = data.get('directory_path', '').strip()
+        
+        if not directory_path:
+            return ResponseService.validation_error('directory_path is required')
+            
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        
+        # Validate path security first
+        is_secure, security_error = file_config.validate_path_security(directory_path)
+        if not is_secure:
+            return ResponseService.validation_error(f'Invalid directory path: {security_error}')
+            
+        from pathlib import Path
+        dir_path = Path(directory_path)
+        if not dir_path.exists() or not dir_path.is_dir():
+            return ResponseService.not_found('Directory not found')
+            
+        # Get all files with their integrity information
+        results = {}
+        file_count = 0
+        corrupted_count = 0
+        
+        for file_path in dir_path.rglob('*'):
+            if file_path.is_file() and not file_path.name.startswith('.'):
+                file_count += 1
+                relative_path = str(file_path.relative_to(dir_path))
+                
+                # Get integrity info for each file
+                integrity_info = file_config.get_file_integrity_info(file_path)
+                if integrity_info:
+                    results[relative_path] = {
+                        'status': 'scanned',
+                        'checksum': integrity_info['checksum'],
+                        'size_bytes': integrity_info['size_bytes'],
+                        'file_path': str(file_path)
+                    }
+                    
+                    # Try to find expected checksum in metadata
+                    metadata_path = file_path.with_suffix(file_path.suffix + '_metadata.json')
+                    if not metadata_path.exists():
+                        # Try alternative metadata naming
+                        metadata_path = file_path.parent / f"{file_path.stem}_metadata.json"
+                        
+                    if metadata_path.exists():
+                        try:
+                            with open(metadata_path, 'r') as f:
+                                metadata = json.load(f)
+                                expected_checksum = metadata.get('file_integrity', {}).get('checksum')
+                                
+                                if expected_checksum:
+                                    if expected_checksum == integrity_info['checksum']:
+                                        results[relative_path]['status'] = 'valid'
+                                    else:
+                                        results[relative_path]['status'] = 'corrupted'
+                                        results[relative_path]['expected_checksum'] = expected_checksum
+                                        corrupted_count += 1
+                                        
+                        except Exception as e:
+                            logger.warning(f"Could not read metadata for {file_path}: {e}")
+                else:
+                    results[relative_path] = {
+                        'status': 'error',
+                        'error': 'Could not calculate integrity',
+                        'file_path': str(file_path)
+                    }
+                    
+        return ResponseService.success({
+            'directory_path': directory_path,
+            'total_files': file_count,
+            'corrupted_files': corrupted_count,
+            'scan_completed_at': datetime.utcnow().isoformat(),
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to verify directory integrity: {e}")
+        return ResponseService.error('Failed to verify directory integrity', status=500)
+
+
+@bp.route('/integrity/scan', methods=['GET'])
+@token_required
+def integrity_scan():
+    """Perform comprehensive integrity scan of all storage directories"""
+    try:
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        
+        storage_root = file_config.get_storage_root()
+        scan_results = {}
+        total_files = 0
+        total_corrupted = 0
+        
+        # Scan each status directory
+        for status, dir_name in file_config.status_to_dir_mapping.items():
+            status_dir = storage_root / dir_name
+            if status_dir.exists() and status_dir.is_dir():
+                
+                directory_results = {}
+                status_file_count = 0
+                status_corrupted_count = 0
+                
+                for file_path in status_dir.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.') and not file_path.name.endswith('_metadata.json'):
+                        status_file_count += 1
+                        relative_path = str(file_path.relative_to(status_dir))
+                        
+                        # Calculate current integrity
+                        integrity_info = file_config.get_file_integrity_info(file_path)
+                        if integrity_info:
+                            # Look for expected checksum in metadata
+                            metadata_path = file_path.parent / f"{file_path.stem}_{file_path.suffix[1:] if file_path.suffix else 'file'}_metadata.json"
+                            expected_checksum = None
+                            
+                            if metadata_path.exists():
+                                try:
+                                    with open(metadata_path, 'r') as f:
+                                        metadata = json.load(f)
+                                        expected_checksum = metadata.get('file_integrity', {}).get('checksum')
+                                except Exception:
+                                    pass
+                            
+                            if expected_checksum:
+                                if expected_checksum == integrity_info['checksum']:
+                                    directory_results[relative_path] = {'status': 'valid', 'checksum': integrity_info['checksum']}
+                                else:
+                                    directory_results[relative_path] = {
+                                        'status': 'corrupted',
+                                        'expected': expected_checksum[:16] + '...',
+                                        'actual': integrity_info['checksum'][:16] + '...',
+                                        'file_path': str(file_path)
+                                    }
+                                    status_corrupted_count += 1
+                            else:
+                                directory_results[relative_path] = {
+                                    'status': 'no_metadata',
+                                    'checksum': integrity_info['checksum']
+                                }
+                        else:
+                            directory_results[relative_path] = {'status': 'scan_error'}
+                
+                scan_results[status] = {
+                    'directory': dir_name,
+                    'total_files': status_file_count,
+                    'corrupted_files': status_corrupted_count,
+                    'files': directory_results
+                }
+                
+                total_files += status_file_count
+                total_corrupted += status_corrupted_count
+        
+        return ResponseService.success({
+            'scan_type': 'comprehensive',
+            'storage_root': str(storage_root),
+            'scan_completed_at': datetime.utcnow().isoformat(),
+            'summary': {
+                'total_files': total_files,
+                'corrupted_files': total_corrupted,
+                'directories_scanned': len(scan_results)
+            },
+            'results': scan_results
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to perform integrity scan: {e}")
+        return ResponseService.error('Failed to perform integrity scan', status=500)
+
+
+@bp.route('/integrity/report', methods=['GET'])
+@token_required  
+def integrity_report():
+    """Get comprehensive integrity report with statistics"""
+    try:
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        
+        storage_root = file_config.get_storage_root()
+        report = {
+            'generated_at': datetime.utcnow().isoformat(),
+            'storage_root': str(storage_root),
+            'directories': {},
+            'summary': {
+                'total_files': 0,
+                'files_with_metadata': 0,
+                'corrupted_files': 0,
+                'directories_checked': 0
+            }
+        }
+        
+        # Check each status directory  
+        for status, dir_name in file_config.status_to_dir_mapping.items():
+            status_dir = storage_root / dir_name
+            if status_dir.exists():
+                report['summary']['directories_checked'] += 1
+                
+                dir_report = {
+                    'path': str(status_dir),
+                    'exists': True,
+                    'file_count': 0,
+                    'metadata_count': 0,
+                    'corruption_count': 0,
+                    'total_size_bytes': 0
+                }
+                
+                for file_path in status_dir.rglob('*'):
+                    if file_path.is_file():
+                        if file_path.name.endswith('_metadata.json'):
+                            dir_report['metadata_count'] += 1
+                        elif not file_path.name.startswith('.'):
+                            dir_report['file_count'] += 1
+                            try:
+                                dir_report['total_size_bytes'] += file_path.stat().st_size
+                            except Exception:
+                                pass
+                                
+                report['directories'][status] = dir_report
+                report['summary']['total_files'] += dir_report['file_count']
+                report['summary']['files_with_metadata'] += dir_report['metadata_count']
+                
+            else:
+                report['directories'][status] = {
+                    'path': str(status_dir),
+                    'exists': False
+                }
+        
+        return ResponseService.success(report)
+        
+    except Exception as e:
+        logger.error(f"Failed to generate integrity report: {e}")
+        return ResponseService.error('Failed to generate integrity report', status=500)
 
 

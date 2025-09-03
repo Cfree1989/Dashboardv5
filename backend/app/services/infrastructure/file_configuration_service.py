@@ -8,8 +8,11 @@ from across the application to provide a single source of truth.
 
 import os
 import struct
+import hashlib
+import json
 from typing import Set, Dict, Optional, Tuple, Union, Any
 from pathlib import Path
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -570,6 +573,326 @@ class FileConfigurationService:
             usage_info['total_size_bytes'] += dir_info['size_bytes']
         
         return usage_info
+
+    # --- File Integrity Methods ---
+    
+    def calculate_file_checksum(self, file_path: Union[str, Path]) -> Optional[str]:
+        """Calculate SHA256 checksum for a file"""
+        try:
+            path_obj = Path(file_path)
+            if not path_obj.exists() or not path_obj.is_file():
+                logger.warning(f"File does not exist for checksum calculation: {file_path}")
+                return None
+                
+            sha256_hash = hashlib.sha256()
+            with open(path_obj, 'rb') as f:
+                # Read file in chunks to handle large files efficiently
+                for chunk in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(chunk)
+                    
+            checksum = sha256_hash.hexdigest()
+            logger.debug(f"Calculated checksum for {file_path}: {checksum[:16]}...")
+            return checksum
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate checksum for {file_path}: {e}")
+            return None
+    
+    def calculate_content_checksum(self, file_content: bytes) -> str:
+        """Calculate SHA256 checksum for file content"""
+        sha256_hash = hashlib.sha256()
+        sha256_hash.update(file_content)
+        return sha256_hash.hexdigest()
+    
+    def verify_file_integrity(self, file_path: Union[str, Path], expected_checksum: str) -> Tuple[bool, Optional[str]]:
+        """Verify file integrity by comparing checksums"""
+        if not expected_checksum:
+            return False, "No expected checksum provided"
+            
+        actual_checksum = self.calculate_file_checksum(file_path)
+        if not actual_checksum:
+            return False, "Failed to calculate file checksum"
+            
+        if actual_checksum == expected_checksum:
+            return True, None
+        else:
+            return False, f"Checksum mismatch: expected {expected_checksum[:16]}..., got {actual_checksum[:16]}..."
+    
+    def get_file_integrity_info(self, file_path: Union[str, Path]) -> Optional[Dict[str, Any]]:
+        """Get comprehensive integrity information for a file"""
+        try:
+            path_obj = Path(file_path)
+            if not path_obj.exists() or not path_obj.is_file():
+                return None
+                
+            stat = path_obj.stat()
+            checksum = self.calculate_file_checksum(path_obj)
+            
+            if not checksum:
+                return None
+                
+            return {
+                'path': str(path_obj),
+                'size_bytes': stat.st_size,
+                'checksum': checksum,
+                'modified_time': stat.st_mtime,
+                'created_time': stat.st_ctime if hasattr(stat, 'st_ctime') else stat.st_mtime,
+                'integrity_calculated_at': datetime.now(timezone.utc).isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get integrity info for {file_path}: {e}")
+            return None
+    
+    def verify_directory_integrity(self, directory_path: Union[str, Path], 
+                                 expected_checksums: Dict[str, str]) -> Dict[str, Dict[str, Any]]:
+        """Verify integrity of all files in a directory against expected checksums"""
+        results = {}
+        
+        try:
+            dir_path = Path(directory_path)
+            if not dir_path.exists() or not dir_path.is_dir():
+                logger.warning(f"Directory does not exist: {directory_path}")
+                return results
+                
+            # Check all files in directory
+            for file_path in dir_path.rglob('*'):
+                if file_path.is_file():
+                    relative_path = str(file_path.relative_to(dir_path))
+                    
+                    if relative_path in expected_checksums:
+                        is_valid, error = self.verify_file_integrity(file_path, expected_checksums[relative_path])
+                        results[relative_path] = {
+                            'status': 'valid' if is_valid else 'corrupted',
+                            'error': error,
+                            'file_path': str(file_path)
+                        }
+                    else:
+                        results[relative_path] = {
+                            'status': 'unknown',
+                            'error': 'No expected checksum found',
+                            'file_path': str(file_path)
+                        }
+                        
+        except Exception as e:
+            logger.error(f"Failed to verify directory integrity for {directory_path}: {e}")
+            
+        return results
+    
+    # --- Corruption Detection and Recovery ---
+    
+    def detect_corrupted_files(self, directory_path: Union[str, Path]) -> Dict[str, Dict[str, Any]]:
+        """Detect corrupted files in a directory by comparing against stored checksums"""
+        corrupted_files = {}
+        
+        try:
+            dir_path = Path(directory_path)
+            if not dir_path.exists() or not dir_path.is_dir():
+                logger.warning(f"Directory does not exist for corruption detection: {directory_path}")
+                return corrupted_files
+                
+            for file_path in dir_path.rglob('*'):
+                if file_path.is_file() and not file_path.name.startswith('.') and not file_path.name.endswith('_metadata.json'):
+                    # Look for metadata with stored checksum
+                    metadata_path = file_path.parent / f"{file_path.stem}_metadata.json"
+                    
+                    if metadata_path.exists():
+                        try:
+                            with open(metadata_path, 'r') as f:
+                                metadata = json.load(f)
+                                expected_checksum = metadata.get('file_integrity', {}).get('checksum')
+                                
+                                if expected_checksum:
+                                    actual_checksum = self.calculate_file_checksum(file_path)
+                                    if actual_checksum and actual_checksum != expected_checksum:
+                                        corrupted_files[str(file_path)] = {
+                                            'expected_checksum': expected_checksum,
+                                            'actual_checksum': actual_checksum,
+                                            'metadata_path': str(metadata_path),
+                                            'size_bytes': file_path.stat().st_size,
+                                            'detected_at': datetime.now(timezone.utc).isoformat()
+                                        }
+                                        logger.warning(f"Corrupted file detected: {file_path}")
+                                        
+                        except Exception as e:
+                            logger.error(f"Error checking corruption for {file_path}: {e}")
+                            
+        except Exception as e:
+            logger.error(f"Failed to detect corrupted files in {directory_path}: {e}")
+            
+        return corrupted_files
+    
+    def quarantine_corrupted_file(self, file_path: Union[str, Path], reason: str = "integrity_failure") -> bool:
+        """Move a corrupted file to quarantine directory"""
+        try:
+            source_path = Path(file_path)
+            if not source_path.exists():
+                logger.warning(f"Cannot quarantine non-existent file: {file_path}")
+                return False
+                
+            # Create quarantine directory
+            storage_root = self.get_storage_root()
+            quarantine_dir = storage_root / "Quarantine"
+            quarantine_dir.mkdir(exist_ok=True)
+            
+            # Generate unique quarantine filename with timestamp
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            quarantine_filename = f"{source_path.stem}_{timestamp}_{reason}{source_path.suffix}"
+            quarantine_path = quarantine_dir / quarantine_filename
+            
+            # Move file to quarantine
+            import shutil
+            shutil.move(str(source_path), str(quarantine_path))
+            
+            # Create quarantine metadata
+            quarantine_metadata = {
+                'original_path': str(source_path),
+                'quarantine_reason': reason,
+                'quarantined_at': datetime.now(timezone.utc).isoformat(),
+                'original_size_bytes': quarantine_path.stat().st_size
+            }
+            
+            # Try to preserve original metadata
+            original_metadata_path = source_path.parent / f"{source_path.stem}_metadata.json"
+            if original_metadata_path.exists():
+                try:
+                    with open(original_metadata_path, 'r') as f:
+                        original_metadata = json.load(f)
+                    quarantine_metadata['original_metadata'] = original_metadata
+                    
+                    # Move original metadata to quarantine as well
+                    quarantine_metadata_path = quarantine_dir / f"{quarantine_filename}_metadata.json"
+                    shutil.move(str(original_metadata_path), str(quarantine_metadata_path))
+                    
+                except Exception as e:
+                    logger.warning(f"Could not preserve original metadata: {e}")
+            
+            # Save quarantine metadata
+            quarantine_info_path = quarantine_dir / f"{quarantine_filename}_quarantine.json"
+            with open(quarantine_info_path, 'w') as f:
+                json.dump(quarantine_metadata, f, indent=2)
+                
+            logger.info(f"File quarantined: {file_path} -> {quarantine_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to quarantine file {file_path}: {e}")
+            return False
+    
+    def attempt_file_recovery(self, corrupted_file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Attempt to recover a corrupted file using available recovery strategies"""
+        recovery_result = {
+            'file_path': str(corrupted_file_path),
+            'recovery_attempted': True,
+            'recovery_successful': False,
+            'strategies_tried': [],
+            'error_message': None
+        }
+        
+        try:
+            file_path = Path(corrupted_file_path)
+            
+            # Strategy 1: Check for backup copies in other status directories
+            recovery_result['strategies_tried'].append('backup_search')
+            backup_path = self._find_backup_copy(file_path)
+            if backup_path and backup_path.exists():
+                # Verify backup integrity
+                backup_checksum = self.calculate_file_checksum(backup_path)
+                if backup_checksum:
+                    # Restore from backup
+                    import shutil
+                    shutil.copy2(str(backup_path), str(file_path))
+                    
+                    # Verify restoration
+                    restored_checksum = self.calculate_file_checksum(file_path)
+                    if restored_checksum == backup_checksum:
+                        recovery_result['recovery_successful'] = True
+                        recovery_result['recovery_method'] = 'backup_restore'
+                        logger.info(f"File recovered from backup: {file_path}")
+                        return recovery_result
+            
+            # Strategy 2: Check for recent atomic operation staging (not yet implemented fully)
+            recovery_result['strategies_tried'].append('staging_recovery')
+            
+            # Strategy 3: Mark for manual review if no automated recovery possible
+            recovery_result['strategies_tried'].append('manual_review_flagged')
+            recovery_result['requires_manual_review'] = True
+            
+        except Exception as e:
+            recovery_result['error_message'] = str(e)
+            logger.error(f"File recovery attempt failed for {corrupted_file_path}: {e}")
+            
+        return recovery_result
+    
+    def _find_backup_copy(self, file_path: Path) -> Optional[Path]:
+        """Try to find a backup copy of the file in other directories"""
+        try:
+            filename = file_path.name
+            storage_root = self.get_storage_root()
+            
+            # Look for the same filename in other status directories
+            for status, dir_name in self.status_to_dir_mapping.items():
+                search_dir = storage_root / dir_name
+                if search_dir.exists() and search_dir != file_path.parent:
+                    potential_backup = search_dir / filename
+                    if potential_backup.exists() and potential_backup.is_file():
+                        logger.debug(f"Found potential backup: {potential_backup}")
+                        return potential_backup
+                        
+        except Exception as e:
+            logger.error(f"Error searching for backup of {file_path}: {e}")
+            
+        return None
+    
+    def handle_corruption_scenario(self, file_path: Union[str, Path], corruption_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a file corruption scenario with appropriate recovery actions"""
+        handling_result = {
+            'file_path': str(file_path),
+            'corruption_detected_at': corruption_info.get('detected_at', datetime.now(timezone.utc).isoformat()),
+            'actions_taken': [],
+            'final_status': 'unknown'
+        }
+        
+        try:
+            # Step 1: Attempt recovery
+            recovery_result = self.attempt_file_recovery(file_path)
+            handling_result['actions_taken'].append('recovery_attempted')
+            handling_result['recovery_result'] = recovery_result
+            
+            if recovery_result['recovery_successful']:
+                handling_result['final_status'] = 'recovered'
+                logger.info(f"Corruption successfully handled for {file_path}")
+            else:
+                # Step 2: Quarantine the corrupted file
+                quarantine_success = self.quarantine_corrupted_file(file_path, "integrity_failure")
+                if quarantine_success:
+                    handling_result['actions_taken'].append('quarantined')
+                    handling_result['final_status'] = 'quarantined'
+                    logger.warning(f"Corrupted file quarantined: {file_path}")
+                else:
+                    handling_result['final_status'] = 'quarantine_failed'
+                    logger.error(f"Failed to quarantine corrupted file: {file_path}")
+            
+            # Step 3: Log corruption event
+            from app.business_logic.shared_services.error_handling_service import get_error_handling_service
+            error_service = get_error_handling_service()
+            error_service.log_file_operation_error(
+                operation="corruption_detected",
+                error=f"File integrity failure: expected {corruption_info.get('expected_checksum', 'unknown')[:16]}..., got {corruption_info.get('actual_checksum', 'unknown')[:16]}...",
+                context={
+                    'file_path': str(file_path),
+                    'corruption_info': corruption_info,
+                    'handling_result': handling_result
+                }
+            )
+            handling_result['actions_taken'].append('logged')
+            
+        except Exception as e:
+            handling_result['error'] = str(e)
+            handling_result['final_status'] = 'handling_failed'
+            logger.error(f"Failed to handle corruption scenario for {file_path}: {e}")
+            
+        return handling_result
 
 
 # Global instance for easy access

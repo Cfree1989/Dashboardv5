@@ -11,6 +11,8 @@ from pathlib import Path
 from app.business_logic.shared_services import event_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import token_service
+from app.business_logic.shared_services.email_service import send_submission_confirmation_email, send_approval_email
+from app.business_logic.shared_services.token_service import generate_confirmation_token, verify_confirmation_token, _serializer
 from app.services.infrastructure.atomic_file_service import get_atomic_file_service
 from app.routes.jobs import _sync_authoritative_metadata
 from app.business_logic.shared_services.catalog_service import CatalogService
@@ -93,25 +95,6 @@ def submit_job():
         if existing:
             return ResponseService.conflict('duplicate active job exists', {'existing_job_id': existing})
 
-        # Prepare storage directory
-        # Use centralized file configuration service
-        file_config = get_file_configuration_service()
-        storage_dir = file_config.get_status_directory('UPLOADED')
-        os.makedirs(storage_dir, exist_ok=True)
-
-        # Generate job ID and standardized filenames
-        new_id = uuid4().hex
-        # Generate a human-friendly short id (ensure uniqueness by retrying with more chars if needed)
-        for length in (6, 7, 8, 9, 10, 11, 12):
-            candidate_short = new_id[:length]
-            # Check only id to avoid selecting newly-added lock columns
-            existing_short = db.session.query(Job.id).filter_by(short_id=candidate_short).first()
-            if not existing_short:
-                short_id = candidate_short
-                break
-        else:
-            short_id = new_id[:12]
-        ext = file.filename.rsplit('.', 1)[1].lower()
         # Determine student name: prefer single field, else combine first/last
         student_name = request.form.get('student_name')
         if not student_name:
@@ -139,60 +122,13 @@ def submit_job():
         if not is_valid:
             return ResponseService.validation_error('Invalid job configuration', {'details': validation_errors})
 
-        # Use centralized filename construction and unique path generation
-        standardized_name = file_config.construct_standardized_filename(
-            student_name, raw_method, raw_color, short_id, ext
+        # Create job using orchestration service
+        candidate_name = f"{normalized_student}_{normalized_method}_{normalized_color}"
+        job = orchestration_service.create_job_from_form_data(
+            file, request.form, file_bytes, file_hash, candidate_name
         )
-        candidate_path, candidate_name = file_config.get_unique_file_path(standardized_name, 'UPLOADED')
-        # Ensure storage directory exists before writing
-        file_config.ensure_status_directory_exists('UPLOADED')
-        with open(candidate_path, 'wb') as out_f:
-            out_f.write(file_bytes)
 
-        # Create metadata JSON
-        from pathlib import Path as _P
-        metadata = {
-            'student_name': student_name,
-            'student_email': request.form.get('student_email'),
-            'discipline': request.form.get('discipline'),
-            'class_number': request.form.get('class_number'),
-            'printer': request.form.get('printer'),
-            'color': raw_color,
-            'material': raw_method,
-            'status': 'UPLOADED',
-            'display_name': candidate_name,
-            'authoritative_filename': candidate_name,
-            'file_path': str(_P(candidate_path).resolve()),
-            'created_at': datetime.utcnow().isoformat()
-        }
-        # Get metadata path using centralized method
-        base_filename = candidate_name.rsplit('.', 1)[0] if '.' in candidate_name else candidate_name
-        metadata_path = file_config.get_job_metadata_path(base_filename, 'UPLOADED')
-        with open(metadata_path, 'w') as meta_f:
-            json.dump(metadata, meta_f)
-
-        # Persist job record
-        job = Job(
-            id=new_id,
-            short_id=short_id,
-            student_name=student_name,
-            student_email=request.form.get('student_email'),
-            discipline=request.form.get('discipline'),
-            class_number=request.form.get('class_number'),
-            original_filename=file.filename,
-            display_name=candidate_name,
-            file_path=str(Path(candidate_path).resolve()),
-            metadata_path=str(Path(metadata_path).resolve()),
-            file_hash=file_hash,
-            printer=request.form.get('printer'),
-            color=raw_color,
-            material=raw_method
-        )
-        db.session.add(job)
-        db.session.commit()
-
-        # Event logging
-        event_service.log_event('JobCreated', {'original_filename': job.original_filename}, job_id=job.id)
+        # Event logging is handled by orchestration service
 
         # Fire-and-forget best-effort submission confirmation email
         try:
@@ -218,45 +154,17 @@ def submit_job():
 @bp.route('/confirm/<token>', methods=['POST'])
 def confirm_job(token: str):
     try:
-        job_id = verify_confirmation_token(token)
+        # Use orchestration service for confirmation
+        job = orchestration_service.confirm_job_by_token(token)
+        return ResponseService.success(job.to_dict())
     except ValueError as ve:
         reason = str(ve)
         if reason == 'expired':
-            return jsonify({'message': 'Confirmation link expired', 'reason': 'expired'}), 410
-        return jsonify({'message': 'Invalid confirmation token'}), 400
-
-    job = Job.query.get(job_id)
-    if not job:
-        return jsonify({'message': 'Job not found'}), 404
-
-    # Transition to READYTOPRINT + move file/metadata
-    job.student_confirmed = True
-    job.status = 'READYTOPRINT'
-    
-    # Use atomic file operations
-    atomic_service = get_atomic_file_service()
-    success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')
-    if not success:
-        return jsonify({'message': 'File operation failed during confirmation'}), 500
-    
-    db.session.commit()
-    
-    # Sync metadata to reflect authoritative file and new status
-    error_service = get_error_handling_service()
-    try:
-        _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'StudentConfirmed')
+            return ResponseService.error('Confirmation link expired', status=410, data={'reason': 'expired'})
+        return ResponseService.validation_error('Invalid confirmation token')
     except Exception as e:
-        error_service.log_metadata_sync_error(
-            error=e,
-            job_id=str(job.id),
-            metadata_path=getattr(job, 'metadata_path', 'unknown'),
-            context={'operation': 'confirm_job_metadata_sync'}
-        )
-        logger.warning(f"Failed to sync metadata during job confirmation for job {job.id}: {e}")
-        # Non-fatal: do not block confirmation on metadata issues
-    
-    event_service.log_event('StudentConfirmed', {'status': job.status}, job_id=job.id)
-    return jsonify(job.to_dict()), 200
+        logger.error(f"Job confirmation failed: {str(e)}")
+        return ResponseService.error('Job confirmation failed', status=500)
 
 
 @bp.route('/resend-confirmation', methods=['POST'])
@@ -278,12 +186,12 @@ def resend_confirmation():
         except Exception:
             return jsonify({'message': 'Invalid token'}), 400
 
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
-        return jsonify({'message': 'Job not found'}), 404
+        return ResponseService.not_found('Job not found')
 
     if job.student_confirmed:
-        return jsonify({'message': 'Job already confirmed'}), 400
+        return ResponseService.validation_error('Job already confirmed')
 
     # Generate fresh token and send email
     new_token = generate_confirmation_token(job.id)

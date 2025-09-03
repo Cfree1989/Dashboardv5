@@ -19,10 +19,18 @@ from app.business_logic.admin_operations.job_admin_service import JobAdminStatus
 from app.business_logic.admin_operations.job_notes_service import JobNoteData, JobUpdateNotesData
 from app.business_logic.shared_services.job_locking_service import JobLockData
 
-# Import models for return types
+# Import models for return types  
 from app.models.job import Job
 from app.models.event import Event
-from typing import Dict, Any, Optional
+from app.models.staff import Staff
+from app.models.payment import Payment
+from typing import Dict, Any, Optional, List
+from app import db
+from datetime import datetime, timedelta
+from flask import g
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class JobOrchestrationService:
@@ -186,7 +194,154 @@ class JobOrchestrationService:
         """Get all events for a job - centralizes Event.query operations"""
         return Event.query.filter(Event.job_id == job_id).order_by(Event.timestamp).all()
     
+    def check_duplicate_active_job(self, file_hash: str, student_email: str) -> Optional[str]:
+        """Check for duplicate active job - centralizes duplicate detection"""
+        active_statuses = ['UPLOADED', 'PENDING', 'READYTOPRINT']
+        existing_record = db.session.query(Job.id).filter(
+            Job.file_hash == file_hash,
+            Job.student_email == student_email,
+            Job.status.in_(active_statuses)
+        ).first()
+        return existing_record[0] if existing_record else None
+    
+    def generate_unique_short_id(self, base_id: str) -> str:
+        """Generate a unique short ID - centralizes short ID generation"""
+        for length in (6, 7, 8, 9, 10, 11, 12):
+            candidate_short = base_id[:length]
+            existing_short = db.session.query(Job.id).filter_by(short_id=candidate_short).first()
+            if not existing_short:
+                return candidate_short
+        return base_id[:12]  # Fallback
+    
+    def get_jobs_by_status(self, statuses: list[str]) -> list[Job]:
+        """Get jobs filtered by status list - centralizes status filtering"""
+        return Job.query.filter(Job.status.in_(statuses)).all()
+    
+    def get_archivable_jobs(self, cutoff_date: datetime) -> list[Job]:
+        """Get jobs eligible for archiving (PAIDPICKEDUP or REJECTED older than cutoff)"""
+        return Job.query.filter(
+            Job.status.in_(['PAIDPICKEDUP', 'REJECTED']),
+            Job.created_at < cutoff_date
+        ).all()
+    
+    def archive_job(self, job_id: str, staff_name: str, retention_days: int) -> Job:
+        """Archive a single job - centralizes archiving logic"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            # Validate staff
+            is_valid, error_msg = self.validate_staff_exists_and_active(staff_name)
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            # Perform atomic file move
+            from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+            atomic_service = get_atomic_file_service()
+            success = atomic_service.atomic_move_authoritative(job, 'ARCHIVED')
+            
+            # Update job status (continue even if file move fails)
+            job.status = 'ARCHIVED'
+            job.last_updated_by = staff_name
+            
+            db.session.add(job)
+            db.session.commit()
+            
+            # Log event
+            self.log_event(job_id, 'JobArchived', {'retention_days': retention_days}, staff_name)
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to archive job: {e}")
+            raise
+    
     # --- Job Submission Operations ---
+    
+    def create_job_from_form_data(self, file, form_data, file_bytes, file_hash, display_name) -> Job:
+        """Create job from form submission - matches submit.py pattern exactly"""
+        from app import db
+        from uuid import uuid4
+        from pathlib import Path
+        import json
+        import os
+        
+        # Generate job ID 
+        new_id = uuid4().hex
+        short_id = self.generate_unique_short_id(new_id)
+        
+        # Prepare storage directory
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service
+        file_config = get_file_configuration_service()
+        storage_dir = file_config.get_status_directory('UPLOADED')
+        os.makedirs(storage_dir, exist_ok=True)
+        
+        # Generate file paths using submit.py's exact pattern
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        student_name = form_data.get('student_name')
+        if not student_name:
+            first_name = form_data.get('student_first_name')
+            last_name = form_data.get('student_last_name')
+            student_name = f"{first_name or ''} {last_name or ''}.".strip()
+            
+        candidate_name = display_name
+        candidate_path = os.path.join(storage_dir, f"{candidate_name}.{ext}")
+        
+        # Save the file
+        with open(candidate_path, 'wb') as f:
+            f.write(file_bytes)
+        
+        # Create metadata
+        metadata = {
+            'student_name': student_name,
+            'student_email': form_data.get('student_email'),
+            'discipline': form_data.get('discipline'),
+            'class_number': form_data.get('class_number'),
+            'printer': form_data.get('printer'),
+            'color': form_data.get('color'),
+            'material': form_data.get('print_method'),
+            'original_filename': file.filename,
+            'file_hash': file_hash,
+            'display_name': display_name,
+            'authoritative_filename': f"{candidate_name}.{ext}",
+            'file_path': str(Path(candidate_path).resolve()),
+            'status': 'UPLOADED'
+        }
+        
+        # Save metadata
+        base_filename = candidate_name.rsplit('.', 1)[0] if '.' in candidate_name else candidate_name
+        metadata_path = file_config.get_job_metadata_path(base_filename, 'UPLOADED')
+        with open(metadata_path, 'w') as meta_f:
+            json.dump(metadata, meta_f)
+        
+        # Create job record
+        job = Job(
+            id=new_id,
+            short_id=short_id,
+            student_name=student_name,
+            student_email=form_data.get('student_email'),
+            discipline=form_data.get('discipline'),
+            class_number=form_data.get('class_number'),
+            original_filename=file.filename,
+            display_name=candidate_name,
+            file_path=str(Path(candidate_path).resolve()),
+            metadata_path=str(Path(metadata_path).resolve()),
+            file_hash=file_hash,
+            printer=form_data.get('printer'),
+            color=form_data.get('color'),
+            material=form_data.get('print_method')
+        )
+        
+        # Save to database
+        db.session.add(job)
+        db.session.commit()
+        
+        # Log event
+        self.log_event(job.id, 'JobCreated', {'original_filename': job.original_filename}, 'system')
+        
+        return job
     
     def create_job_with_upload(self, submission_data: JobSubmissionData) -> Job:
         """Create a new job with file upload - centralizes job creation logic"""
@@ -254,6 +409,43 @@ class JobOrchestrationService:
         
         # Log event
         self.log_event(job.id, 'JobCreated', {'original_filename': job.original_filename}, 'system')
+        
+        return job
+    
+    def confirm_job_by_token(self, token: str) -> Job:
+        """Confirm job by token - simpler interface for submit.py"""
+        from app import db
+        from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+        from app.business_logic.shared_services import token_service
+        
+        # Verify token and get job_id
+        try:
+            job_id = token_service.verify_confirmation_token(token)
+        except ValueError as ve:
+            raise ve  # Re-raise with original message (expired, invalid, etc.)
+        
+        job = self.get_job_by_id(job_id)
+        if not job:
+            raise ValueError("Job not found")
+        
+        # Transition to READYTOPRINT + move file/metadata
+        atomic_service = get_atomic_file_service()
+        success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')
+        
+        if not success:
+            raise RuntimeError("File operation failed during confirmation")
+        
+        # Update job status
+        job.status = 'READYTOPRINT'
+        job.student_confirmed = True
+        
+        db.session.commit()
+        
+        # Sync metadata and log event
+        from app.routes.jobs import _sync_authoritative_metadata
+        from pathlib import Path
+        _sync_authoritative_metadata(job, Path(job.file_path).name, None, 'StudentConfirmed')
+        self.log_event(job.id, 'StudentConfirmed', {'status': job.status}, 'system')
         
         return job
     
@@ -332,3 +524,309 @@ class JobOrchestrationService:
         db.session.commit()
         
         return job
+    
+    # ========================================
+    # STAFF OPERATIONS
+    # ========================================
+    
+    def get_staff_by_name(self, staff_name: str) -> Optional[Staff]:
+        """Get staff member by name - replaces Staff.query.get()"""
+        return Staff.query.get(staff_name)
+    
+    def validate_staff_exists_and_active(self, staff_name: str) -> tuple[bool, Optional[str]]:
+        """Validate staff exists and is active - centralized validation"""
+        if not staff_name:
+            return False, "staff_name is required"
+            
+        staff = Staff.query.get(staff_name)
+        if not staff or not staff.is_active:
+            return False, "Invalid or inactive staff_name"
+            
+        return True, None
+    
+    # ========================================
+    # EVENT LOGGING OPERATIONS
+    # ========================================
+    
+    def log_event(self, job_id: str, event_type: str, details: Optional[Dict[str, Any]] = None, 
+                 triggered_by: str = 'system', workstation_id: Optional[str] = None) -> Event:
+        """Log event - replaces direct Event() instantiation"""
+        if workstation_id is None:
+            workstation_id = getattr(g, 'workstation_id', 'unknown')
+            
+        event = Event(
+            job_id=job_id,
+            event_type=event_type,
+            details=details or {},
+            triggered_by=triggered_by,
+            workstation_id=workstation_id
+        )
+        
+        db.session.add(event)
+        db.session.commit()
+        
+        return event
+    
+    # ========================================
+    # JOB STATUS TRANSITION OPERATIONS
+    # ========================================
+    
+    def update_job_status(self, job_id: str, new_status: str, staff_name: str, 
+                         event_type: Optional[str] = None, details: Optional[Dict[str, Any]] = None,
+                         sync_metadata: bool = True) -> Job:
+        """Update job status with event logging and optional metadata sync"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            # Validate staff
+            is_valid, error_msg = self.validate_staff_exists_and_active(staff_name)
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            # Update job
+            old_status = job.status
+            job.status = new_status
+            job.last_updated_by = staff_name
+            
+            db.session.add(job)
+            db.session.commit()
+            
+            # Log event
+            if event_type:
+                event_details = details or {}
+                if old_status != new_status:
+                    event_details.update({'from': old_status, 'to': new_status})
+                
+                self.log_event(job_id, event_type, event_details, staff_name)
+            
+            # Sync metadata if requested
+            if sync_metadata:
+                from pathlib import Path
+                from app.routes.jobs import _sync_authoritative_metadata
+                filename = Path(job.file_path).name if job.file_path else job.original_filename
+                _sync_authoritative_metadata(job, filename, staff_name, event_type or 'StatusUpdate')
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update job status: {e}")
+            raise
+    
+    def transition_job_with_file_move(self, job_id: str, new_status: str, staff_name: str,
+                                    event_type: str, details: Optional[Dict[str, Any]] = None) -> Job:
+        """Update job status with atomic file operations"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            # Validate staff
+            is_valid, error_msg = self.validate_staff_exists_and_active(staff_name)
+            if not is_valid:
+                raise ValueError(error_msg)
+                
+            # Perform atomic file move
+            from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+            atomic_service = get_atomic_file_service()
+            success = atomic_service.atomic_move_authoritative(job, new_status)
+            
+            if not success:
+                raise RuntimeError(f"File operation failed during {new_status} status update")
+            
+            # Update job status
+            old_status = job.status
+            job.status = new_status
+            job.last_updated_by = staff_name
+            
+            db.session.add(job)
+            db.session.commit()
+            
+            # Log event
+            event_details = details or {}
+            event_details.update({'from': old_status, 'to': new_status})
+            self.log_event(job_id, event_type, event_details, staff_name)
+            
+            # Sync metadata
+            from pathlib import Path
+            from app.routes.jobs import _sync_authoritative_metadata
+            filename = Path(job.file_path).name if job.file_path else job.original_filename
+            _sync_authoritative_metadata(job, filename, staff_name, event_type)
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to transition job with file move: {e}")
+            raise
+    
+    # ========================================
+    # PAYMENT OPERATIONS
+    # ========================================
+    
+    def record_job_payment(self, job_id: str, grams: float, txn_no: str, 
+                          picked_up_by: str, staff_name: str) -> tuple[Job, Payment]:
+        """Record payment and transition to PAIDPICKEDUP"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            if job.status != 'COMPLETED':
+                raise ValueError('Job must be in COMPLETED to record payment')
+                
+            # Validate staff
+            is_valid, error_msg = self.validate_staff_exists_and_active(staff_name)
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            # Calculate payment
+            from decimal import Decimal, ROUND_HALF_UP
+            material_rate = 0.20 if (job.material or '').lower() == 'resin' else 0.10
+            raw_cost = grams * material_rate
+            final_cost = max(raw_cost, 3.0)  # $3 minimum
+            price_cents = int(Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
+            
+            # Create payment record
+            payment = Payment(
+                job_id=job.id,
+                grams=grams,
+                price_cents=price_cents,
+                txn_no=txn_no,
+                picked_up_by=picked_up_by,
+                paid_by_staff=staff_name,
+            )
+            db.session.add(payment)
+            
+            # Transition to PAIDPICKEDUP with file move
+            job = self.transition_job_with_file_move(
+                job_id, 'PAIDPICKEDUP', staff_name, 'PaymentRecorded', 
+                {'price_cents': price_cents}
+            )
+            
+            return job, payment
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to record job payment: {e}")
+            raise
+    
+    # ========================================
+    # JOB NOTES OPERATIONS  
+    # ========================================
+    
+    def update_job_notes(self, job_id: str, notes: str, staff_name: str) -> Job:
+        """Update job notes with validation and event logging"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            # Validate staff
+            is_valid, error_msg = self.validate_staff_exists_and_active(staff_name)
+            if not is_valid:
+                raise ValueError(error_msg)
+            
+            # Validate notes
+            if not isinstance(notes, str):
+                raise ValueError('notes must be a string')
+            if len(notes) > 5000:
+                raise ValueError('notes must be at most 5000 characters')
+            
+            # Update job
+            job.notes = notes
+            job.last_updated_by = staff_name
+            
+            db.session.add(job)
+            db.session.commit()
+            
+            # Log event (don't store full notes in event log for privacy)
+            self.log_event(job_id, 'NotesUpdated', {'notes_length': len(notes)}, staff_name)
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update job notes: {e}")
+            raise
+    
+    # ========================================
+    # JOB LOCKING OPERATIONS
+    # ========================================
+    
+    def lock_job(self, job_id: str, workstation_id: Optional[str] = None) -> Job:
+        """Lock job for editing"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            
+            if workstation_id is None:
+                workstation_id = getattr(g, 'workstation_id', 'unknown')
+            
+            now = datetime.utcnow()
+            if job.locked_by and job.locked_until and job.locked_until > now:
+                raise ValueError("Job is currently locked by another workstation")
+            
+            job.locked_by = workstation_id
+            job.locked_until = now + timedelta(minutes=5)
+            
+            db.session.commit()
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to lock job: {e}")
+            raise
+    
+    def unlock_job(self, job_id: str, workstation_id: Optional[str] = None) -> Job:
+        """Unlock job"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+                
+            if workstation_id is None:
+                workstation_id = getattr(g, 'workstation_id', 'unknown')
+            
+            if job.locked_by != workstation_id:
+                raise ValueError("Not lock owner")
+            
+            job.locked_by = None
+            job.locked_until = None
+            
+            db.session.commit()
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to unlock job: {e}")
+            raise
+    
+    def extend_job_lock(self, job_id: str, workstation_id: Optional[str] = None) -> Job:
+        """Extend job lock"""
+        try:
+            job = self.get_job_by_id(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+                
+            if workstation_id is None:
+                workstation_id = getattr(g, 'workstation_id', 'unknown')
+            
+            if job.locked_by != workstation_id:
+                raise ValueError("Not lock owner")
+            
+            job.locked_until = datetime.utcnow() + timedelta(minutes=5)
+            
+            db.session.commit()
+            
+            return job
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to extend job lock: {e}")
+            raise

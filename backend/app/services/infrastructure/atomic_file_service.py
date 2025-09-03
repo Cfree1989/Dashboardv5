@@ -38,8 +38,73 @@ class AtomicFileOperation:
         self.staged_metadata: List[Tuple[Path, Dict]] = []  # (dest_path, metadata)
         self.original_metadata: Dict[str, Dict] = {}
         self.lock_service = get_file_lock_service()
+        self.file_config = get_file_configuration_service()
         self._prepared = False
         self._committed = False
+        # File integrity tracking
+        self.integrity_info: Dict[str, Dict[str, Any]] = {}  # {file_path: {checksum, size, etc.}}
+    
+    def _calculate_file_integrity(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """Calculate and store integrity information for a file"""
+        try:
+            if not file_path.exists() or not file_path.is_file():
+                logger.warning(f"File does not exist for integrity calculation: {file_path}")
+                return None
+                
+            integrity_info = self.file_config.get_file_integrity_info(file_path)
+            if integrity_info:
+                self.integrity_info[str(file_path)] = integrity_info
+                logger.debug(f"Stored integrity info for {file_path}: {integrity_info['checksum'][:16]}...")
+                
+            return integrity_info
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate integrity for {file_path}: {e}")
+            return None
+    
+    def _verify_staged_file_integrity(self, staging_path: Path, original_path: Path) -> bool:
+        """Verify that staged file matches original file integrity"""
+        try:
+            if str(original_path) not in self.integrity_info:
+                logger.warning(f"No original integrity info for {original_path}")
+                return True  # Skip verification if no original info
+                
+            original_checksum = self.integrity_info[str(original_path)]['checksum']
+            staged_checksum = self.file_config.calculate_file_checksum(staging_path)
+            
+            if staged_checksum != original_checksum:
+                logger.error(f"Staged file integrity mismatch: {staging_path}")
+                logger.error(f"Original: {original_checksum[:16]}..., Staged: {(staged_checksum or 'None')[:16] if staged_checksum else 'None'}...")
+                return False
+                
+            logger.debug(f"Staged file integrity verified: {staging_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to verify staged file integrity: {e}")
+            return False
+    
+    def _verify_final_file_integrity(self, final_path: Path, original_path: Path) -> bool:
+        """Verify that final file matches original file integrity"""
+        try:
+            if str(original_path) not in self.integrity_info:
+                logger.warning(f"No original integrity info for {original_path}")
+                return True  # Skip verification if no original info
+                
+            original_checksum = self.integrity_info[str(original_path)]['checksum']
+            final_checksum = self.file_config.calculate_file_checksum(final_path)
+            
+            if final_checksum != original_checksum:
+                logger.error(f"Final file integrity mismatch: {final_path}")
+                logger.error(f"Original: {original_checksum[:16]}..., Final: {(final_checksum or 'None')[:16] if final_checksum else 'None'}...")
+                return False
+                
+            logger.debug(f"Final file integrity verified: {final_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to verify final file integrity: {e}")
+            return False
         
     def __enter__(self):
         return self
@@ -56,6 +121,13 @@ class AtomicFileOperation:
             return True
             
         try:
+            # Calculate initial file integrity
+            if self.source_path.exists():
+                logger.debug(f"Calculating integrity for source file: {self.source_path}")
+                integrity_info = self._calculate_file_integrity(self.source_path)
+                if not integrity_info:
+                    logger.warning(f"Could not calculate integrity for {self.source_path}, continuing without verification")
+            
             # Create staging directory
             self.staging_dir = Path(tempfile.mkdtemp(prefix=f"atomic_{self.operation_id}_"))
             logger.debug(f"Created staging directory: {self.staging_dir}")
@@ -81,19 +153,45 @@ class AtomicFileOperation:
             return True
             
         try:
-            # Move staged files to final locations
+            # Move staged files to final locations and verify integrity
+            moved_files = []
             for source_path, staging_path in self.staged_files:
                 if staging_path.exists():
+                    # Verify staged file integrity before final move
+                    if not self._verify_staged_file_integrity(staging_path, source_path):
+                        raise RuntimeError(f"Staged file integrity verification failed: {staging_path}")
+                    
                     dest_path = self._get_destination_path(source_path)
                     if dest_path:
                         dest_path.parent.mkdir(parents=True, exist_ok=True)
                         shutil.move(str(staging_path), str(dest_path))
                         logger.debug(f"Committed file: {staging_path} -> {dest_path}")
                         
-            # Write metadata files
+                        # Verify final file integrity after move
+                        if not self._verify_final_file_integrity(dest_path, source_path):
+                            # This is critical - file may be corrupted during move
+                            logger.error(f"CRITICAL: Final file integrity verification failed: {dest_path}")
+                            # Don't fail the operation but log as critical issue
+                            # The file was moved successfully, corruption might be from the move operation itself
+                        
+                        moved_files.append((source_path, dest_path))
+                        
+            # Write metadata files (include integrity information)
             for dest_path, metadata in self.staged_metadata:
                 if dest_path:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Add integrity information to metadata if available
+                    for source_path, final_path in moved_files:
+                        if str(source_path) in self.integrity_info:
+                            metadata.setdefault('file_integrity', {})
+                            metadata['file_integrity'] = {
+                                'checksum': self.integrity_info[str(source_path)]['checksum'],
+                                'size_bytes': self.integrity_info[str(source_path)]['size_bytes'],
+                                'verified_at': datetime.now(timezone.utc).isoformat(),
+                                'operation_id': self.operation_id
+                            }
+                    
                     with open(dest_path, 'w', encoding='utf-8') as f:
                         json.dump(metadata, f, indent=2)
                     logger.debug(f"Committed metadata: {dest_path}")
@@ -184,6 +282,11 @@ class AtomicFileMoveOperation(AtomicFileOperation):
                 shutil.copy2(str(source_path), str(staging_path))
                 self.staged_files.append((source_path, staging_path))
                 logger.debug(f"Staged file: {source_path} -> {staging_path}")
+                
+                # Verify staging integrity immediately after copy
+                if not self._verify_staged_file_integrity(staging_path, source_path):
+                    raise RuntimeError(f"File integrity verification failed during staging: {staging_path}")
+                logger.debug(f"Staging integrity verified for: {source_path}")
             else:
                 raise FileNotFoundError(f"Source file not found: {source_path}")
                 

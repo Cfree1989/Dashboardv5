@@ -1,5 +1,5 @@
 from flask import Blueprint
-from flask import request, jsonify, abort, g
+from flask import request, abort, g
 from app import db, limiter
 from app.models.job import Job
 from app.utils.decorators import token_required
@@ -20,6 +20,8 @@ from app.business_logic.shared_services.catalog_service import CatalogService
 from app.business_logic.shared_services.error_handling_service import get_error_handling_service
 from app.services.infrastructure.file_discovery_service import FileDiscoveryService
 from app.business_logic.shared_services.validation_service import ValidationService
+from app.business_logic.shared_services.response_service import ResponseService
+from app.services.orchestration.job_orchestration_service import JobOrchestrationService
 from app.routes.jobs import _sync_authoritative_metadata
 import logging
 from sqlalchemy import or_
@@ -29,19 +31,22 @@ logger = logging.getLogger(__name__)
 def _validate_staff_and_body(data):
     """Helper function to validate staff and request body"""
     if not data:
-        return None, jsonify({'message': 'Request body required'}), 400
+        return None, ResponseService.validation_error('Request body required')
     
     staff_name = data.get('staff_name', '').strip()
     if not staff_name:
-        return None, jsonify({'message': 'staff_name is required'}), 400
+        return None, ResponseService.validation_error('staff_name is required')
     
     staff_result = ValidationService.validate_staff(staff_name)
     if not staff_result.is_valid:
-        return None, jsonify({'message': staff_result.message}), 400
+        return None, ResponseService.validation_error(staff_result.message)
     
-    return staff_name, None, None
+    return staff_name, None
 
 bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
+
+# Create orchestration service instance
+orchestration_service = JobOrchestrationService()
 
 # Job management routes implemented using new service architecture
 # All routes use JobOrchestrationService, ValidationService, and ResponseService 
@@ -63,7 +68,7 @@ def list_jobs():
     jobs = query.all()
     if search:
         jobs = [job for job in jobs if search.lower() in job.student_name.lower() or search.lower() in job.student_email.lower()]
-    return jsonify([job.to_dict() for job in jobs]), 200
+    return ResponseService.success([job.to_dict() for job in jobs])
 
 
 @bp.route('/counts', methods=['GET'])
@@ -86,10 +91,10 @@ def get_job_counts():
         
         rows = query.with_entities(Job.status, func.count()).group_by(Job.status).all()
         counts = {status: int(count) for status, count in rows}
-        return jsonify(counts), 200
+        return ResponseService.success(counts)
     except Exception as e:
         logger.error(f"Failed to get job counts: {e}")
-        return jsonify({'error': 'Failed to get job counts'}), 500
+        return ResponseService.server_error('Failed to get job counts')
 
 
 
@@ -97,33 +102,30 @@ def get_job_counts():
 @bp.route('/<job_id>', methods=['GET'])
 @token_required
 def get_job(job_id):
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
-        abort(404, description='Job not found')
-    return jsonify(job.to_dict()), 200
+        return ResponseService.not_found('Job')
+    return ResponseService.success(job.to_dict())
 
 @bp.route('/<job_id>/events', methods=['GET'])
 @token_required
 def get_job_events(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    events = Event.query.filter(Event.job_id == job_id).order_by(Event.timestamp).all()
-    return jsonify([e.to_dict() for e in events]), 200
+    events = orchestration_service.get_job_events(job_id)
+    return ResponseService.success([e.to_dict() for e in events])
 
 
 @bp.route('/<job_id>/candidate-files', methods=['GET'])
 @token_required
 def candidate_files(job_id):
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
-        abort(404, description='Job not found')
+        return ResponseService.not_found('Job')
 
     try:
         # Use the centralized file discovery service
         discovery_service = FileDiscoveryService()
         result = discovery_service.discover_candidate_files(job)
-        return jsonify(result.to_dict()), 200
+        return ResponseService.success(result.to_dict())
     except Exception as e:
         # On error, return legacy-compatible minimal payload
         fallback_name = job.original_filename if job and job.original_filename else None
@@ -132,7 +134,7 @@ def candidate_files(job_id):
             payload['files_detailed'] = [{ 'name': fallback_name, 'mtime': 0 }]
         else:
             payload['files_detailed'] = []
-        return jsonify(payload), 200
+        return ResponseService.success(payload)
 
 
 @bp.route('/<job_id>/log-file-open', methods=['POST'])
@@ -141,268 +143,227 @@ def log_file_open(job_id):
     """Stub endpoint for protocol handler touchpoint. Logs FileOpenedInSlicer.
     Body: { } (staff_name no longer required)
     """
-    job = Job.query.get(job_id)
+    job = orchestration_service.get_job_by_id(job_id)
     if not job:
-        abort(404, description='Job not found')
-    data = request.get_json(silent=True) or {}
+        return ResponseService.not_found('Job')
     
-    # Ensure non-null values for required Event fields
-    workstation_id = getattr(g, 'workstation_id', 'unknown')
-    if not workstation_id:
-        workstation_id = 'unknown'
-    
-    evt = Event(
-        job_id=job.id,
-        event_type='FileOpenedInSlicer',
-        details={'file_path': job.file_path},
-        triggered_by='file-open-action',  # System action, not staff-attributed
-        workstation_id=workstation_id,
-    )
-    db.session.add(evt)
-    db.session.commit()
-    return jsonify({'message': 'logged'}), 200
+    try:
+        orchestration_service.log_event(
+            job_id, 
+            'FileOpenedInSlicer',
+            {'file_path': job.file_path},
+            'file-open-action'  # System action, not staff-attributed
+        )
+        return ResponseService.success({'message': 'logged'})
+    except Exception as e:
+        logger.error(f"Failed to log file open event: {e}")
+        return ResponseService.server_error('Failed to log file open event')
 
 
 @bp.route('/<job_id>/notes', methods=['PATCH'])
 @token_required
 def update_notes(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
     data = request.get_json(silent=True) or {}
     staff_name = data.get('staff_name')
+    
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
+        return ResponseService.validation_error('staff_name is required')
+        
     if 'notes' not in data:
-        return jsonify({'message': 'notes field is required'}), 400
+        return ResponseService.validation_error('notes field is required')
     notes_val = data.get('notes')
-    if not isinstance(notes_val, str):
-        return jsonify({'message': 'notes must be a string'}), 400
-    if len(notes_val) > 5000:
-        return jsonify({'message': 'notes must be at most 5000 characters'}), 400
-
-    job.notes = notes_val
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
-
-    # Log event with length only (avoid storing full notes in event log)
-    evt = Event(
-        job_id=job.id,
-        event_type='NotesUpdated',
-        details={'notes_len': len(notes_val)},
-        triggered_by=staff_name,
-        workstation_id=getattr(g, 'workstation_id', None),
-    )
-    db.session.add(evt)
-    db.session.commit()
-
-    return jsonify(job.to_dict()), 200
+    
+    try:
+        job = orchestration_service.update_job_notes(job_id, notes_val, staff_name)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to update notes: {e}")
+        return ResponseService.server_error('Failed to update notes')
 
 @bp.route('/<job_id>/mark-printing', methods=['POST'])
 @token_required
 def mark_printing(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'READYTOPRINT':
-        return jsonify({'message': 'Job must be in READYTOPRINT to mark printing'}), 400
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
-    job.status = 'PRINTING'
-    job.last_updated_by = staff_name
-    # Move file/metadata to Printing
-    atomic_service = get_atomic_file_service()
-    success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
-    if not success:
-        return jsonify({'message': 'File operation failed during printing status update'}), 500
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedPrinting', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPrinting')
-    return jsonify(job.to_dict()), 200
+        return err_resp
+    
+    try:
+        # Check current status before transition
+        job = orchestration_service.get_job_by_id(job_id)
+        if not job:
+            return ResponseService.not_found('Job')
+        if job.status != 'READYTOPRINT':
+            return ResponseService.validation_error('Job must be in READYTOPRINT to mark printing')
+        
+        job = orchestration_service.transition_job_with_file_move(
+            job_id, 'PRINTING', staff_name, 'JobMarkedPrinting'
+        )
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except RuntimeError as e:
+        return ResponseService.server_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to mark printing: {e}")
+        return ResponseService.server_error('Failed to mark printing')
 
 
 @bp.route('/<job_id>/mark-complete', methods=['POST'])
 @token_required
 def mark_complete(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'PRINTING':
-        return jsonify({'message': 'Job must be in PRINTING to mark complete'}), 400
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
-    job.status = 'COMPLETED'
-    job.last_updated_by = staff_name
-    # Move file/metadata to Completed
-    atomic_service = get_atomic_file_service()
-    success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
-    if not success:
-        return jsonify({'message': 'File operation failed during completion status update'}), 500
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedComplete', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    # Attempt completion email (best-effort)
+        return err_resp
+    
     try:
-        send_completion_email(job)
-        email_evt = Event(job_id=job.id, event_type='CompletionEmailSent', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-        db.session.add(email_evt)
-        db.session.commit()
-    except Exception:
-        pass
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedComplete')
-    return jsonify(job.to_dict()), 200
+        # Check current status before transition
+        job = orchestration_service.get_job_by_id(job_id)
+        if not job:
+            return ResponseService.not_found('Job')
+        if job.status != 'PRINTING':
+            return ResponseService.validation_error('Job must be in PRINTING to mark complete')
+        
+        job = orchestration_service.transition_job_with_file_move(
+            job_id, 'COMPLETED', staff_name, 'JobMarkedComplete'
+        )
+        
+        # Attempt completion email (best-effort)
+        try:
+            send_completion_email(job)
+            orchestration_service.log_event(job_id, 'CompletionEmailSent', {}, staff_name)
+        except Exception:
+            pass
+            
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except RuntimeError as e:
+        return ResponseService.server_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to mark complete: {e}")
+        return ResponseService.server_error('Failed to mark complete')
 
 
 @bp.route('/<job_id>/mark-picked-up', methods=['POST'])
 @token_required
 def mark_picked_up(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to mark picked up'}), 400
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
-    job.status = 'PAIDPICKEDUP'
-    job.last_updated_by = staff_name
-    # Move file/metadata to PaidPickedUp
-    atomic_service = get_atomic_file_service()
-    success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
-    if not success:
-        return jsonify({'message': 'File operation failed during pickup status update'}), 500
-    db.session.add(job)
-    db.session.commit()
-    evt = Event(job_id=job.id, event_type='JobMarkedPickedUp', details={}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobMarkedPickedUp')
-    return jsonify(job.to_dict()), 200
+        return err_resp
+    
+    try:
+        # Check current status before transition
+        job = orchestration_service.get_job_by_id(job_id)
+        if not job:
+            return ResponseService.not_found('Job')
+        if job.status != 'COMPLETED':
+            return ResponseService.validation_error('Job must be in COMPLETED to mark picked up')
+        
+        job = orchestration_service.transition_job_with_file_move(
+            job_id, 'PAIDPICKEDUP', staff_name, 'JobMarkedPickedUp'
+        )
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except RuntimeError as e:
+        return ResponseService.server_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to mark picked up: {e}")
+        return ResponseService.server_error('Failed to mark picked up')
 
 
 @bp.route('/<job_id>/payment', methods=['POST'])
 @token_required
 def record_payment(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to record payment'}), 400
-
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
+        return err_resp
 
     try:
         grams = float(data.get('grams'))
     except (TypeError, ValueError):
-        return jsonify({'message': 'grams must be a number'}), 400
+        return ResponseService.validation_error('grams must be a number')
+    
     txn_no = (data.get('txn_no') or '').strip()
     picked_up_by = (data.get('picked_up_by') or '').strip()
     if grams <= 0 or not txn_no or not picked_up_by:
-        return jsonify({'message': 'grams > 0, txn_no and picked_up_by are required'}), 400
+        return ResponseService.validation_error('grams > 0, txn_no and picked_up_by are required')
 
-    # Compute final price from actual pickup weight (grams) with material-specific rate and $3 minimum
-    # Note: job.cost_usd is the estimate from approval; actual price is calculated from pickup weight
-    material_rate = 0.20 if (job.material or '').lower() == 'resin' else 0.10
-    raw_cost = grams * material_rate
-    final_cost = max(3.0, raw_cost)  # $3.00 minimum charge
-    price_cents = int(Decimal(str(final_cost)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) * 100)
-
-    payment = Payment(
-        job_id=job.id,
-        grams=grams,
-        price_cents=price_cents,
-        txn_no=txn_no,
-        picked_up_by=picked_up_by,
-        paid_by_staff=staff_name,
-    )
-    db.session.add(payment)
-
-    # Transition to PAIDPICKEDUP
-    job.status = 'PAIDPICKEDUP'
-    job.last_updated_by = staff_name
-    # Move file/metadata to PaidPickedUp
-    atomic_service = get_atomic_file_service()
-    success = atomic_service.atomic_move_authoritative(job, 'PAIDPICKEDUP')
-    if not success:
-        return jsonify({'message': 'File operation failed during payment recording'}), 500
-    db.session.add(job)
-    db.session.commit()
-
-    evt = Event(job_id=job.id, event_type='PaymentRecorded', details={'price_cents': price_cents}, triggered_by=staff_name, workstation_id=g.workstation_id)
-    db.session.add(evt)
-    db.session.commit()
-    _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'PaymentRecorded')
-    return jsonify(job.to_dict()), 200
+    try:
+        job, payment = orchestration_service.record_job_payment(
+            job_id, grams, txn_no, picked_up_by, staff_name
+        )
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except RuntimeError as e:
+        return ResponseService.server_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to record payment: {e}")
+        return ResponseService.server_error('Failed to record payment')
 
 
 @bp.route('/<job_id>/review', methods=['POST'])
 @token_required
 def review_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-
-    # Only allow review state on UPLOADED jobs
-    if job.status != 'UPLOADED':
-        return jsonify({'message': 'Job review state can only be changed in UPLOADED status'}), 400
-
     data = request.get_json(silent=True) or {}
     staff_name = data.get('staff_name')
     reviewed = data.get('reviewed')
 
     if staff_name is None:
-        return jsonify({'message': 'staff_name is required'}), 400
-
-    staff = Staff.query.get(staff_name)
-    if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
-
+        return ResponseService.validation_error('staff_name is required')
+        
     if not isinstance(reviewed, bool):
-        return jsonify({'message': 'reviewed must be a boolean'}), 400
+        return ResponseService.validation_error('reviewed must be a boolean')
 
-    # Apply state change
-    if reviewed:
-        job.staff_viewed_at = datetime.utcnow()
-        event_type = 'JobReviewed'
-    else:
-        job.staff_viewed_at = None
-        event_type = 'JobReviewCleared'
+    try:
+        # Check job exists and status
+        job = orchestration_service.get_job_by_id(job_id)
+        if not job:
+            return ResponseService.not_found('Job')
+            
+        if job.status != 'UPLOADED':
+            return ResponseService.validation_error('Job review state can only be changed in UPLOADED status')
 
-    job.last_updated_by = staff_name
-    db.session.add(job)
-    db.session.commit()
+        # Validate staff
+        is_valid, error_msg = orchestration_service.validate_staff_exists_and_active(staff_name)
+        if not is_valid:
+            return ResponseService.validation_error(error_msg)
 
-    # Log event with attribution
-    evt = Event(
-        job_id=job.id,
-        event_type=event_type,
-        details={},
-        triggered_by=staff_name,
-        workstation_id=g.workstation_id,
-    )
-    db.session.add(evt)
-    db.session.commit()
+        # Apply state change
+        if reviewed:
+            job.staff_viewed_at = datetime.utcnow()
+            event_type = 'JobReviewed'
+        else:
+            job.staff_viewed_at = None
+            event_type = 'JobReviewCleared'
 
-    return jsonify(job.to_dict()), 200
+        # Update job and log event
+        job = orchestration_service.update_job_status(
+            job_id, job.status, staff_name, event_type, {}, sync_metadata=False
+        )
+        
+        # Apply additional fields (staff_viewed_at is not handled by standard update)
+        from app import db
+        if reviewed:
+            job.staff_viewed_at = datetime.utcnow()
+        else:
+            job.staff_viewed_at = None
+        db.session.add(job)
+        db.session.commit()
+
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        return ResponseService.validation_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to review job: {e}")
+        return ResponseService.server_error('Failed to review job')
 
 
 @bp.route('/<job_id>/reject', methods=['POST'])
@@ -413,7 +374,7 @@ def reject_job(job_id):
         abort(404, description='Job not found')
 
     if job.status != 'UPLOADED':
-        return jsonify({'message': 'Job cannot be rejected in its current status'}), 400
+        return ResponseService.validation_error('Job cannot be rejected in its current status')
 
     data = request.get_json(silent=True) or {}
     staff_name = data.get('staff_name')
@@ -421,19 +382,19 @@ def reject_job(job_id):
     custom_reason = (data.get('custom_reason') or '').strip()
 
     if not staff_name:
-        return jsonify({'message': 'staff_name is required'}), 400
+        return ResponseService.validation_error('staff_name is required')
     staff = Staff.query.get(staff_name)
     if not staff or not staff.is_active:
-        return jsonify({'message': 'Invalid or inactive staff_name'}), 400
+        return ResponseService.validation_error('Invalid or inactive staff_name')
 
     # Normalize reasons
     if not isinstance(reasons, list):
-        return jsonify({'message': 'reasons must be an array of strings'}), 400
+        return ResponseService.validation_error('reasons must be an array of strings')
     reasons = [str(r) for r in reasons if str(r).strip()]
     if custom_reason:
         reasons.append(custom_reason)
     if not reasons:
-        return jsonify({'message': 'At least one reason or a custom_reason is required'}), 400
+        return ResponseService.validation_error('At least one reason or a custom_reason is required')
 
     # Update job
     job.status = 'REJECTED'
@@ -461,7 +422,7 @@ def reject_job(job_id):
     except Exception:
         pass
 
-    return jsonify(job.to_dict()), 200
+    return ResponseService.success(job.to_dict())
 
 
 @bp.route('/<job_id>/revert-completion', methods=['POST'])
@@ -471,25 +432,25 @@ def revert_completion(job_id):
     if not job:
         abort(404, description='Job not found')
     if job.status != 'COMPLETED':
-        return jsonify({'message': 'Job must be in COMPLETED to revert to PRINTING'}), 400
+        return ResponseService.validation_error('Job must be in COMPLETED to revert to PRINTING')
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
+        return err_resp
     before = job.status
     job.status = 'PRINTING'
     job.last_updated_by = staff_name
     atomic_service = get_atomic_file_service()
     success = atomic_service.atomic_move_authoritative(job, 'PRINTING')
     if not success:
-        return jsonify({'message': 'File operation failed during revert to printing'}), 500
+        return ResponseService.server_error('File operation failed during revert to printing')
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobRevertedToPrinting', details={'from': before, 'to': 'PRINTING'}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
     _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToPrinting')
-    return jsonify(job.to_dict()), 200
+    return ResponseService.success(job.to_dict())
 
 
 @bp.route('/<job_id>/revert-pickup', methods=['POST'])
@@ -499,61 +460,73 @@ def revert_pickup(job_id):
     if not job:
         abort(404, description='Job not found')
     if job.status != 'PAIDPICKEDUP':
-        return jsonify({'message': 'Job must be in PAIDPICKEDUP to revert to COMPLETED'}), 400
+        return ResponseService.validation_error('Job must be in PAIDPICKEDUP to revert to COMPLETED')
     data = request.get_json(silent=True) or {}
-    staff_name, err_resp, err_code = _validate_staff_and_body(data)
+    staff_name, err_resp = _validate_staff_and_body(data)
     if err_resp:
-        return err_resp, err_code
+        return err_resp
     before = job.status
     job.status = 'COMPLETED'
     job.last_updated_by = staff_name
     atomic_service = get_atomic_file_service()
     success = atomic_service.atomic_move_authoritative(job, 'COMPLETED')
     if not success:
-        return jsonify({'message': 'File operation failed during revert to completed'}), 500
+        return ResponseService.server_error('File operation failed during revert to completed')
     db.session.add(job)
     db.session.commit()
     evt = Event(job_id=job.id, event_type='JobRevertedToCompleted', details={'from': before, 'to': 'COMPLETED'}, triggered_by=staff_name, workstation_id=g.workstation_id)
     db.session.add(evt)
     db.session.commit()
     _sync_authoritative_metadata(job, Path(job.file_path).name, staff_name, 'JobRevertedToCompleted')
-    return jsonify(job.to_dict()), 200
+    return ResponseService.success(job.to_dict())
 
 @bp.route('/<job_id>/lock', methods=['POST'])
 @token_required
 def lock_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    now = datetime.utcnow()
-    if job.locked_by and job.locked_until and job.locked_until > now:
-        return jsonify(job.to_dict()), 409
-    job.locked_by = g.workstation_id
-    job.locked_until = now + timedelta(minutes=5)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        job = orchestration_service.lock_job(job_id)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        if 'not found' in str(e).lower():
+            return ResponseService.not_found('Job')
+        elif 'locked' in str(e).lower():
+            return ResponseService.conflict(str(e))
+        else:
+            return ResponseService.validation_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to lock job: {e}")
+        return ResponseService.server_error('Failed to lock job')
 
 @bp.route('/<job_id>/unlock', methods=['POST'])
 @token_required
 def unlock_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.locked_by != g.workstation_id:
-        return jsonify({'message': 'Not lock owner'}), 403
-    job.locked_by = None
-    job.locked_until = None
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        job = orchestration_service.unlock_job(job_id)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        if 'not found' in str(e).lower():
+            return ResponseService.not_found('Job')
+        elif 'not lock owner' in str(e).lower():
+            return ResponseService.forbidden(str(e))
+        else:
+            return ResponseService.validation_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to unlock job: {e}")
+        return ResponseService.server_error('Failed to unlock job')
 
 @bp.route('/<job_id>/extend', methods=['POST'])
 @token_required
 def extend_job_lock(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        abort(404, description='Job not found')
-    if job.locked_by != g.workstation_id:
-        return jsonify({'message': 'Not lock owner'}), 403
-    job.locked_until = datetime.utcnow() + timedelta(minutes=5)
-    db.session.commit()
-    return jsonify(job.to_dict()), 200
+    try:
+        job = orchestration_service.extend_job_lock(job_id)
+        return ResponseService.success(job.to_dict())
+    except ValueError as e:
+        if 'not found' in str(e).lower():
+            return ResponseService.not_found('Job')
+        elif 'not lock owner' in str(e).lower():
+            return ResponseService.forbidden(str(e))
+        else:
+            return ResponseService.validation_error(str(e))
+    except Exception as e:
+        logger.error(f"Failed to extend job lock: {e}")
+        return ResponseService.server_error('Failed to extend job lock')

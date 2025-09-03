@@ -3,7 +3,7 @@ Monitoring endpoints for comprehensive system monitoring and metrics collection.
 Provides health checks, performance metrics, and system status information.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 from app.services.monitoring_service import monitoring_service
 from app.business_logic.shared_services.response_service import ResponseService, ErrorCategory, ErrorCode
 import logging
@@ -18,15 +18,11 @@ def get_health():
     try:
         health_data = monitoring_service.get_comprehensive_health()
         
-        # Determine HTTP status code based on health
-        if health_data['status'] == 'healthy':
-            status_code = 200
-        elif health_data['status'] == 'degraded':
-            status_code = 200  # Still operational but with issues
+        # Return appropriate response based on health status
+        if health_data['status'] == 'healthy' or health_data['status'] == 'degraded':
+            return ResponseService.success(health_data)
         else:
-            status_code = 503  # Service unavailable
-        
-        return jsonify(health_data), status_code
+            return ResponseService.server_error('System is unhealthy', health_data, status=503)
     except Exception as e:
         logger.error(f"Failed to get health status: {e}")
         return ResponseService.server_error(
@@ -39,7 +35,7 @@ def get_system_metrics():
     """Get system-level metrics (CPU, memory, disk, network)"""
     try:
         metrics = monitoring_service.get_system_metrics()
-        return jsonify(metrics)
+        return ResponseService.success(metrics)
     except Exception as e:
         logger.error(f"Failed to get system metrics: {e}")
         return ResponseService.server_error(
@@ -52,7 +48,7 @@ def get_application_metrics():
     """Get application-specific metrics (requests, errors, performance)"""
     try:
         metrics = monitoring_service.get_application_metrics()
-        return jsonify(metrics)
+        return ResponseService.success(metrics)
     except Exception as e:
         logger.error(f"Failed to get application metrics: {e}")
         return ResponseService.server_error(
@@ -65,7 +61,7 @@ def get_database_metrics():
     """Get database performance and health metrics"""
     try:
         metrics = monitoring_service.get_database_metrics()
-        return jsonify(metrics)
+        return ResponseService.success(metrics)
     except Exception as e:
         logger.error(f"Failed to get database metrics: {e}")
         return ResponseService.server_error(
@@ -78,7 +74,7 @@ def get_storage_metrics():
     """Get storage system metrics"""
     try:
         metrics = monitoring_service.get_storage_metrics()
-        return jsonify(metrics)
+        return ResponseService.success(metrics)
     except Exception as e:
         logger.error(f"Failed to get storage metrics: {e}")
         return ResponseService.server_error(
@@ -91,7 +87,7 @@ def get_redis_metrics():
     """Get Redis performance and health metrics"""
     try:
         metrics = monitoring_service.get_redis_metrics()
-        return jsonify(metrics)
+        return ResponseService.success(metrics)
     except Exception as e:
         logger.error(f"Failed to get Redis metrics: {e}")
         return ResponseService.server_error(
@@ -111,7 +107,7 @@ def get_all_metrics():
             'storage': monitoring_service.get_storage_metrics(),
             'redis': monitoring_service.get_redis_metrics()
         }
-        return jsonify(all_metrics)
+        return ResponseService.success(all_metrics)
     except Exception as e:
         logger.error(f"Failed to get all metrics: {e}")
         return ResponseService.server_error(
@@ -135,7 +131,7 @@ def get_metrics_history():
             )
         
         history = monitoring_service.get_metrics_history(hours)
-        return jsonify({
+        return ResponseService.success({
             'hours': hours,
             'count': len(history),
             'data': history
@@ -152,7 +148,7 @@ def get_performance_alerts():
     """Get current performance alerts"""
     try:
         alerts = monitoring_service.get_performance_alerts()
-        return jsonify({
+        return ResponseService.success({
             'timestamp': monitoring_service.get_system_metrics().get('timestamp'),
             'count': len(alerts),
             'alerts': alerts
@@ -191,37 +187,35 @@ def get_status():
             else:
                 status['components'][component] = 'healthy' if 'error' not in data else 'unhealthy'
         
-        # Determine HTTP status code
-        if status['status'] == 'healthy':
-            status_code = 200
-        elif status['status'] == 'degraded':
-            status_code = 200
+        # Return appropriate response based on status
+        if status['status'] == 'healthy' or status['status'] == 'degraded':
+            return ResponseService.success(status)
         else:
-            status_code = 503
-        
-        return jsonify(status), status_code
+            return ResponseService.server_error('System is unhealthy', status, status=503)
     except Exception as e:
         logger.error(f"Failed to get status: {e}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': 'Failed to retrieve status'
-        }), 503
+        return ResponseService.server_error(
+            'Failed to retrieve status', 
+            {'status': 'unhealthy', 'error': 'Failed to retrieve status'}, 
+            status=503
+        )
 
 @monitoring_bp.route('/ping', methods=['GET'])
 def ping():
     """Simple ping endpoint for basic connectivity testing"""
     try:
-        return jsonify({
+        return ResponseService.success({
             'status': 'ok',
             'timestamp': monitoring_service.get_system_metrics().get('timestamp'),
             'message': 'pong'
         })
     except Exception as e:
         logger.error(f"Ping failed: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': 'ping failed'
-        }), 503
+        return ResponseService.server_error(
+            'ping failed',
+            {'status': 'error', 'message': 'ping failed'},
+            status=503
+        )
 
 @monitoring_bp.route('/info', methods=['GET'])
 def get_info():
@@ -251,7 +245,7 @@ def get_info():
             }
         }
         
-        return jsonify(info)
+        return ResponseService.success(info)
     except Exception as e:
         logger.error(f"Failed to get system info: {e}")
         return ResponseService.server_error(

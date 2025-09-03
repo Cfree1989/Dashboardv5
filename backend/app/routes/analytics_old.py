@@ -1,5 +1,6 @@
 from flask import Blueprint
-from flask import jsonify, request, current_app
+from flask import request, current_app
+from app.business_logic.shared_services.response_service import ResponseService
 from app.models.event import Event
 from app.models.job import Job
 from app.models.payment import Payment
@@ -39,7 +40,7 @@ def overview():
     # Use AnalyticsService to get overview metrics
     payload = analytics_service.get_overview_metrics(date_range, filters)
     
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/trends', methods=['GET'])
@@ -64,7 +65,7 @@ def trends():
         'date_range': trend_data['date_range']
     }
     
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/resources', methods=['GET'])
@@ -81,7 +82,7 @@ def resources():
     # Use AnalyticsService to get resource metrics
     payload = analytics_service.get_resource_metrics(date_range, filters)
     
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/financial', methods=['GET'])
@@ -98,7 +99,7 @@ def financial():
     # Use AnalyticsService to get financial summary
     payload = analytics_service.get_financial_summary(date_range, filters)
     
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 # Legacy cache functions - can be removed once all endpoints use AnalyticsService
@@ -277,7 +278,7 @@ def _cache_get(key: tuple):
         }
     }
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/financial', methods=['GET'])
@@ -286,7 +287,7 @@ def financial():
     cache_key = ('financial', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     # Parse date range
     start, end = _parse_date_range()
@@ -377,7 +378,7 @@ def financial():
         }
     }
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/events', methods=['GET'])
@@ -409,7 +410,7 @@ def list_events():
     # Order by timestamp (newest first)
     events = query.order_by(Event.timestamp.desc()).all()
     
-    return jsonify([e.to_dict() for e in events]), 200
+    return ResponseService.success([e.to_dict() for e in events])
 
 
 # Staff Analytics Endpoints
@@ -420,7 +421,7 @@ def staff_overview():
     cache_key = ('staff_overview', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     # Parse date range
     start, end = _parse_date_range()
@@ -518,7 +519,7 @@ def staff_overview():
     }
     
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/staff/performance', methods=['GET'])
@@ -528,19 +529,19 @@ def staff_performance():
     cache_key = ('staff_performance', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     # Parse date range
     start, end = _parse_date_range()
     staff_name = request.args.get('staff')
     
     if not staff_name:
-        return jsonify({'error': 'staff parameter is required'}), 400
+        return ResponseService.validation_error('staff parameter is required')
     
     # Verify staff exists and is active
     staff = Staff.query.filter(Staff.name == staff_name, Staff.is_active == True).first()
     if not staff:
-        return jsonify({'error': 'Staff member not found or inactive'}), 404
+        return ResponseService.not_found('Staff member not found or inactive')
     
     # Get all events by this staff member in the date range
     staff_events = Event.query.filter(
@@ -600,7 +601,7 @@ def staff_performance():
     }
     
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/staff/comparison', methods=['GET'])
@@ -610,7 +611,7 @@ def staff_comparison():
     cache_key = ('staff_comparison', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     # Parse date range
     start, end = _parse_date_range()
@@ -685,7 +686,7 @@ def staff_comparison():
     }
     
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200 
+    return ResponseService.success(payload) 
 
 @bp.route('/student/overview', methods=['GET'])
 @token_required
@@ -694,7 +695,7 @@ def student_overview():
     cache_key = ('student_overview', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     start, end = _parse_date_range()
     
@@ -732,7 +733,7 @@ def student_overview():
         }
     }
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/student/performance', methods=['GET'])
@@ -742,7 +743,7 @@ def student_performance():
     cache_key = ('student_performance', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     start, end = _parse_date_range()
     
@@ -802,7 +803,7 @@ def student_performance():
         }
     }
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200
+    return ResponseService.success(payload)
 
 
 @bp.route('/student/trends', methods=['GET'])
@@ -812,7 +813,7 @@ def student_trends():
     cache_key = ('student_trends', tuple(sorted(request.args.items())))
     cached = _cache_get(cache_key)
     if cached is not None:
-        return jsonify(cached), 200
+        return ResponseService.success(cached)
     
     start, end = _parse_date_range()
     
@@ -853,4 +854,4 @@ def student_trends():
         }
     }
     _cache_set(cache_key, payload)
-    return jsonify(payload), 200 
+    return ResponseService.success(payload) 
