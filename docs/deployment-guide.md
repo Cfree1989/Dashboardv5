@@ -336,11 +336,86 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO printapp;
 -- DATABASE_URL=postgresql://printapp:<strong-password>@db:5432/3d_print_system
 ```
 
-### Database Backup Setup
+### Comprehensive Backup System Setup
+
+The system includes a masterplan-compliant backup strategy with synchronized database and file storage backups. 
+
+**⚠️ IMPORTANT**: Use the comprehensive backup system instead of the basic backup shown below.
+
+#### Quick Setup (Recommended)
 
 ```bash
-# Create backup script
-cat << 'EOF' > /opt/3d-print-system/scripts/backup_db.sh
+# Ensure backup scripts are executable
+chmod +x /opt/3d-print-system/scripts/backup_database.sh
+chmod +x /opt/3d-print-system/scripts/restore_database.sh
+
+# Create backup directory structure
+mkdir -p /opt/3d-print-system/backups/{daily,weekly,monthly,logs}
+
+# Configure backup settings in .env file
+cat >> /opt/3d-print-system/.env << 'EOF'
+# Comprehensive Backup Configuration
+BACKUP_BASE_DIR="/opt/3d-print-system/backups"
+STORAGE_PATH="/opt/3d-print-system/storage"
+DOCKER_COMPOSE_FILE="/opt/3d-print-system/docker-compose.prod.yml"
+
+# Off-site storage (highly recommended)
+OFFSITE_ENABLED="true"
+OFFSITE_TYPE="rsync"
+OFFSITE_DESTINATION="backup-user@backup.university.edu:/secure/backups/3d-print/"
+OFFSITE_OPTIONS="-e 'ssh -i /opt/3d-print-system/.ssh/backup-key'"
+
+# Email notifications
+EMAIL_ENABLED="true"
+EMAIL_TO="admin@yourdomain.com"
+EMAIL_FROM="3d-print-backup@yourdomain.com"
+EOF
+
+# Set up automated daily backups at 3:00 AM
+echo "0 3 * * * /opt/3d-print-system/scripts/backup_database.sh >> /var/log/3d-print-backup.log 2>&1" | crontab -
+
+# Test the backup configuration
+/opt/3d-print-system/scripts/backup_database.sh --test-mode
+
+echo "✅ Comprehensive backup system configured"
+echo "📖 See docs/backup-procedures.md for detailed procedures"
+```
+
+#### Backup Features
+- **Synchronized Database + File Storage**: Coordinated backups minimize data inconsistency
+- **Multi-Tier Retention**: Daily (14 days), Weekly (2 months), Monthly (1 year)
+- **Off-Site Storage**: Automated sync to secure remote location (rsync/S3/SCP)
+- **Integrity Verification**: Automatic validation of all backup files
+- **Email Notifications**: Success/failure alerts sent to administrators
+- **Safe Recovery**: Pre-restore backups and automated integrity audits
+
+#### Basic Backup Operations
+
+```bash
+# Manual backup
+/opt/3d-print-system/scripts/backup_database.sh
+
+# List available backups
+/opt/3d-print-system/scripts/restore_database.sh --list-backups
+
+# Verify backup integrity
+/opt/3d-print-system/scripts/restore_database.sh --verify-backup 20231215
+
+# Emergency restore (⚠️ OVERWRITES DATA)
+/opt/3d-print-system/scripts/restore_database.sh --backup-date 20231215
+```
+
+**For complete procedures, see [`docs/backup-procedures.md`](backup-procedures.md)**
+
+---
+
+#### Legacy Basic Backup (Not Recommended)
+
+*Use only if the comprehensive backup system cannot be implemented:*
+
+```bash
+# Create basic backup script (DEPRECATED - Use comprehensive system above)
+cat << 'EOF' > /opt/3d-print-system/scripts/backup_db_basic.sh
 #!/bin/bash
 BACKUP_DIR="/opt/3d-print-system/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -359,10 +434,7 @@ find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
 echo "Database backup completed: $BACKUP_FILE.gz"
 EOF
 
-chmod +x /opt/3d-print-system/scripts/backup_db.sh
-
-# Set up daily backup cron job
-echo "0 2 * * * /opt/3d-print-system/scripts/backup_db.sh >> /var/log/db_backup.log 2>&1" | crontab -
+chmod +x /opt/3d-print-system/scripts/backup_db_basic.sh
 ```
 
 ## SSL/TLS Configuration
