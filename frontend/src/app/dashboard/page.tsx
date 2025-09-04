@@ -5,7 +5,7 @@ import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
 import { getLegacyToken } from '../../lib/auth';
-import { playNewUploadSound, initDashboardAudio, canPlayAudio } from '../../lib/sound-utils';
+import { initDashboardAudio } from '../../lib/sound-utils';
 import { apiClient } from '../../lib/unified-api-client';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -74,25 +74,35 @@ export default function DashboardPage() {
   // Use currentStatus instead of status
   const status = currentStatus;
 
-  // Initialize audio on page load - add click handler to ensure audio works
+  // Initialize audio on page load - requires user interaction for browser autoplay policy
   useEffect(() => {
-    const initAudio = () => {
-      initDashboardAudio();
-      console.log('🔊 Audio context initialized for dashboard');
+    const initAudio = async () => {
+      await initDashboardAudio();
     };
     
-    // Try to initialize immediately
+    // Set up user interaction handler for audio activation
+    const handleUserInteraction = async (event: Event) => {
+      const success = await initDashboardAudio();
+      if (success) {
+        // Remove listeners once audio is successfully initialized
+        document.removeEventListener('click', handleUserInteraction);
+        document.removeEventListener('keydown', handleUserInteraction);
+        document.removeEventListener('touchstart', handleUserInteraction);
+      }
+    };
+    
+    // Try to initialize immediately (will fail due to autoplay policy, but sets up context)
     initAudio();
     
-    // Also initialize on first click anywhere on the page
-    const handleFirstClick = () => {
-      initAudio();
-      document.removeEventListener('click', handleFirstClick);
-    };
-    document.addEventListener('click', handleFirstClick);
+    // Set up multiple event listeners to catch any user interaction
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
     
     return () => {
-      document.removeEventListener('click', handleFirstClick);
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
     };
   }, []);
 
@@ -141,29 +151,11 @@ export default function DashboardPage() {
         }
       );
       
-      console.log('📊 fetchCounts() received data:', data);
-      console.log('📊 Previous counts in ref:', previousCountsRef.current);
       setCounts(data);
-      console.log('📊 setCounts() called with new data');
       
       // Play sound if UPLOADED count increased (new job submitted)
       const currentUploaded = data[JobStatus.UPLOADED] || 0;
       const previousUploaded = previousCountsRef.current[JobStatus.UPLOADED] || 0;
-      
-      console.log(`📊 Job counts - Current: ${currentUploaded}, Previous: ${previousUploaded}, First load: ${isFirstLoadRef.current}, Paused: ${pauseRefresh}, Job operation: ${isJobOperation}`);
-      
-      // More lenient sound conditions - only skip on first load
-      if (currentUploaded > previousUploaded && !isFirstLoadRef.current) {
-        console.log('🔊 NEW JOB DETECTED! Playing sound notification...');
-        try {
-          playNewUploadSound();
-          console.log('✅ Sound played successfully');
-        } catch (error) {
-          console.error('❌ Failed to play sound:', error);
-        }
-      } else if (currentUploaded > previousUploaded && isFirstLoadRef.current) {
-        console.log('🔇 Skipping sound on first load');
-      }
       
       // Update ref with current data for next comparison
       previousCountsRef.current = data;
@@ -205,13 +197,18 @@ export default function DashboardPage() {
       clearInterval(autoRefreshIntervalRef.current);
     }
 
-    // Start auto-refresh every 30 seconds (faster than the original 45s)
+    // Start auto-refresh every 30 seconds
     autoRefreshIntervalRef.current = setInterval(() => {
       if (isAuthenticated && !pauseRefresh) {
-        console.log('🔄 Auto-refresh triggered - fetching latest job counts');
-        fetchCounts();
+        // Fetch counts first, then trigger job list refresh
+        fetchCounts().then(() => {
+          // Small delay to ensure counts are processed before job list refresh
+          setTimeout(() => {
+            incrementRefreshTick();
+          }, 500); // Half second delay to ensure proper sequencing
+        });
       }
-    }, 30000); // 30 second intervals
+    }, 30000);
 
     // Cleanup on unmount
     return () => {
@@ -220,6 +217,11 @@ export default function DashboardPage() {
       }
     };
   }, [isAuthenticated, pauseRefresh, fetchCounts]);
+
+  // Props tracking for JobList updates
+  useEffect(() => {
+    // Dashboard props updated
+  }, [refreshTick, status, debouncedSearch]);
 
   // Recompute counts when search changes
   useEffect(() => {
@@ -237,18 +239,14 @@ export default function DashboardPage() {
   // Manual interval removed in favor of adaptive polling
   
   const refreshPage = useCallback(async () => {
-    console.log('🔄 Manual refresh triggered');
     setRefreshing(true);
     const ts = new Date().toLocaleTimeString();
     setLastUpdated(ts);
     try { localStorage.setItem('lastUpdated', ts); } catch {}
-    console.log('🔄 incrementRefreshTick() - before:', refreshTick);
     incrementRefreshTick();
-    console.log('🔄 incrementRefreshTick() - after:', useDashboardStore.getState().refreshTick);
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));
     setRefreshing(false);
-    console.log('✅ Manual refresh completed');
   }, [fetchCounts, setRefreshing, setLastUpdated, incrementRefreshTick]);
   
   const updateStatus = useCallback((newStatus: string) => {

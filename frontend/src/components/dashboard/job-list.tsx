@@ -9,6 +9,7 @@ import { ErrorBoundary } from '../error-boundary';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { ErrorCard } from '../ui/error-display';
 import { JobListFilters, JobListState, Job } from '../../types';
+import { playNewUploadSound } from '../../lib/sound-utils';
 
 export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
   filters?: JobListFilters, 
@@ -41,6 +42,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   const router = useRouter();
   const controllerRef = useRef<AbortController | null>(null);
+
+  // JobList render tracking
 
   // React Strict Mode compatibility: Skip cleanup in development
   useEffect(() => {
@@ -103,6 +106,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   // Memoized fetch jobs function
   const fetchJobs = useCallback(async () => {
+    
     // Always create a fresh controller - don't try to abort existing ones in development
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -133,12 +137,25 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       });
 
       if (!controller.signal.aborted) {
-        setState(prev => ({
-          ...prev,
-          data: { jobs: response, hasLoaded: true },
-          loading: { loading: false, isFetching: false },
-          error: clearErrorState()
-        }));
+        setState(prev => {
+          const previousJobCount = prev.data.jobs.length;
+          const newJobCount = response.length;
+          const hadLoaded = prev.data.hasLoaded;
+          
+          // Play sound notification when new jobs appear visually (immediate response)
+          if (newJobCount > previousJobCount && hadLoaded) {
+            playNewUploadSound().catch((error) => {
+              console.warn('Failed to play dashboard sound:', error);
+            });
+          }
+          
+          return {
+            ...prev,
+            data: { jobs: response, hasLoaded: true },
+            loading: { loading: false, isFetching: false },
+            error: clearErrorState()
+          };
+        });
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
