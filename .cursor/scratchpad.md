@@ -25,14 +25,48 @@
 
 ## Active Work
 
-### **PLANNER: Monitoring System Issues Analysis** 🔍
+### **EXECUTOR: Fixing 5-Hour Time Offset on Monitoring Page** 🔧
 
-**Problem Statement**: Multiple real-time functionality failures affecting production monitoring
-- **Issue 1**: No sound notifications on file upload (expected behavior not working)
-- **Issue 2**: Real-time refresh not working - "Last updated" timestamp frozen at 1:23:57 PM 
-- **Issue 3**: Incorrect time calculations - showing 6:49:53 PM when current time 1:50 PM, should show 1:43 PM (7 minutes ago)
+**Problem Statement**: Time displayed on monitoring page is off by 5 hours
 
-**Root Cause Analysis**:
+**Root Cause Identified**: Backend generating UTC timestamps without timezone info using `datetime.utcnow().isoformat()` 
+- Backend returns timestamps like "2024-01-01T17:00:00.123456" (no timezone)
+- JavaScript `new Date()` interprets this as local time instead of UTC
+- User in Central Time (UTC-5) sees 5:00 PM instead of correct 12:00 PM local time
+
+**Technical Details**:
+- Backend: `monitoring_service.py` uses `datetime.utcnow().isoformat()` throughout (lines 48, 109, 151, etc.)
+- Frontend: `monitoring-dashboard.tsx` line 189 displays `new Date(healthStatus.timestamp).toLocaleTimeString()`
+- Missing timezone indicator causes JavaScript to assume local time instead of UTC conversion
+
+**RESOLUTION COMPLETED** ✅
+
+**Fix Applied**: Updated all backend timestamp generation to include proper UTC timezone information
+- **Files Modified**: 
+  - `backend/app/services/monitoring_service.py` - All timestamp generations
+  - `backend/app/routes/health.py` - Health endpoint timestamps  
+  - `backend/app/routes/admin.py` - Audit report timestamps
+  - `backend/app/routes/jobs.py` - Job metadata timestamps
+  - `backend/app/__init__.py` - Logging timestamps
+
+**Technical Solution**:
+- **Before**: `datetime.utcnow().isoformat()` → `"2024-01-01T17:00:00.123456"` (no timezone info)
+- **After**: `datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()` → `"2024-01-01T17:00:00.123456+00:00"` (proper UTC)
+
+**Verification**:
+- Backend test confirmed proper timestamp format: `2025-09-04T21:26:23.125364+00:00`
+- JavaScript `new Date()` will now correctly interpret these as UTC and convert to user's local timezone
+- 5-hour offset issue resolved - UTC timestamps with `+00:00` will display correctly in all timezones
+
+**Impact**: Monitoring dashboard will now display accurate local time instead of being off by 5 hours
+
+**CONFIRMED WORKING** ✅ 
+- User tested monitoring page in Baton Rouge, Louisiana (CDT, UTC-5) on 9/4/2025 at 4:27 PM
+- Backend API returning proper UTC timestamps: `2025-09-04T21:28:32.660377+00:00`
+- Frontend correctly converting and displaying local time
+- 5-hour offset issue completely resolved
+
+**Root Cause Analysis** (Historical):
 
 #### **Issue 1: Missing Sound Notification System** 🔍
 **Investigation Results**: Comprehensive codebase search revealed **no existing sound notification implementation**

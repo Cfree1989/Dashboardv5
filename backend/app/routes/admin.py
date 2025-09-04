@@ -934,7 +934,7 @@ def verify_directory_integrity():
             'directory_path': directory_path,
             'total_files': file_count,
             'corrupted_files': corrupted_count,
-            'scan_completed_at': datetime.utcnow().isoformat(),
+            'scan_completed_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
             'results': results
         })
         
@@ -1017,7 +1017,7 @@ def integrity_scan():
         return ResponseService.success({
             'scan_type': 'comprehensive',
             'storage_root': str(storage_root),
-            'scan_completed_at': datetime.utcnow().isoformat(),
+            'scan_completed_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
             'summary': {
                 'total_files': total_files,
                 'corrupted_files': total_corrupted,
@@ -1041,7 +1041,7 @@ def integrity_report():
         
         storage_root = file_config.get_storage_root()
         report = {
-            'generated_at': datetime.utcnow().isoformat(),
+            'generated_at': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
             'storage_root': str(storage_root),
             'directories': {},
             'summary': {

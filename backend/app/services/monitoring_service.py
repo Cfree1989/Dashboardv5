@@ -7,7 +7,7 @@ import time
 import psutil
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 from flask import current_app
 import logging
@@ -45,7 +45,7 @@ class MonitoringService:
             process_cpu = process.cpu_percent()
             
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'uptime_seconds': time.time() - self.start_time,
                 'cpu': {
                     'percent': cpu_percent,
@@ -106,7 +106,7 @@ class MonitoringService:
             slow_endpoints.sort(key=lambda x: x['avg_duration_ms'], reverse=True)
             
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'requests': {
                     'total': request_count,
                     'errors': error_count,
@@ -148,7 +148,7 @@ class MonitoringService:
             recent_events = Event.query.filter(Event.timestamp >= yesterday).count()
             
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'connectivity': {
                     'status': 'healthy',
                     'response_time_ms': round(connectivity_time * 1000, 2)
@@ -166,7 +166,7 @@ class MonitoringService:
         except Exception as e:
             logger.error(f"Failed to collect database metrics: {e}")
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'connectivity': {
                     'status': 'unhealthy',
                     'error': str(e)
@@ -180,7 +180,7 @@ class MonitoringService:
             
             if not os.path.exists(storage_path):
                 return {
-                    'timestamp': datetime.utcnow().isoformat(),
+                    'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                     'status': 'not_found',
                     'error': f'Storage path {storage_path} does not exist'
                 }
@@ -204,7 +204,7 @@ class MonitoringService:
             disk_usage = psutil.disk_usage(storage_path)
             
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'status': 'healthy',
                 'path': storage_path,
                 'files': {
@@ -222,7 +222,7 @@ class MonitoringService:
         except Exception as e:
             logger.error(f"Failed to collect storage metrics: {e}")
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'status': 'error',
                 'error': str(e)
             }
@@ -250,7 +250,7 @@ class MonitoringService:
             job_count = len(queue)
             
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'connectivity': {
                     'status': 'healthy',
                     'response_time_ms': round(connectivity_time * 1000, 2)
@@ -269,7 +269,7 @@ class MonitoringService:
         except Exception as e:
             logger.error(f"Failed to collect Redis metrics: {e}")
             return {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'connectivity': {
                     'status': 'unhealthy',
                     'error': str(e)
@@ -299,7 +299,7 @@ class MonitoringService:
             
             # Store metrics in history
             metrics_entry = {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'overall_health': overall_health,
                 'health_checks': health_checks,
                 'system': system_metrics,
@@ -317,7 +317,7 @@ class MonitoringService:
             
             return {
                 'status': overall_health,
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'uptime_seconds': time.time() - self.start_time,
                 'health_checks': health_checks,
                 'components': {
@@ -332,7 +332,7 @@ class MonitoringService:
             logger.error(f"Failed to collect comprehensive health: {e}")
             return {
                 'status': 'unhealthy',
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
                 'error': str(e)
             }
     
@@ -368,7 +368,7 @@ class MonitoringService:
                     'type': 'high_cpu',
                     'severity': 'warning',
                     'message': f"High CPU usage: {system_metrics['cpu']['percent']}%",
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
                 })
             
             # Check memory usage
@@ -377,7 +377,7 @@ class MonitoringService:
                     'type': 'high_memory',
                     'severity': 'warning',
                     'message': f"High memory usage: {system_metrics['memory']['percent']}%",
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
                 })
             
             # Check disk usage
@@ -386,7 +386,7 @@ class MonitoringService:
                     'type': 'high_disk',
                     'severity': 'critical',
                     'message': f"High disk usage: {system_metrics['disk']['percent']}%",
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
                 })
             
             # Check error rate
@@ -395,7 +395,7 @@ class MonitoringService:
                     'type': 'high_error_rate',
                     'severity': 'critical',
                     'message': f"High error rate: {app_metrics['requests']['error_rate_percent']}%",
-                    'timestamp': datetime.utcnow().isoformat()
+                    'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
                 })
             
             # Check slow endpoints
@@ -406,7 +406,7 @@ class MonitoringService:
                             'type': 'slow_endpoint',
                             'severity': 'warning',
                             'message': f"Slow endpoint {endpoint['path']}: {endpoint['avg_duration_ms']}ms avg",
-                            'timestamp': datetime.utcnow().isoformat()
+                            'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
                         })
         
         except Exception as e:
@@ -415,7 +415,7 @@ class MonitoringService:
                 'type': 'alert_generation_error',
                 'severity': 'error',
                 'message': f"Failed to generate alerts: {str(e)}",
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
             })
         
         return alerts

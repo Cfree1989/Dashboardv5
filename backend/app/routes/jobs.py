@@ -9,7 +9,7 @@ from app.business_logic.shared_services import token_service
 from app.business_logic.shared_services import email_service
 from app.business_logic.shared_services import event_service
 # Staff model queries replaced with ValidationService
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import json
 from pathlib import Path  # Still used in metadata helpers
 from decimal import Decimal, ROUND_HALF_UP
@@ -152,7 +152,7 @@ def _sync_metadata_content(job: Job, authoritative_filename: str, staff_name: st
     
     if authoritative_filename and authoritative_filename != prev:
         history.append({
-            'ts': datetime.utcnow().isoformat(),
+            'ts': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
             'by': staff_name,
             'event': event_type,
             'from': prev,
@@ -173,7 +173,7 @@ def _sync_metadata_content(job: Job, authoritative_filename: str, staff_name: st
         meta['file_path'] = job.file_path
         changed = True
     
-    meta['updated_at'] = datetime.utcnow().isoformat()
+    meta['updated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
     
     if changed:
         _save_metadata(job, meta)

@@ -8,7 +8,7 @@ from app import db
 from sqlalchemy import text
 import redis
 from rq import Queue
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 bp = Blueprint('health', __name__, url_prefix='/api/v1')
@@ -258,7 +258,7 @@ def api_health():
         'status': status,
         'components': components,
         'env': 'testing' if current_app.config.get('TESTING') else 'production-like',
-        'timestamp': datetime.utcnow().isoformat()
+        'timestamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
     }
     
     if status == 'error':
