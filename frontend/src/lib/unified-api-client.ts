@@ -183,10 +183,6 @@ class UnifiedApiClient {
 
     // Handle non-standardized errors
     if (!response.ok) {
-      if (config.skipErrorHandling) {
-        // Return raw data to caller when caller explicitly wants to ignore errors
-        return data as unknown as T;
-      }
       throw new Error(`API Error: ${response.status} - ${data.message || 'Unknown error'}`);
     }
 

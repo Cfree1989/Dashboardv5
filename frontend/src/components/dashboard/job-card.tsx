@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
@@ -119,14 +119,6 @@ export default function JobCard({
     loadStaff();
   }, []);
 
-  // Track whether we've successfully acquired a lock to prevent premature unlock calls
-  const hasAcquiredLock = useRef(false);
-
-  // Reset lock tracking when job ID changes (component reuse scenarios)
-  useEffect(() => {
-    hasAcquiredLock.current = false;
-  }, [job.id]);
-
   // Auto-lock and extend lock while any modal is open
   useEffect(() => {
     const isModalOpen = Boolean(
@@ -142,61 +134,29 @@ export default function JobCard({
     let intervalId: NodeJS.Timeout;
     const lockJob = async () => {
       try {
-        console.log('[lockEffect] lockJob() called for', job.id);
-        await apiClient.post(`/api/v1/jobs/${job.id}/lock`, undefined, { skipErrorHandling: true });
-        hasAcquiredLock.current = true; // Track successful lock acquisition
-        console.log('[lockEffect] lock acquired successfully');
+        await apiClient.post(`/api/v1/jobs/${job.id}/lock`);
       } catch (err) {
-        console.warn('[lockEffect] lockJob error', err);
+        // Silently handle lock request failures
       }
     };
-    
-    const unlockJob = async () => {
-      if (hasAcquiredLock.current) {
-        console.log('[lockEffect] unlocking job (had lock)');
-        try {
-          await apiClient.post(`/api/v1/jobs/${job.id}/unlock`, undefined, { skipErrorHandling: true });
-        } catch (err) {
-          console.warn('[lockEffect] unlock error', err);
-        } finally {
-          hasAcquiredLock.current = false; // Reset lock tracking
-        }
-      } else {
-        console.log('[lockEffect] skipping unlock (no lock acquired)');
-      }
-    };
-    
     const extendLock = async () => {
-      if (hasAcquiredLock.current) {
-        try {
-          await apiClient.post(`/api/v1/jobs/${job.id}/extend`, undefined, { skipErrorHandling: true });
-        } catch (err) {
-          // Silently handle extend lock failures
-        }
+      try {
+        await apiClient.post(`/api/v1/jobs/${job.id}/extend`);
+      } catch (err) {
+        // Silently handle extend lock failures
       }
     };
 
     if (isModalOpen) {
-      console.log('[lockEffect] isModalOpen=true (lock/extend) flags', {
-        showReviewModal,
-        showRejectModal,
-        showApprovalModal,
-        showStatusChangeModal,
-        showPaymentModal,
-        showDeleteConfirm,
-        openFileModal,
-      });
       lockJob();
       intervalId = setInterval(extendLock, 4 * 60 * 1000);
     } else {
-      console.log('[lockEffect] isModalOpen=false -> unlock');
-      unlockJob();
+      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {});
     }
 
     return () => {
       clearInterval(intervalId);
-      console.log('[lockEffect cleanup] sending unlock on unmount');
-      unlockJob();
+      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {});
     };
   }, [showReviewModal, showRejectModal, showApprovalModal, showStatusChangeModal, showPaymentModal, showDeleteConfirm, openFileModal, job.id]);
 
@@ -347,7 +307,6 @@ export default function JobCard({
       {openFileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => {
-            console.log('[OpenFileModal] overlay click -> close modal');
             setOpenFileModal(false);
             onModalOpenChange?.(false);
           }} />
@@ -359,7 +318,6 @@ export default function JobCard({
                 href={`print3d://open/?path=${encodeURIComponent(convertToWindowsPath(job.file_path || ''))}`}
                 className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition"
                 onClick={async (e) => {
-                  console.log('[OpenFileModal] Open in Slicer clicked');
                   try {
                     await apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {});
                   } catch {}

@@ -55,28 +55,11 @@ class JobLockingService:
         
         job = job_result.data
         
-        from datetime import datetime, timezone
-
-        # Graceful unlock rules:
-        # 1. If job has no lock, succeed silently
-        # 2. If we do not own the lock but it is expired, clear it and succeed
-        # 3. If we do not own the lock and it is still active, keep it but return success (no error cascade)
-
-        if job.locked_by is None:
-            return job
-
+        # Check if current workstation owns the lock
         if job.locked_by != lock_data.workstation_id:
-            now = datetime.now(timezone.utc)
-            if job.locked_until and now > job.locked_until.replace(tzinfo=timezone.utc):
-                # Lock expired – clear it
-                job.locked_by = None
-                job.locked_until = None
-            # Either way, return job without error
-            db.session.add(job)
-            db.session.commit()
-            return job
-
-        # We own the lock – clear it normally
+            raise ValueError('Not lock owner')
+        
+        # Unlock the job
         job.locked_by = None
         job.locked_until = None
         

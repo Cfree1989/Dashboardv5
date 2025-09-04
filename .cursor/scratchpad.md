@@ -25,50 +25,6 @@
 
 ## Active Work
 
-### **Current Priority: Modal Flicker Bug Fix** 🔧
-
-**Issue**: "Open File" button modal flickers and disappears on first click, requires second click to work properly
-**Problem**: Lock management useEffect sends immediate unlock on first render after modal state change
-**Root Cause**: `isModalOpen` evaluates to `false` during first render cycle, triggering premature unlock before modal is fully established
-
-**Technical Details**:
-- First click: `setOpenFileModal(true)` → useEffect runs → `isModalOpen` still `false` → immediate unlock → modal flickers
-- Second click: Component in correct state → modal opens properly
-- Current `fileOpeningRef` workaround ineffective due to timing and dependency issues
-
-**Solution Strategy**: Implement lock acquisition tracking to prevent unlock calls unless we actually acquired a lock ✅
-
-**Implementation Completed**:
-1. ✅ **Added Lock Tracking**: `hasAcquiredLock` useRef to track successful lock acquisition
-2. ✅ **Updated Lock Logic**: Only send unlock if `hasAcquiredLock.current` is true
-3. ✅ **Reset Tracking**: Clear lock tracking when job ID changes and on unlock completion
-4. ✅ **Removed Workarounds**: Cleaned up `fileOpeningRef` and `beginFileOpen()` approach
-5. ✅ **Enhanced Logging**: Added detailed console logs for lock state tracking
-
-**Key Changes Made**:
-- Added `hasAcquiredLock` ref for reliable lock state tracking
-- Modified `lockJob()` to set `hasAcquiredLock.current = true` on successful lock
-- Created `unlockJob()` function that only unlocks if lock was acquired
-- Added useEffect to reset lock tracking when job.id changes
-- Removed `fileOpeningRef` timing-based workaround
-
-**Testing Protocol**:
-1. **Primary Test**: Click "Open File" button on any job card - modal should open immediately without flicker
-2. **Console Validation**: Check browser console for lock tracking logs:
-   - Should see `[lockEffect] lock acquired successfully` 
-   - Should see `[lockEffect] unlocking job (had lock)` when closing modal
-   - Should NOT see `[lockEffect] skipping unlock (no lock acquired)` on first click
-3. **Edge Cases**: Test multiple rapid clicks, modal close/reopen, different job cards
-4. **Backward Compatibility**: Verify other modals (approval, payment, etc.) still work normally
-
-**Expected Console Flow** (First Click):
-```
-[lockEffect] lockJob() called for <job-id>
-[lockEffect] lock acquired successfully  
-[lockEffect] isModalOpen=true (lock/extend) flags {...openFileModal: true}
-// Modal opens and stays open - NO FLICKER
-```
-
 ### **Recently Completed: Individual Job Archive Staff Attribution Fix** ✅
 
 **Issue**: Individual job archiving from job cards lacked staff attribution for audit trail compliance
@@ -316,14 +272,6 @@ export default function SubmissionForm() {
 **Solution**: Skip controller cleanup in development mode to prevent cross-mount interference
 **BFROS Lesson**: Validation logs with stack traces can reveal hidden secondary sources of same issue
 **Key Learning**: Complex debugging requires systematic backwards analysis + assumption validation
-
-### **Duplicate Legacy Methods Causing 500 Errors**
-
-**Problem**: Route functions passed `JobLockData` instances, but the class `JobOrchestrationService` still had older overloads of `lock_job`, `unlock_job`, and `extend_job_lock` that accepted a simple `workstation_id` string. When Flask imported the module, these duplicate methods appeared *after* the new implementations and therefore **overwrote** them at runtime. The type mismatch surfaced as an uncaught exception inside the route handler, resulting in an HTTP 500 and dashboard flicker.
-
-**Solution**: Remove the obsolete methods so only the `JobLockData`-based versions remain.
-
-**Lesson**: Always delete superseded API surface when refactoring; duplicate method names silently shadow newer implementations and can surface as unexplained 500s.
 
 ## Production Readiness Status
 
