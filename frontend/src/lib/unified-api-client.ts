@@ -183,6 +183,10 @@ class UnifiedApiClient {
 
     // Handle non-standardized errors
     if (!response.ok) {
+      if (config.skipErrorHandling) {
+        // Return raw data to caller when caller explicitly wants to ignore errors
+        return data as unknown as T;
+      }
       throw new Error(`API Error: ${response.status} - ${data.message || 'Unknown error'}`);
     }
 
@@ -432,8 +436,12 @@ class UnifiedApiClient {
   /**
    * DELETE request (no caching)
    */
-  async delete<T>(url: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(url, { method: 'DELETE' }, config);
+  async delete<T>(url: string, data?: any, config?: RequestConfig): Promise<T> {
+    return this.request<T>(url, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: data ? JSON.stringify(data) : undefined,
+    }, config);
   }
 }
 

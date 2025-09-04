@@ -265,9 +265,17 @@ def update_notes(job_id):
 @bp.route('/<job_id>', methods=['DELETE'])
 @token_required
 def delete_job(job_id):
+    data = request.get_json(silent=True) or {}
+    
     try:
-        # Use JobLifecycleService to delete job
-        job = orchestration_service.delete_job(job_id)
+        # Create delete data object with staff attribution
+        from app.business_logic.admin_operations.job_admin_service import JobDeleteData
+        delete_data = JobDeleteData(
+            staff_name=data.get('staff_name')
+        )
+        
+        # Use JobOrchestrationService to delete job with staff attribution
+        job = orchestration_service.delete_job(job_id, delete_data)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:

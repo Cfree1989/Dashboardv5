@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { Archive, Trash2, AlertTriangle, CheckCircle, Settings } from "lucide-react";
 import { useToast } from "../ui/toast";
-import { CatalogEditor } from "./catalog-editor";
 import { apiClient } from "../../lib/unified-api-client";
 
 interface ArchiveResponse {
@@ -97,9 +96,6 @@ export function DataManagementPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Catalog Editor */}
-      <CatalogEditor featureFlag={true} />
-      
       {/* Archive Jobs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100">

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
@@ -8,6 +8,7 @@ import ApprovalModal from './modals/approval-modal';
 import StatusChangeModal from './modals/status-change-modal';
 import PaymentModal from './modals/payment-modal';
 import ConfirmDialog from './modals/confirm-dialog';
+import ArchiveJobDialog from './modals/archive-job-dialog';
 import { apiClient } from '../../lib/unified-api-client';
 import { Job, JobCardProps, JobStatus, JobStatusAction } from '../../types';
 import { useModalStore, useJobOperationsStore } from '../../store';
@@ -118,6 +119,14 @@ export default function JobCard({
     loadStaff();
   }, []);
 
+  // Track whether we've successfully acquired a lock to prevent premature unlock calls
+  const hasAcquiredLock = useRef(false);
+
+  // Reset lock tracking when job ID changes (component reuse scenarios)
+  useEffect(() => {
+    hasAcquiredLock.current = false;
+  }, [job.id]);
+
   // Auto-lock and extend lock while any modal is open
   useEffect(() => {
     const isModalOpen = Boolean(
@@ -133,29 +142,61 @@ export default function JobCard({
     let intervalId: NodeJS.Timeout;
     const lockJob = async () => {
       try {
-        await apiClient.post(`/api/v1/jobs/${job.id}/lock`);
+        console.log('[lockEffect] lockJob() called for', job.id);
+        await apiClient.post(`/api/v1/jobs/${job.id}/lock`, undefined, { skipErrorHandling: true });
+        hasAcquiredLock.current = true; // Track successful lock acquisition
+        console.log('[lockEffect] lock acquired successfully');
       } catch (err) {
-        // Silently handle lock request failures
+        console.warn('[lockEffect] lockJob error', err);
       }
     };
+    
+    const unlockJob = async () => {
+      if (hasAcquiredLock.current) {
+        console.log('[lockEffect] unlocking job (had lock)');
+        try {
+          await apiClient.post(`/api/v1/jobs/${job.id}/unlock`, undefined, { skipErrorHandling: true });
+        } catch (err) {
+          console.warn('[lockEffect] unlock error', err);
+        } finally {
+          hasAcquiredLock.current = false; // Reset lock tracking
+        }
+      } else {
+        console.log('[lockEffect] skipping unlock (no lock acquired)');
+      }
+    };
+    
     const extendLock = async () => {
-      try {
-        await apiClient.post(`/api/v1/jobs/${job.id}/extend`);
-      } catch (err) {
-        // Silently handle extend lock failures
+      if (hasAcquiredLock.current) {
+        try {
+          await apiClient.post(`/api/v1/jobs/${job.id}/extend`, undefined, { skipErrorHandling: true });
+        } catch (err) {
+          // Silently handle extend lock failures
+        }
       }
     };
 
     if (isModalOpen) {
+      console.log('[lockEffect] isModalOpen=true (lock/extend) flags', {
+        showReviewModal,
+        showRejectModal,
+        showApprovalModal,
+        showStatusChangeModal,
+        showPaymentModal,
+        showDeleteConfirm,
+        openFileModal,
+      });
       lockJob();
       intervalId = setInterval(extendLock, 4 * 60 * 1000);
     } else {
-      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {});
+      console.log('[lockEffect] isModalOpen=false -> unlock');
+      unlockJob();
     }
 
     return () => {
       clearInterval(intervalId);
-      apiClient.post(`/api/v1/jobs/${job.id}/unlock`).catch(() => {});
+      console.log('[lockEffect cleanup] sending unlock on unmount');
+      unlockJob();
     };
   }, [showReviewModal, showRejectModal, showApprovalModal, showStatusChangeModal, showPaymentModal, showDeleteConfirm, openFileModal, job.id]);
 
@@ -306,6 +347,7 @@ export default function JobCard({
       {openFileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => {
+            console.log('[OpenFileModal] overlay click -> close modal');
             setOpenFileModal(false);
             onModalOpenChange?.(false);
           }} />
@@ -317,6 +359,7 @@ export default function JobCard({
                 href={`print3d://open/?path=${encodeURIComponent(convertToWindowsPath(job.file_path || ''))}`}
                 className="flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus-ring btn-transition"
                 onClick={async (e) => {
+                  console.log('[OpenFileModal] Open in Slicer clicked');
                   try {
                     await apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {});
                   } catch {}
@@ -352,15 +395,15 @@ export default function JobCard({
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <ConfirmDialog
-          title="Confirm Archive"
-          description="This will archive the job. You can later permanently delete it from the Admin area."
-          confirmLabel="Archive Job"
+        <ArchiveJobDialog
+          jobShortId={job.short_id || job.id?.slice(0, 6) || ''}
           onCancel={() => setShowDeleteConfirm(false)}
-          onConfirm={async () => {
+          onConfirm={async (staffName: string) => {
             try {
               setIsDeleting(true);
-              await apiClient.delete(`/api/v1/jobs/${job.id}`);
+              await apiClient.delete(`/api/v1/jobs/${job.id}`, {
+                staff_name: staffName
+              });
               show('Job archived');
               onReject?.(job.id);
             } catch (e) {
@@ -369,11 +412,6 @@ export default function JobCard({
               setIsDeleting(false);
               setShowDeleteConfirm(false);
             }
-          }}
-          requireTextMatch={{
-            label: 'Type the Job short ID to confirm',
-            expected: job.short_id || (job.id?.slice(0, 6) || ''),
-            placeholder: job.short_id || job.id?.slice(0, 6)
           }}
         />
       )}
