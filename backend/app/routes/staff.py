@@ -31,7 +31,7 @@ def add_staff():
     db.session.commit()
     return ResponseService.success(new_staff.to_dict(), status=201)
 
-@bp.route('/<string:name>', methods=['PATCH'])
+@bp.route('/<string:name>', methods=['PATCH', 'PUT'])
 @token_required
 def update_staff(name):
     data = request.get_json() or {}

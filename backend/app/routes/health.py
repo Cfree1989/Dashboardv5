@@ -15,17 +15,63 @@ bp = Blueprint('health', __name__, url_prefix='/api/v1')
 
 def check_database():
     """Check database connectivity and basic operations"""
+    import time
+    
     try:
+        start_time = time.time()
+        
         with db.engine.connect() as conn:
             # Basic connectivity test
             conn.execute(text('SELECT 1'))
             
-            # Check if we can access the jobs table
-            conn.execute(text('SELECT COUNT(*) FROM job LIMIT 1'))
+            # Get table counts for monitoring dashboard
+            job_count_result = conn.execute(text('SELECT COUNT(*) FROM job'))
+            job_count = job_count_result.scalar()
             
-        return {'status': 'ok', 'message': 'Database is accessible'}
+            event_count_result = conn.execute(text('SELECT COUNT(*) FROM event'))
+            event_count = event_count_result.scalar()
+            
+            # Get recent activity (jobs in last 24 hours)
+            recent_jobs_result = conn.execute(text("""
+                SELECT COUNT(*) FROM job 
+                WHERE created_at >= NOW() - INTERVAL '24 hours'
+            """))
+            jobs_last_24h = recent_jobs_result.scalar()
+            
+        # Calculate response time
+        response_time_ms = round((time.time() - start_time) * 1000, 2)
+        
+        return {
+            'status': 'ok', 
+            'message': 'Database is accessible',
+            'connectivity': {
+                'status': 'ok',
+                'response_time_ms': response_time_ms
+            },
+            'tables': {
+                'jobs': job_count,
+                'events': event_count
+            },
+            'recent_activity': {
+                'jobs_last_24h': jobs_last_24h
+            }
+        }
     except Exception as e:
-        return {'status': 'error', 'message': f'Database error: {str(e)}'}
+        return {
+            'status': 'error', 
+            'message': f'Database error: {str(e)}',
+            'connectivity': {
+                'status': 'error',
+                'response_time_ms': 0
+            },
+            'tables': {
+                'jobs': 0,
+                'events': 0
+            },
+            'recent_activity': {
+                'jobs_last_24h': 0
+            }
+        }
 
 
 def check_redis():

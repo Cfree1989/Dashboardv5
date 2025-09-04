@@ -131,8 +131,9 @@ class MonitoringService:
             
             start_time = time.time()
             
-            # Test database connectivity
-            db.session.execute('SELECT 1')
+            # Test database connectivity  
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1'))
             db.session.commit()
             connectivity_time = time.time() - start_time
             

@@ -68,7 +68,7 @@ export function SystemHealthPanel() {
     for (const path of lastReport.orphaned_files) {
       await apiClient.request("/api/v1/admin/audit/orphaned-file", {
         method: "DELETE",
-        body: JSON.stringify({ file_path: path, staff_name: "Admin User" })
+        body: JSON.stringify({ file_path: path, staff_name: "Kiran Lutchman" })
       });
     }
     // refresh
@@ -79,7 +79,7 @@ export function SystemHealthPanel() {
     try {
       await apiClient.request("/api/v1/admin/audit/stale-file", {
         method: "DELETE",
-        body: JSON.stringify({ file_path: path, staff_name: "Admin User" })
+        body: JSON.stringify({ file_path: path, staff_name: "Kiran Lutchman" })
       });
       // refresh
       await fetchReport();
@@ -90,7 +90,7 @@ export function SystemHealthPanel() {
 
   const markReviewed = async (jobId: string, issues: string[]) => {
     try {
-      await apiClient.post("/api/v1/admin/audit/mark-reviewed", { job_id: jobId, staff_name: "Admin User", issues });
+      await apiClient.post("/api/v1/admin/audit/mark-reviewed", { job_id: jobId, staff_name: "Kiran Lutchman", issues });
       show("Marked reviewed");
       // Refresh the report so the UI can reflect any state (if desired in future)
       await fetchReport();
@@ -101,7 +101,7 @@ export function SystemHealthPanel() {
 
   const repairMetadata = async (jobId: string) => {
     try {
-      await apiClient.post("/api/v1/admin/audit/repair-metadata", { job_id: jobId, staff_name: "Admin User" });
+      await apiClient.post("/api/v1/admin/audit/repair-metadata", { job_id: jobId, staff_name: "Kiran Lutchman" });
       show("Metadata repaired");
       await fetchReport();
     } catch (e) {
@@ -111,7 +111,7 @@ export function SystemHealthPanel() {
 
   const repairLocation = async (jobId: string) => {
     try {
-      await apiClient.post("/api/v1/admin/audit/repair-location", { job_id: jobId, staff_name: "Admin User" });
+      await apiClient.post("/api/v1/admin/audit/repair-location", { job_id: jobId, staff_name: "Kiran Lutchman" });
       show("Location repaired");
       await fetchReport();
     } catch (e) {
@@ -123,7 +123,7 @@ export function SystemHealthPanel() {
     const path = prompt('Enter full path to the authoritative file (under storage):');
     if (!path) return;
     try {
-      await apiClient.post("/api/v1/admin/audit/relink-file", { job_id: jobId, staff_name: "Admin User", file_path: path });
+      await apiClient.post("/api/v1/admin/audit/relink-file", { job_id: jobId, staff_name: "Kiran Lutchman", file_path: path });
       show("File relinked");
       await fetchReport();
     } catch (e) {

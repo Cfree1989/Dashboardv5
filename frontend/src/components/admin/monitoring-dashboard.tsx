@@ -318,28 +318,46 @@ const MonitoringDashboard: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm">Response Time</span>
-                  <span className="text-sm">{healthStatus.components.database.connectivity.response_time_ms}ms</span>
+                  <span className="text-sm">
+                    {healthStatus.components.database.connectivity?.response_time_ms ? 
+                      `${healthStatus.components.database.connectivity.response_time_ms}ms` : 
+                      'N/A'
+                    }
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-gray-900">
-                      {healthStatus.components.database.tables.jobs.toLocaleString()}
+                {healthStatus.components.database.tables ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-gray-900">
+                          {healthStatus.components.database.tables.jobs?.toLocaleString() || '0'}
+                        </div>
+                        <p className="text-sm text-gray-600">Jobs</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-gray-900">
+                          {healthStatus.components.database.tables.events?.toLocaleString() || '0'}
+                        </div>
+                        <p className="text-sm text-gray-600">Events</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600">Jobs</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-gray-900">
-                      {healthStatus.components.database.tables.events.toLocaleString()}
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-blue-600">
+                        {healthStatus.components.database.recent_activity?.jobs_last_24h || '0'}
+                      </div>
+                      <p className="text-sm text-gray-600">Jobs (24h)</p>
                     </div>
-                    <p className="text-sm text-gray-600">Events</p>
+                  </>
+                ) : (
+                  <div className="text-center p-4 text-red-600">
+                    <p className="text-sm">Database metrics unavailable</p>
+                    {healthStatus.components.database.connectivity?.error && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {healthStatus.components.database.connectivity.error}
+                      </p>
+                    )}
                   </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-blue-600">
-                    {healthStatus.components.database.recent_activity.jobs_last_24h}
-                  </div>
-                  <p className="text-sm text-gray-600">Jobs (24h)</p>
-                </div>
+                )}
               </div>
             </div>
 
