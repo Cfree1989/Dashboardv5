@@ -293,7 +293,24 @@ def repair_metadata():
             job.metadata_path = str(meta_path.resolve())
             db.session.add(job)
             db.session.commit()
-        _update_metadata_status(meta_path, job.status, job.file_path)
+        # Update metadata status
+        if meta_path and meta_path.exists():
+            try:
+                # Load current metadata
+                with open(meta_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                
+                # Update status and file path
+                meta['status'] = job.status
+                meta['file_path'] = job.file_path
+                meta['updated_at'] = datetime.now(timezone.utc).isoformat()
+                
+                # Save updated metadata
+                with open(meta_path, 'w', encoding='utf-8') as f:
+                    json.dump(meta, f, indent=2)
+                    
+            except Exception as meta_error:
+                logger.warning(f"Failed to update metadata status for job {job_id}: {meta_error}")
         log_event('AuditMetadataRepaired', {'metadata_path': str(meta_path) if meta_path else None}, triggered_by=staff_name, job_id=job.id)
         return ResponseService.success({'message': 'metadata repaired'})
     except Exception as e:
@@ -330,9 +347,23 @@ def repair_location():
         db.session.add(job)
         db.session.commit()
         # Update metadata.json to reflect new location/status
-        meta_path = Path(job.metadata_path) if getattr(job, 'metadata_path', None) else None
-        if meta_path:
-            _update_metadata_status(meta_path, job.status, job.file_path)
+        if hasattr(job, 'metadata_path') and job.metadata_path:
+            try:
+                # Load current metadata
+                with open(job.metadata_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                
+                # Update status and file path
+                meta['status'] = job.status
+                meta['file_path'] = job.file_path
+                meta['updated_at'] = datetime.now(timezone.utc).isoformat()
+                
+                # Save updated metadata
+                with open(job.metadata_path, 'w', encoding='utf-8') as f:
+                    json.dump(meta, f, indent=2)
+                    
+            except Exception as meta_error:
+                logger.warning(f"Failed to update metadata for job {job_id}: {meta_error}")
         log_event('AuditLocationRepaired', {'status': job.status}, triggered_by=staff_name, job_id=job.id)
         return ResponseService.success({'message': 'location repaired'})
     except Exception as e:

@@ -114,3 +114,19 @@ export function isAudioSupported(): boolean {
 export function canPlayAudio(): boolean {
   return isAudioSupported() && document.visibilityState === 'visible';
 }
+
+/**
+ * Initialize audio context for dashboard - call this on user interaction
+ */
+export function initDashboardAudio(): void {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+  } catch (error) {
+    console.warn('Could not initialize audio context:', error);
+  }
+}

@@ -27,10 +27,21 @@ export function SystemHealthPanel() {
     try {
       setLoadingReport(true);
       setError(clearErrorState());
-      const data: ServerAuditReport = await apiClient.get("/api/v1/admin/audit/report");
+      
+      // Add timestamp to prevent caching of audit reports
+      const timestamp = Date.now();
+      const data: ServerAuditReport = await apiClient.get(`/api/v1/admin/audit/report?t=${timestamp}`);
       setLastReport(data);
       setCurrentAudit(null);
+      
+      console.log(`🔄 Audit report refreshed at ${new Date().toLocaleTimeString()}:`, {
+        orphaned_files: data.orphaned_files?.length || 0,
+        broken_links: data.broken_links?.length || 0,
+        stale_files: data.stale_files?.length || 0,
+        files_scanned: (data as any).files_scanned || 0
+      });
     } catch (e) {
+      console.error('Failed to fetch audit report:', e);
       setError(updateErrorState(error, e));
     } finally {
       setLoadingReport(false);
@@ -64,15 +75,43 @@ export function SystemHealthPanel() {
   };
 
   const cleanUpOrphans = async () => {
-    if (!lastReport) return;
-    for (const path of lastReport.orphaned_files) {
-      await apiClient.request("/api/v1/admin/audit/orphaned-file", {
-        method: "DELETE",
-        body: JSON.stringify({ file_path: path, staff_name: "Kiran Lutchman" })
-      });
+    if (!lastReport || !lastReport.orphaned_files?.length) {
+      show("No orphaned files to clean up");
+      return;
     }
-    // refresh
+
+    let successCount = 0;
+    let failureCount = 0;
+    const failures: string[] = [];
+
+    show("Starting cleanup of orphaned files...");
+
+    for (const path of lastReport.orphaned_files) {
+      try {
+        await apiClient.request("/api/v1/admin/audit/orphaned-file", {
+          method: "DELETE",
+          body: JSON.stringify({ file_path: path, staff_name: "Kiran Lutchman" })
+        });
+        successCount++;
+        console.log(`✅ Successfully deleted orphaned file: ${path}`);
+      } catch (error) {
+        failureCount++;
+        failures.push(`${path}: ${error}`);
+        console.error(`❌ Failed to delete orphaned file ${path}:`, error);
+      }
+    }
+
+    // Always refresh audit report after cleanup attempt
     await fetchReport();
+
+    // Provide detailed user feedback
+    if (failureCount === 0) {
+      show(`✅ Successfully cleaned up ${successCount} orphaned file(s)`);
+    } else if (successCount === 0) {
+      show(`❌ Failed to clean up ${failureCount} orphaned file(s). Check console for details.`);
+    } else {
+      show(`⚠️ Partially successful: ${successCount} cleaned, ${failureCount} failed. Check console for details.`);
+    }
   };
 
   const deleteStale = async (path: string) => {
@@ -185,7 +224,7 @@ export function SystemHealthPanel() {
       {lastReport && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Last Audit Report</h2>
+              <h2 className="text-base font-semibold text-gray-900">Last Audit Report</h2>
               <span className="text-xs px-2 py-1 rounded-full bg-gray-900 text-white">completed</span>
           </div>
           <div className="p-5">

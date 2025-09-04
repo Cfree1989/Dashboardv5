@@ -5,7 +5,7 @@ import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
 import { getLegacyToken } from '../../lib/auth';
-import { playNewUploadSound } from '../../lib/sound-utils';
+import { playNewUploadSound, initDashboardAudio, canPlayAudio } from '../../lib/sound-utils';
 import { apiClient } from '../../lib/unified-api-client';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -61,6 +61,7 @@ export default function DashboardPage() {
   // Use ref to track previous counts for sound comparison
   const previousCountsRef = useRef<Record<string, number>>({});
   const isFirstLoadRef = useRef(true);
+  const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // Initialize status from URL params on mount
   useEffect(() => {
@@ -72,6 +73,28 @@ export default function DashboardPage() {
 
   // Use currentStatus instead of status
   const status = currentStatus;
+
+  // Initialize audio on page load - add click handler to ensure audio works
+  useEffect(() => {
+    const initAudio = () => {
+      initDashboardAudio();
+      console.log('🔊 Audio context initialized for dashboard');
+    };
+    
+    // Try to initialize immediately
+    initAudio();
+    
+    // Also initialize on first click anywhere on the page
+    const handleFirstClick = () => {
+      initAudio();
+      document.removeEventListener('click', handleFirstClick);
+    };
+    document.addEventListener('click', handleFirstClick);
+    
+    return () => {
+      document.removeEventListener('click', handleFirstClick);
+    };
+  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -117,13 +140,29 @@ export default function DashboardPage() {
           }
         }
       );
-      setCounts(data);
       
-      // Play sound if UPLOADED count increased (new job submitted) and not due to job operations
-          const currentUploaded = data[JobStatus.UPLOADED] || 0;
-    const previousUploaded = previousCountsRef.current[JobStatus.UPLOADED] || 0;
-    if (currentUploaded > previousUploaded && !pauseRefresh && !isJobOperation && !isFirstLoadRef.current) {
-        playNewUploadSound();
+      console.log('📊 fetchCounts() received data:', data);
+      console.log('📊 Previous counts in ref:', previousCountsRef.current);
+      setCounts(data);
+      console.log('📊 setCounts() called with new data');
+      
+      // Play sound if UPLOADED count increased (new job submitted)
+      const currentUploaded = data[JobStatus.UPLOADED] || 0;
+      const previousUploaded = previousCountsRef.current[JobStatus.UPLOADED] || 0;
+      
+      console.log(`📊 Job counts - Current: ${currentUploaded}, Previous: ${previousUploaded}, First load: ${isFirstLoadRef.current}, Paused: ${pauseRefresh}, Job operation: ${isJobOperation}`);
+      
+      // More lenient sound conditions - only skip on first load
+      if (currentUploaded > previousUploaded && !isFirstLoadRef.current) {
+        console.log('🔊 NEW JOB DETECTED! Playing sound notification...');
+        try {
+          playNewUploadSound();
+          console.log('✅ Sound played successfully');
+        } catch (error) {
+          console.error('❌ Failed to play sound:', error);
+        }
+      } else if (currentUploaded > previousUploaded && isFirstLoadRef.current) {
+        console.log('🔇 Skipping sound on first load');
       }
       
       // Update ref with current data for next comparison
@@ -159,6 +198,29 @@ export default function DashboardPage() {
     checkAuthAndLoad();
   }, [router, fetchCounts, checkAuthStatus]);
 
+  // Add reliable auto-refresh mechanism
+  useEffect(() => {
+    // Clear any existing interval
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+
+    // Start auto-refresh every 30 seconds (faster than the original 45s)
+    autoRefreshIntervalRef.current = setInterval(() => {
+      if (isAuthenticated && !pauseRefresh) {
+        console.log('🔄 Auto-refresh triggered - fetching latest job counts');
+        fetchCounts();
+      }
+    }, 30000); // 30 second intervals
+
+    // Cleanup on unmount
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [isAuthenticated, pauseRefresh, fetchCounts]);
+
   // Recompute counts when search changes
   useEffect(() => {
     if (counts && Object.keys(counts).length > 0) {
@@ -175,14 +237,18 @@ export default function DashboardPage() {
   // Manual interval removed in favor of adaptive polling
   
   const refreshPage = useCallback(async () => {
+    console.log('🔄 Manual refresh triggered');
     setRefreshing(true);
     const ts = new Date().toLocaleTimeString();
     setLastUpdated(ts);
     try { localStorage.setItem('lastUpdated', ts); } catch {}
+    console.log('🔄 incrementRefreshTick() - before:', refreshTick);
     incrementRefreshTick();
+    console.log('🔄 incrementRefreshTick() - after:', useDashboardStore.getState().refreshTick);
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));
     setRefreshing(false);
+    console.log('✅ Manual refresh completed');
   }, [fetchCounts, setRefreshing, setLastUpdated, incrementRefreshTick]);
   
   const updateStatus = useCallback((newStatus: string) => {
