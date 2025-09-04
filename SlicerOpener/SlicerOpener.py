@@ -190,7 +190,7 @@ def main() -> int:
                 return 0
             chosen = selection["value"]
         launch_slicer(chosen, file_path, logger)
-        show_info("Success", f"Opened file in {chosen.display_name}:\n{file_path}")
+        # show_info("Success", f"Opened file in {chosen.display_name}:\n{file_path}")  # Disabled - no popup needed
         logger.info("Launched '%s' for '%s'", chosen.display_name, file_path)
         return 0
     except SlicerOpenerError as e:

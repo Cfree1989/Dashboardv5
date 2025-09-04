@@ -25,7 +25,6 @@ from app.business_logic.job_lifecycle.job_approval_service import JobApprovalDat
 from app.business_logic.job_lifecycle.job_status_service import JobStatusTransitionData
 from app.business_logic.admin_operations.job_notes_service import JobNoteData, JobUpdateNotesData
 from app.business_logic.admin_operations.job_admin_service import JobAdminStatusChangeData, JobDeleteData, JobResendEmailData, JobForceUnlockData
-from app.business_logic.shared_services.job_locking_service import JobLockData
 from app.services.infrastructure.payment_service import PaymentService
 from app.services.infrastructure.payment_service_interface import PaymentData
 from app.services.infrastructure.file_discovery_service import FileDiscoveryService
@@ -633,13 +632,11 @@ def revert_pickup(job_id):
 @token_required
 def lock_job(job_id):
     try:
-        # Create lock data object
-        lock_data = JobLockData(
-            workstation_id=getattr(g, 'workstation_id', 'unknown')
-        )
+        # Get workstation ID for locking
+        workstation_id = getattr(g, 'workstation_id', 'unknown')
         
-        # Use JobLifecycleService to lock job
-        job = orchestration_service.lock_job(job_id, lock_data)
+        # Use JobOrchestrationService to lock job
+        job = orchestration_service.lock_job(job_id, workstation_id)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -649,13 +646,11 @@ def lock_job(job_id):
 @token_required
 def unlock_job(job_id):
     try:
-        # Create lock data object
-        lock_data = JobLockData(
-            workstation_id=getattr(g, 'workstation_id', 'unknown')
-        )
+        # Get workstation ID for unlocking
+        workstation_id = getattr(g, 'workstation_id', 'unknown')
         
-        # Use JobLifecycleService to unlock job
-        job = orchestration_service.unlock_job(job_id, lock_data)
+        # Use JobOrchestrationService to unlock job
+        job = orchestration_service.unlock_job(job_id, workstation_id)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -665,13 +660,11 @@ def unlock_job(job_id):
 @token_required
 def extend_job_lock(job_id):
     try:
-        # Create lock data object
-        lock_data = JobLockData(
-            workstation_id=getattr(g, 'workstation_id', 'unknown')
-        )
+        # Get workstation ID for extending lock
+        workstation_id = getattr(g, 'workstation_id', 'unknown')
         
-        # Use JobLifecycleService to extend job lock
-        job = orchestration_service.extend_job_lock(job_id, lock_data)
+        # Use JobOrchestrationService to extend job lock
+        job = orchestration_service.extend_job_lock(job_id, workstation_id)
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:

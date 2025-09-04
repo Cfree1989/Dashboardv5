@@ -84,6 +84,40 @@
 - ✅ Archive staff attribution implemented
 - ✅ All core functionality operational
 
+### **Recently Resolved: Docker Container Startup Issue** ✅
+
+**Problem**: Frontend container not starting due to backend dependency failure  
+**Root Cause**: Health check configuration mismatch - docker-compose.dev.yml used script-based health check with Windows line ending issues  
+**Solution**: Changed health check from `/app/health_check.sh` to direct `curl -f http://localhost:5000/api/v1/health`  
+**Result**: All services now running healthy (backend, frontend, db, redis, worker)
+
+### **Recently Resolved: Job Locking 500 Error** ✅
+
+**Problem**: Job locking endpoint returning 500 Internal Server Error with PostgreSQL serialization failure
+**Root Cause**: Parameter type mismatch - routes passed `JobLockData` object to service expecting `workstation_id` string
+**Error Details**: `psycopg2.ProgrammingError: can't adapt type 'JobLockData'` - database couldn't serialize custom Python object
+**Solution**: Fixed all lock endpoints (lock/unlock/extend) to extract and pass `workstation_id` string instead of object
+**Result**: Job locking system now functions correctly without serialization errors
+
+**Technical Details**:
+- Route layer was creating `JobLockData(workstation_id=...)` and passing entire object to orchestration service  
+- Service expected string parameter but received object, causing database to attempt serializing Python object
+- Fixed by extracting `workstation_id` from object before service call
+- Removed unused `JobLockData` import from routes module
+
+### **Recently Resolved: Success Popup Disabled** ✅
+
+**Problem**: Unwanted success popup appeared every time protocol handler opened files successfully
+**Root Cause**: `SlicerOpener.py` line 193 showed `show_info("Success", f"Opened file in {chosen.display_name}:\n{file_path}")` popup  
+**Solution**: Commented out the popup line while preserving logging functionality
+**Result**: Files open silently without interrupting user workflow - only errors show popups
+
+**Technical Details**:
+- Success actions still logged to `sliceropener.log` for troubleshooting
+- Error dialogs remain active for genuine issues
+- Protocol handler workflow now seamless and unobtrusive
+- Built with `--noconsole` flag to prevent terminal window from appearing
+
 ### **Next Steps: Production Deployment**
 - E2E Testing Framework setup
 - Production deployment configuration  
