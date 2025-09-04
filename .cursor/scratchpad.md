@@ -25,6 +25,31 @@
 
 ## Active Work
 
+### **RESOLVED: "Open File" Button Modal Flickering** ✅
+
+**Problem**: "Open File" button in job card caused screen flickering on first click (no response), worked on second click
+
+**BFROS Analysis Success**: 
+- **Root Cause Identified**: Component re-mounting via `onModalOpenChange?.(true)` callback
+- **Evidence**: Console logs showed `UNMOUNTED` → `MOUNTED` cycle immediately after button click
+- **Impact**: Fresh component mount reset `openFileModal` state from `true` back to `false`
+
+**Problem Flow**:
+1. Click "Open File" → `setOpenFileModal(true)` → `onModalOpenChange?.(true)`
+2. Parent callback triggered re-render → JobCard component unmount/remount  
+3. Fresh mount reset all state → `openFileModal` back to `false`
+4. Modal disappeared because state was reset
+
+**Solution Implemented**:
+- **Removed** `onModalOpenChange?.(true)` call from `handleOpenFile` to prevent component remounting
+- **Preserved** `onModalOpenChange?.(false)` calls when modal closes for parent cleanup
+- **Result**: Modal now opens immediately on first click without component re-mounting
+
+**Fix Verified**: ✅ User confirmed single-click operation without flickering  
+**Cleanup Complete**: ✅ Debug logging removed, code returned to clean state
+
+**BFROS Methodology Success**: Systematic backwards analysis with targeted logging revealed exact cause, enabling surgical fix
+
 ### **Recently Completed: Individual Job Archive Staff Attribution Fix** ✅
 
 **Issue**: Individual job archiving from job cards lacked staff attribution for audit trail compliance
@@ -272,6 +297,15 @@ export default function SubmissionForm() {
 **Solution**: Skip controller cleanup in development mode to prevent cross-mount interference
 **BFROS Lesson**: Validation logs with stack traces can reveal hidden secondary sources of same issue
 **Key Learning**: Complex debugging requires systematic backwards analysis + assumption validation
+
+### **Component Re-mounting from Parent Callbacks** (BFROS Success Story)
+**Problem**: "Open File" modal flickered on first click - appeared then immediately disappeared, worked on second click
+**Symptoms**: Screen flicker strongly suggested component re-mounting (classic React re-mount symptom)
+**BFROS Analysis**: Walked backwards from symptoms → identified 7 possible sources → narrowed to 2 most likely
+**Root Cause**: `onModalOpenChange?.(true)` callback caused parent component to re-render and unmount/remount JobCard
+**Evidence**: Console logs showed `UNMOUNTED` → `MOUNTED` cycle immediately after state change, resetting modal state
+**Solution**: Remove parent callback for local modals that don't need parent coordination
+**Lesson**: Parent callbacks that trigger re-renders can cause child component re-mounting and state loss
 
 ## Production Readiness Status
 

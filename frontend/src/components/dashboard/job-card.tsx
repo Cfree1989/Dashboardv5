@@ -58,6 +58,7 @@ export default function JobCard({
   expandSignal, 
   collapseSignal 
 }: JobCardProps) {
+  
   const isLocked = typeof job.locked_by === 'string' && job.locked_until !== undefined && new Date(job.locked_until) > new Date();
   
   // Global state stores (leveraging Task 3's completed global state management)
@@ -88,6 +89,7 @@ export default function JobCard({
   const { show } = useToast();
   const isUnreviewed = currentStatus === JobStatus.UPLOADED && !job.staff_viewed_at;
   const detailsSectionId = `details-section-${job.id}`;
+  
 
   // Respond to global expand/collapse signals
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function JobCard({
   const handleDelete = () => setShowDeleteConfirm(true);
   const handleOpenFile = () => {
     setOpenFileModal(true);
-    onModalOpenChange?.(true);
+    // Fix: Remove onModalOpenChange?.(true) call that was causing component remounting
   };
 
   const copyFilePath = async () => {
