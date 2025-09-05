@@ -4,7 +4,7 @@
 
 **System Status**: **100% Functional** - All systems working, clean data slate ready for fresh submissions  
 **Architecture**: Flask API (PostgreSQL) + Next.js frontend + Docker deployment  
-**Active Priority**: Production deployment preparation (E2E testing, infrastructure hardening)
+**Active Priority**: Production deployment preparation (E2E testing, infrastructure hardening, Docker Hub management)
 
 **Key Completions**:
 - ✅ Core system (authentication, job lifecycle, file management, payments)
@@ -13,6 +13,7 @@
 - ✅ Infrastructure security and Docker optimization
 
 **Remaining Work**:
+- [ ] Docker Hub image management and audit
 - [ ] E2E testing framework setup
 - [ ] Production deployment configuration
 - [ ] Documentation and user guides
@@ -25,7 +26,57 @@
 
 ## Active Work
 
-### **EXECUTOR: Fixing 5-Hour Time Offset on Monitoring Page** 🔧
+### **NEW TASK: Docker Hub Image Listing and Management** 🔍
+
+**Problem Statement**: Need to list all Docker images in Docker Hub account for project audit and management purposes
+
+**Context Analysis**: 
+- Current system uses extensive Docker architecture (backend, frontend, nginx, db, redis, worker containers)
+- Production deployment preparation phase requires Docker image management
+- Likely need to audit existing images, clean up old versions, or verify current image status
+- System has both development and production Docker configurations
+
+**Technical Approach Options**:
+
+#### **Option 1: Docker CLI with Docker Hub Authentication** (Recommended)
+**Pros**: 
+- Native Docker tooling integration
+- Works with existing Docker environment
+- Supports filtering and detailed metadata
+- Can be scripted for automation
+
+**Cons**:
+- Requires Docker Hub login credentials
+- Limited to authenticated user's repositories
+
+#### **Option 2: Docker Hub REST API Direct** 
+**Pros**:
+- More flexible querying options
+- Can be integrated into monitoring systems
+- Supports programmatic access
+
+**Cons**:
+- Requires API token management
+- More complex implementation
+- Rate limiting considerations
+
+#### **Option 3: Third-party Tools (docker-hub-utils, etc.)**
+**Pros**:
+- Enhanced filtering and formatting options
+- May offer better user experience
+
+**Cons**:
+- Additional dependencies
+- Less standardized approach
+
+**Recommended Implementation Strategy**:
+1. **Docker CLI Approach**: Use `docker` command with proper authentication
+2. **Authentication**: Verify Docker Hub login status or prompt for login
+3. **Repository Listing**: Extract and display user's repositories with tags
+4. **Metadata Display**: Show creation dates, sizes, and pull counts where available
+5. **Filtering Options**: Provide options to filter by repository name patterns (e.g., related to this 3D print project)
+
+### **COMPLETED: 5-Hour Time Offset Fix on Monitoring Page** ✅
 
 **Problem Statement**: Time displayed on monitoring page is off by 5 hours
 
@@ -405,6 +456,63 @@ export default function SubmissionForm() {
 
 ## High-level Task Breakdown
 
+### **Docker Hub Image Listing Implementation Plan**
+
+**Phase 1: Environment Preparation and Authentication** (15 minutes)
+
+**Step 1: Docker Environment Validation** (5 minutes)
+1. **Verify Docker Installation**: Check if Docker CLI is available and functional
+2. **Check Docker Hub Authentication**: Verify current login status with `docker info` or similar
+3. **Authentication Setup**: If not logged in, prompt for Docker Hub credentials and execute login
+
+**Step 2: Authentication and Access Validation** (10 minutes)
+1. **Login Process**: Execute `docker login` with user credentials if needed
+2. **Permission Verification**: Test basic Docker Hub access with a simple query
+3. **Error Handling**: Implement proper error handling for authentication failures
+4. **Session Persistence**: Verify login persists for subsequent operations
+
+**Phase 2: Repository Discovery and Listing** (20 minutes)
+
+**Step 3: Docker Hub API Integration** (10 minutes)
+1. **Repository Enumeration**: Use Docker Hub API or CLI to list user's repositories
+2. **Metadata Extraction**: Gather repository names, descriptions, and basic info
+3. **Tag Discovery**: For each repository, enumerate available tags/versions
+4. **Data Structure**: Organize information into a clear, readable format
+
+**Step 4: Information Display and Filtering** (10 minutes)
+1. **Formatted Output**: Display repositories with tags in organized table/list format
+2. **Metadata Display**: Show creation dates, image sizes, pull counts where available
+3. **Project Filtering**: Highlight or filter images related to current 3D print project
+4. **Sorting Options**: Provide options to sort by name, date, size, or relevance
+
+**Phase 3: Enhanced Functionality and Documentation** (10 minutes)
+
+**Step 5: Advanced Features Implementation** (5 minutes)
+1. **Search Functionality**: Allow filtering by repository name patterns
+2. **Size Analysis**: Display total storage usage and per-image breakdown
+3. **Age Analysis**: Identify old/unused images that might need cleanup
+4. **Export Options**: Provide options to save results to file for record-keeping
+
+**Step 6: Documentation and Error Handling** (5 minutes)
+1. **Usage Documentation**: Create clear instructions for running the image listing process
+2. **Error Recovery**: Handle common failure scenarios (network issues, auth problems)
+3. **Logging**: Implement logging for troubleshooting and audit purposes
+4. **Integration Notes**: Document how this fits into production deployment workflow
+
+**Success Criteria**:
+1. **Complete Listing**: Successfully enumerate all Docker Hub repositories and tags for the user account
+2. **Metadata Display**: Show relevant information including creation dates, sizes, and descriptions
+3. **Project Context**: Identify which images are related to the current 3D print management system
+4. **Usability**: Provide clear, organized output that enables effective Docker image management
+5. **Documentation**: Clear instructions for future use and integration into deployment processes
+
+**Expected Deliverables**:
+- Complete listing of all Docker Hub repositories and tags
+- Organized display with metadata (dates, sizes, descriptions)
+- Filtering/search capabilities for project-related images
+- Documentation for future Docker Hub management tasks
+- Integration notes for production deployment preparation
+
 ### **Dashboard Auto-Refresh & Sound Issues - Two-Phase Fix Plan**
 
 **Phase A: Fix Auto-Refresh UI Updates (Priority 1) - 45 minutes**
@@ -466,7 +574,22 @@ export default function SubmissionForm() {
 
 ### **Active Tasks (CRITICAL PRIORITY)**
 
-### **PLANNER: Dashboard Auto-Refresh & Sound Issues Analysis** 🔍
+### **NEW: Docker Hub Image Listing and Management** 📋
+**Status**: Planning Complete - Ready for Executor Implementation  
+**Priority**: Medium (Production Infrastructure Support)  
+**Estimated Time**: 45 minutes total (3 phases)
+
+**Task Summary**: List all Docker images in Docker Hub account for project audit and deployment management
+**Approach**: Docker CLI authentication + API integration for comprehensive repository listing
+**Key Deliverables**: 
+- Complete repository and tag enumeration
+- Metadata display (dates, sizes, descriptions)
+- Project-specific filtering and documentation
+- Integration with production deployment workflow
+
+**Next Action**: Hand off to Executor for Phase 1 implementation (Environment Preparation & Authentication)
+
+### **COMPLETED: Dashboard Auto-Refresh & Sound Issues Analysis** ✅
 
 **Problem Statement**: Auto-refresh mechanism partially working but has critical UI and sound notification failures
 - **Issue 1**: Auto-refresh logs show activity but jobs don't appear visually until manual refresh
