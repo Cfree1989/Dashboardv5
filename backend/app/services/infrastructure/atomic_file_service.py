@@ -357,6 +357,13 @@ class AtomicFileService:
                 if not op.commit():
                     return False
                     
+                # Update database paths after successful file move
+                from app import db
+                job.file_path = str(target_path)
+                job.metadata_path = str(target_metadata_path) if target_metadata_path else None
+                db.session.add(job)
+                db.session.commit()
+                    
             logger.info(f"Atomic move completed for job {job.id} to {target_status}")
             return True
             
@@ -378,6 +385,20 @@ class AtomicFileService:
             if source_path and target_path:
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(source_path), str(target_path))
+                
+                # Update database paths after successful file move
+                from app import db
+                job.file_path = str(target_path)
+                # Update metadata path if it exists
+                metadata_path = self._get_job_metadata_path(job)
+                if metadata_path:
+                    target_metadata_path = self._get_target_metadata_path(job, target_status)
+                    if target_metadata_path:
+                        shutil.move(str(metadata_path), str(target_metadata_path))
+                        job.metadata_path = str(target_metadata_path)
+                db.session.add(job)
+                db.session.commit()
+                
                 logger.info(f"Legacy move completed for job {job.id} to {target_status}")
                 return True
         except Exception as e:
