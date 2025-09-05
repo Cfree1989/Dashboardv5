@@ -96,6 +96,17 @@ class JobApprovalService:
         if approval_data.authoritative_filename:
             self._apply_authoritative_filename(job, approval_data.authoritative_filename)
         
+        # Perform atomic file move from Uploaded to Pending before updating status
+        from app.services.infrastructure.atomic_file_service import get_atomic_file_service
+        atomic_service = get_atomic_file_service()
+        file_move_success = atomic_service.atomic_move_authoritative(job, 'PENDING')
+        
+        if not file_move_success:
+            # Log the error but continue with the approval - file can be fixed later via admin tools
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"File move failed during approval for job {job.id}, continuing with status update")
+        
         job.status = 'PENDING'
         
         # Save job changes
@@ -267,6 +278,9 @@ class JobApprovalService:
     def _log_approval_events(self, job: Job, approval_data: JobApprovalData, 
                            confirmation_url: str, workstation_id: str) -> None:
         """Log approval-related events"""
+        # Provide fallback for workstation_id to prevent constraint violations
+        safe_workstation_id = workstation_id or 'unknown'
+        
         evt_details = {
             'confirmation_url': confirmation_url,
             'weight_g': approval_data.weight_g,
@@ -284,7 +298,7 @@ class JobApprovalService:
             event_type='StaffApproved',
             details=evt_details,
             triggered_by=approval_data.staff_name,
-            workstation_id=workstation_id,
+            workstation_id=safe_workstation_id,
         )
         db.session.add(evt1)
         db.session.commit()
@@ -294,7 +308,7 @@ class JobApprovalService:
             event_type='ApprovalEmailSent',
             details={},
             triggered_by=approval_data.staff_name,
-            workstation_id=workstation_id,
+            workstation_id=safe_workstation_id,
         )
         db.session.add(evt2)
         db.session.commit()

@@ -123,7 +123,7 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
       });
       show('Approval sent');
       onApproved();
-      onClose();
+      // Note: onClose() is now handled by the parent after refresh completes
     } catch (err) {
       setError("Approval failed. Please check inputs and try again.");
     } finally {

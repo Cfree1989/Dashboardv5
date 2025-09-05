@@ -26,7 +26,60 @@
 
 ## Active Work
 
-### **NEW TASK: Docker Hub Image Listing and Management** 🔍
+### **COMPLETED: Critical Job Approval System Fixes** ✅
+
+**Problem Statement**: Multiple critical issues with job approval system - 500 errors, missing file movement, broken System Health links
+
+#### **Issue 1: Database Constraint Violation (500 Error)**
+**Root Cause**: `workstation_id` was null when logging "StaffApproved" event, violating NOT NULL constraint
+- Event logging failed despite successful approval (job updated, email sent)
+- Frontend showed "failed" while approval actually worked
+**Fix**: Added fallback `safe_workstation_id = workstation_id or 'unknown'` in event logging
+
+#### **Issue 2: Missing File Movement Operation** 
+**Root Cause**: Approval service never moved files from Uploaded/ to Pending/ directory
+- Database status changed to PENDING but files remained in Uploaded/ folder
+- Caused "dir_status_mismatch" and "metadata_mismatch" errors in System Health
+**Fix**: Added `atomic_move_authoritative(job, 'PENDING')` before status update with graceful error handling
+
+### **COMPLETED: Job Approval UI Update Issue** ✅
+
+**Problem Statement**: Job approval modal closes immediately without showing status change from uploaded to pending until page refresh
+
+**Root Cause Identified**: Race condition in callback timing - modal closed before job list refresh completed
+- ApprovalModal called both `onApproved()` and `onClose()` immediately after API success
+- Job list refresh (`fetchJobs()`) is async but modal closing was synchronous  
+- User saw modal disappear instantly while refresh happened in background
+
+**Solution Applied**:
+1. **JobCard**: Made approval callback async, wait for refresh before closing modal
+2. **JobList**: Made `handleJobMutation()` async to return proper promise
+3. **ApprovalModal**: Removed redundant `onClose()` call, let parent handle timing
+
+**Technical Changes**:
+```typescript
+// JobCard - Wait for refresh before closing modal
+onApproved={async () => {
+  if (onApprove) {
+    await onApprove(job.id);  // Wait for fetchJobs() to complete
+  }
+  setShowApprovalModal(false); // Then close modal
+}}
+
+// JobList - Return promise for proper awaiting
+const handleJobMutation = useCallback(async () => {
+  if (onJobsMutated) { onJobsMutated(); }
+  await fetchJobs(); // Now properly awaitable
+}, [onJobsMutated, fetchJobs]);
+```
+
+**Result**: Job approval now shows immediate visual feedback - job moves from uploaded to pending status when modal closes
+
+### **RESOLVED: Web App Startup Error Analysis** ✅ 
+
+**Problem Statement**: Multiple errors encountered on first startup today - AudioContext warnings, 401 authentication failures, missing favicon
+
+### **COMPLETED: Docker Hub Image Listing and Management** ✅
 
 **Problem Statement**: Need to list all Docker images in Docker Hub account for project audit and management purposes
 

@@ -206,17 +206,17 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   }, []);
 
   // Memoized job mutation handlers
-  const handleJobMutation = useCallback(() => {
+  const handleJobMutation = useCallback(async () => {
     if (onJobsMutated) {
       onJobsMutated();
     }
-    fetchJobs();
+    await fetchJobs();
   }, [onJobsMutated, fetchJobs]);
 
   const handleJobUpdate = useCallback(async (jobId: string, updates: any) => {
     try {
       await apiClient.put(`/api/v1/jobs/${jobId}`, updates);
-      handleJobMutation();
+      await handleJobMutation();
     } catch (error) {
       throw error;
     }
@@ -225,7 +225,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   const handleJobDelete = useCallback(async (jobId: string) => {
     try {
       await apiClient.delete(`/api/v1/jobs/${jobId}`);
-      handleJobMutation();
+      await handleJobMutation();
     } catch (error) {
       throw error;
     }

@@ -298,8 +298,11 @@ export default function JobCard({
           material={job.material}
           currentPrinter={job.printer}
           onClose={() => setShowApprovalModal(false)}
-          onApproved={() => {
-            onApprove?.(job.id);
+          onApproved={async () => {
+            // Wait for the job list refresh to complete before closing modal
+            if (onApprove) {
+              await onApprove(job.id);
+            }
             setShowApprovalModal(false);
           }}
         />
