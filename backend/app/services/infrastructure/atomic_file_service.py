@@ -326,12 +326,14 @@ class AtomicFileService:
         
     def atomic_move_authoritative(self, job, target_status: str) -> bool:
         """Atomic version of move_authoritative with fallback to legacy system."""
+        logger.info("[AtomicFile] BEGIN atomic_move job=%s current_status=%s target_status=%s", job.id, job.status, target_status)
         if not ATOMIC_FILE_OPERATIONS_ENABLED:
             logger.info("Atomic file operations disabled, using legacy system")
             return self._legacy_move_authoritative(job, target_status)
             
         try:
             # Get file paths
+            logger.debug("[AtomicFile] Resolving file paths for job=%s", job.id)
             source_path = self._get_job_file_path(job)
             target_path = self._get_target_path(job, target_status)
             metadata_path = self._get_metadata_path(job)
@@ -347,6 +349,7 @@ class AtomicFileService:
             
             with operation as op:
                 # Prepare the move
+                logger.debug("[AtomicFile] Preparing move job=%s source=%s target=%s", job.id, source_path, target_path)
                 if not op.prepare_move_operation(
                     source_path, target_path, metadata_path, target_metadata_path,
                     metadata_updates={"status": target_status}
@@ -354,6 +357,7 @@ class AtomicFileService:
                     return False
                     
                 # Commit the operation
+                logger.debug("[AtomicFile] Committing move job=%s", job.id)
                 if not op.commit():
                     return False
                     
@@ -363,12 +367,37 @@ class AtomicFileService:
                 job.metadata_path = str(target_metadata_path) if target_metadata_path else None
                 db.session.add(job)
                 db.session.commit()
+                
+                # Update metadata JSON file content to match new paths and status
+                if target_metadata_path and target_metadata_path.exists():
+                    try:
+                        import json
+                        from datetime import datetime as dt, timezone as tz
+                        
+                        # Load current metadata
+                        with open(target_metadata_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                        
+                        # Update metadata to match database
+                        metadata['status'] = target_status
+                        metadata['file_path'] = str(target_path)
+                        metadata['updated_at'] = dt.now(tz.utc).isoformat()
+                        
+                        # Save updated metadata
+                        with open(target_metadata_path, 'w', encoding='utf-8') as f:
+                            json.dump(metadata, f, indent=2)
+                        
+                        logger.info(f"Updated metadata content for job {job.id}: status={target_status}, file_path={target_path}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to update metadata content for job {job.id}: {e}")
+                        # Don't fail the whole operation for metadata sync issues
                     
-            logger.info(f"Atomic move completed for job {job.id} to {target_status}")
+            logger.info("[AtomicFile] SUCCESS job=%s moved to %s", job.id, target_status)
             return True
             
         except Exception as e:
-            logger.error(f"Atomic move failed for job {job.id}: {e}")
+            logger.exception("[AtomicFile] ERROR job=%s exception=%s", job.id, e)
             if ATOMIC_FILE_OPERATIONS_ENABLED:
                 logger.warning("Falling back to legacy move system")
                 return self._legacy_move_authoritative(job, target_status)
@@ -390,7 +419,8 @@ class AtomicFileService:
                 from app import db
                 job.file_path = str(target_path)
                 # Update metadata path if it exists
-                metadata_path = self._get_job_metadata_path(job)
+                metadata_path = self._get_metadata_path(job)
+                target_metadata_path = None
                 if metadata_path:
                     target_metadata_path = self._get_target_metadata_path(job, target_status)
                     if target_metadata_path:
@@ -398,6 +428,31 @@ class AtomicFileService:
                         job.metadata_path = str(target_metadata_path)
                 db.session.add(job)
                 db.session.commit()
+                
+                # Update metadata JSON file content to match new paths and status
+                if target_metadata_path and target_metadata_path.exists():
+                    try:
+                        import json
+                        from datetime import datetime as dt, timezone as tz
+                        
+                        # Load current metadata
+                        with open(target_metadata_path, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+                        
+                        # Update metadata to match database
+                        metadata['status'] = target_status
+                        metadata['file_path'] = str(target_path)
+                        metadata['updated_at'] = dt.now(tz.utc).isoformat()
+                        
+                        # Save updated metadata
+                        with open(target_metadata_path, 'w', encoding='utf-8') as f:
+                            json.dump(metadata, f, indent=2)
+                        
+                        logger.info(f"Legacy move: Updated metadata content for job {job.id}: status={target_status}, file_path={target_path}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Legacy move: Failed to update metadata content for job {job.id}: {e}")
+                        # Don't fail the whole operation for metadata sync issues
                 
                 logger.info(f"Legacy move completed for job {job.id} to {target_status}")
                 return True

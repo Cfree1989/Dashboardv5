@@ -18,10 +18,6 @@ from pathlib import Path
 import os
 import json
 from datetime import datetime, timezone
-from datetime import timedelta
-import shutil
-from app.business_logic.shared_services.error_handling_service import get_error_handling_service
-from app.business_logic.shared_services.validation_service import ValidationService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -77,6 +73,7 @@ def perform_audit() -> dict:
     root = _storage_root()
     all_files = _list_all_storage_files(root)
     all_files_set = {str(p.resolve()) for p in all_files}
+    logger.debug("[Audit] Starting perform_audit: files_scanned=%s", len(all_files_set))
 
     # Collect known paths from DB using orchestration service
     jobs: list[Job] = orchestration_service.get_all_jobs()
@@ -119,10 +116,17 @@ def perform_audit() -> dict:
         # Metadata parity
         if meta_path and meta_path.exists():
             meta = _safe_read_json(meta_path)
-            if meta.get('status') != j.status or meta.get('file_path') != str(Path(j.file_path).resolve()):
+            status_match = meta.get('status') == j.status
+            path_match = meta.get('file_path') == str(Path(j.file_path).resolve())
+            
+            if not status_match or not path_match:
                 issues.append('metadata_mismatch')
+                logger.debug("[Audit] Job %s metadata_mismatch: status_match=%s path_match=%s", j.id, status_match, path_match)
+                logger.debug("[Audit] Job %s meta_status='%s' job_status='%s'", j.id, meta.get('status'), j.status)
+                logger.debug("[Audit] Job %s meta_path='%s' job_path='%s'", j.id, meta.get('file_path'), str(Path(j.file_path).resolve()))
 
         if issues:
+            logger.debug("[Audit] Job %s has issues: %s", j.id, issues)
             broken_links.append({
                 'job_id': j.id,
                 'issues': issues,
@@ -144,6 +148,8 @@ def perform_audit() -> dict:
                 if str(p.resolve()) != str(meta_path.resolve()):
                     stale_files.add(str(p.resolve()))
 
+    logger.debug("[Audit] orphaned=%s broken=%s stale=%s", len(orphaned_files), len(broken_links), len(stale_files))
+
     report = {
         'report_generated_at': datetime.now(timezone.utc).isoformat(),
         'orphaned_files': orphaned_files,
@@ -151,6 +157,7 @@ def perform_audit() -> dict:
         'stale_files': sorted(stale_files),
         'files_scanned': len(all_files_set),
     }
+    logger.info("[Audit] Report generated files=%s broken=%s orphaned=%s stale=%s", report['files_scanned'], len(report['broken_links']), len(report['orphaned_files']), len(report['stale_files']))
     return report
 
 

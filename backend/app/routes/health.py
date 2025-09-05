@@ -140,8 +140,8 @@ def check_system_resources():
         memory = psutil.virtual_memory()
         memory_percent = memory.percent
         
-        # CPU usage (average over 1 second)
-        cpu_percent = psutil.cpu_percent(interval=1)
+        # CPU usage (instantaneous - for health check speed)
+        cpu_percent = psutil.cpu_percent(interval=None)
         
         # Disk usage for storage
         storage_path = os.environ.get('STORAGE_PATH', 'storage')
@@ -180,33 +180,31 @@ def check_file_integrity():
         corrupted_files = 0
         directories_with_issues = []
         
-        # Sample files from each status directory (limit to first 10 files per directory for performance)
+        # Sample files from each status directory (limit to first 3 files per directory for health check speed)
         for status, dir_name in list(file_config.status_to_dir_mapping.items())[:3]:  # Check first 3 directories
             status_dir = storage_root / dir_name
             if status_dir.exists() and status_dir.is_dir():
                 
-                files_in_dir = list(status_dir.rglob('*'))[:10]  # Limit to 10 files for health check
+                # Use iterdir() instead of rglob() for faster directory listing (non-recursive)
+                files_in_dir = [f for f in status_dir.iterdir() if f.is_file()][:3]  # Only check first 3 files for speed
                 for file_path in files_in_dir:
-                    if file_path.is_file() and not file_path.name.startswith('.') and not file_path.name.endswith('_metadata.json'):
+                    if not file_path.name.startswith('.') and not file_path.name.endswith('_metadata.json'):
                         total_files_checked += 1
                         
-                        # Look for metadata with expected checksum
+                        # Just check file existence and basic metadata (skip checksum for speed)
                         metadata_path = file_path.parent / f"{file_path.stem}_metadata.json"
                         if metadata_path.exists():
                             try:
-                                with open(metadata_path, 'r') as f:
-                                    metadata = json.load(f)
-                                    expected_checksum = metadata.get('file_integrity', {}).get('checksum')
-                                    
-                                    if expected_checksum:
-                                        actual_checksum = file_config.calculate_file_checksum(file_path)
-                                        if actual_checksum != expected_checksum:
-                                            corrupted_files += 1
-                                            if status not in directories_with_issues:
-                                                directories_with_issues.append(status)
+                                # Quick check: file exists and has non-zero size
+                                if file_path.stat().st_size == 0:
+                                    corrupted_files += 1
+                                    if status not in directories_with_issues:
+                                        directories_with_issues.append(status)
                                             
                             except Exception:
-                                pass  # Skip files with metadata reading issues
+                                corrupted_files += 1
+                                if status not in directories_with_issues:
+                                    directories_with_issues.append(status)
         
         # Determine status based on findings
         if corrupted_files > 0:

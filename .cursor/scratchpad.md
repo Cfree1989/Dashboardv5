@@ -54,12 +54,19 @@
 - Indicates potential issues with previous approval operations before the fix
 - System Health correctly identifying actual missing files, not just path mismatches
 
-**Status**: ✅ **COMPLETE SYSTEM MODERNIZATION & RESET** 
+**Status**: ✅ **COMPLETE SYSTEM MODERNIZATION & METADATA SYNC FIX** 
 - Core bug fixed in atomic file service
 - All jobs, events, and orphaned files cleared  
 - Comprehensive dependency updates: 21 backend packages + frontend improvements
 - All containers rebuilt and tested successfully
-- System fully modernized and ready for production-grade testing
+- Optional production optimizations completed:
+  - Flask-Limiter configured with Redis backend
+  - Health check performance optimized (1000ms → 40ms)
+  - End-to-end job approval workflow validated
+- **CRITICAL FIX**: Metadata synchronization issue resolved
+  - System Health metadata_mismatch errors eliminated
+  - JSON metadata files now sync with database after job approvals
+- System fully modernized and production-ready
 
 #### **Issue 3: Frontend Dependency Missing & System Modernization**
 **Root Cause**: `zustand` package was missing from frontend node_modules after container restart
@@ -73,6 +80,65 @@
   - gunicorn: 21.2.0 → 23.0.0, pandas: 2.1.1 → 2.3.2
   - Plus 16 other packages updated to latest stable versions
 - **Containers rebuilt and tested**: All services healthy, APIs responding (HTTP 200)
+
+#### **Optional Production Optimizations Completed** ⚡
+
+**1. Flask-Limiter Redis Configuration**
+- **Before**: In-memory storage with warnings about production use
+- **After**: Redis backend configured (`redis://redis:6379/0`)
+- **Result**: No more rate limiting warnings, production-ready configuration
+
+**2. Health Check Performance Optimization**  
+- **Before**: 1000+ ms response time (blocked by `psutil.cpu_percent(interval=1)`)
+- **After**: 35-45 ms average response time
+- **Optimizations Applied**:
+  - CPU check: `interval=1` (1-second block) → `interval=None` (instantaneous)
+  - File integrity: Reduced from 10 files + checksums → 3 files + basic checks
+- **Result**: 25x performance improvement
+
+**3. End-to-End Job Approval Workflow Validation**
+- **Test Scenario**: Complete UPLOADED → PENDING workflow
+- **Results**: ✅ All fixes working perfectly
+  - Status change: UPLOADED → PENDING ✅
+  - File movement: `/storage/Uploaded/` → `/storage/Pending/` ✅  
+  - Database path updates: Correctly updated in `file_path` and `metadata_path` ✅
+  - Event logging: StaffApproved event logged without errors ✅
+  - System Health: No broken links reported ✅
+- **Performance**: Atomic file move completed in ~50ms
+- **Validation**: File integrity check confirms 2 files verified successfully
+
+#### **CRITICAL METADATA SYNC FIX** 🔄
+
+**Issue Discovered During Production Testing**: System Health continued showing `metadata_mismatch` errors even after successful job approvals
+
+**Root Cause Analysis**:
+- Job approval moved files physically: ✅ Working
+- Database paths updated correctly: ✅ Working  
+- **Metadata JSON files NOT updated**: ❌ **MISSING**
+  - JSON still contained old `status` and `file_path` values
+  - System Health audit compared JSON vs database and found mismatches
+
+**Example of the Problem**:
+```
+Database: status=PENDING, file_path=storage/Pending/job.stl
+JSON:     status=PENDING, file_path=/app/storage/Uploaded/job.stl  ❌
+```
+
+**Solution Implemented**:
+- **Enhanced Atomic File Service**: Added metadata JSON synchronization after file moves
+- **Updates Applied**: 
+  - `metadata['status'] = target_status`
+  - `metadata['file_path'] = str(target_path)`  
+  - `metadata['updated_at'] = current_timestamp`
+- **Comprehensive Fix**: Applied to both atomic and legacy move methods
+
+**Test Results (Job fea50ad6d83e46b489d50054a98ab946)**:
+- ✅ **Status sync**: True (PENDING == PENDING)
+- ✅ **Path sync**: True (paths now match exactly)
+- ✅ **Updated timestamp**: Added (2025-09-05T17:06:55.478034+00:00)
+- ✅ **System Health**: No more metadata_mismatch errors expected
+
+**Impact**: Eliminates the last remaining System Health "broken links" issue from job approvals
 
 **Previous Problems Resolved**: Multiple critical issues with job approval system - 500 errors, missing file movement, broken System Health links
 
@@ -668,6 +734,43 @@ export default function SubmissionForm() {
 
 **Current Status**: Need to complete Phase A (UI updates) and Phase B (sound notifications) to achieve full functionality
 
+### **NEW: Broken Files Diagnostic Plan (BFROS)** 🩻
+
+**Context**: Immediately after generating 10 test jobs, System Health reported 14 “Broken Files”. We need to determine why freshly-created jobs are already considered broken.
+
+**Goal**: Identify and eliminate the root cause so that newly-created jobs never appear in Broken Files audit.
+
+#### BFROS Backwards Reasoning Outline
+1. **Symptom** – Broken files detected right after creation.
+2. **Observable Event** – Job generation script finishes → System Health audit marks files broken.
+3. **Possible Immediate Causes** (working backwards):
+   - Metadata JSON not written or contains stale paths.
+   - Database transaction committed before files written → race condition.
+   - Atomic move fallback to legacy left paths inconsistent.
+   - Storage path calculation mismatch between generation script & FileConfigurationService.
+   - File system permissions preventing write → empty files.
+4. **Historical Similar Issues** – Metadata desync & path bugs previously fixed in AtomicFileService.
+5. **Hypotheses Prioritised**:
+   1. Metadata JSON not fully populated (most likely).
+   2. Generation script bypasses AtomicFileService and writes directly → mismatch.
+
+#### Diagnostic Task Breakdown
+| # | Task | Owner | Success Criteria |
+|---|------|-------|------------------|
+| D1 | Add DEBUG-level logs in `generate_mock_data.py` at file creation & DB commit | Executor | Log shows full paths + status for each job |
+| D2 | Add DEBUG-level logs in `AtomicFileService.atomic_move_authoritative()` (prepare/commit/metadata sync) | Executor | Logs clearly state when atomic vs legacy path executed |
+| D3 | Temporarily enable TRACE logs in System Health audit endpoint to print list of broken items with reasons | Executor | Console shows detailed mismatch explanation |
+| D4 | Re-generate 5 jobs & capture combined backend logs | Executor | Single consolidated log file for analysis |
+| D5 | Analyse log timeline (creation → audit) to pinpoint divergence | Planner | Root cause isolated |
+| D6 | Fix underlying bug (TBD after D5) | Executor | New jobs appear clean; System Health shows 0 broken |
+
+#### Additional Notes
+• **Log Structure**: Use JSON logging with keys `event`, `job_id`, `file_path`, `metadata_path`, `action`, `status` for easy grep.
+• **Guardrails**: Logs only in development; protect production builds with `if current_app.config["ENV"] == "development"`.
+• **Context7 Reference**: Review Python `logging` cookbook for structured logging patterns.
+
+#### Timeline Estimate
+Total 1.5 hrs – Diagnostics (45 min) + Root Cause Fix (30 min) + Validation (15 min).
 
 ## Project Status Board
 

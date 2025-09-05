@@ -18,6 +18,11 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Dict
+# Added structured logging
+import logging
+
+# Configure basic logging for development runs
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
 def _ensure_backend_on_path() -> None:
@@ -90,7 +95,37 @@ def create_jobs(counts: Dict[str, int], email: str) -> Dict[str, int]:
             extension = list(file_config.allowed_extensions)[0]  # Use first allowed extension
             filename = f"Mock_{short}{extension}"
             status_dir = _status_to_dir(status)
+
+            # Log intent before file creation
+            logging.info(
+                "[MockData] Creating job %s status=%s dir=%s filename=%s",
+                short,
+                status,
+                status_dir,
+                filename,
+            )
+
             file_path, meta_path = _create_placeholder_files(storage_root, status_dir, filename)
+
+            # Write initial metadata JSON so System Health doesn't flag mismatch
+            import json, datetime as _dt
+            metadata_content = {
+                "job_id": job_id,
+                "status": status,
+                "file_path": str(file_path),
+                "created_at": _dt.datetime.utcnow().replace(tzinfo=_dt.timezone.utc).isoformat(),
+            }
+            try:
+                meta_path.write_text(json.dumps(metadata_content, indent=2), encoding="utf-8")
+            except Exception as meta_err:
+                logging.warning("[MockData] Failed writing metadata for job=%s error=%s", short, meta_err)
+
+            logging.info(
+                "[MockData] Created files job=%s file_path=%s metadata_path=%s",
+                short,
+                file_path,
+                meta_path,
+            )
 
             job = Job(
                 id=job_id,
@@ -112,6 +147,13 @@ def create_jobs(counts: Dict[str, int], email: str) -> Dict[str, int]:
             db.session.flush()
             db.session.add(Event(job_id=job.id, event_type="JobCreated", details={}, triggered_by="dev-script", workstation_id="dev"))
             db.session.commit()
+            logging.info(
+                "[MockData] DB committed job=%s status=%s file=%s metadata=%s",
+                short,
+                status,
+                file_path,
+                meta_path,
+            )
             created_by_status[status] += 1
 
     return created_by_status

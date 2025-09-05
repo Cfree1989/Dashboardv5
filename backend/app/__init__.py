@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import redis
 from flask_mail import Mail
 import os
 import re
@@ -16,7 +17,18 @@ from functools import wraps
 
 db = SQLAlchemy(session_options={"expire_on_commit": False})
 migrate = Migrate()
-limiter = Limiter(key_func=get_remote_address)
+
+# Initialize Redis connection for Flask-Limiter
+def get_redis_connection():
+    """Get Redis connection for rate limiting"""
+    redis_url = os.environ.get('REDIS_URL', 'redis://redis:6379')
+    return redis.from_url(redis_url, decode_responses=True)
+
+# Configure Flask-Limiter with Redis backend
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+)
 mail = Mail()
 
 # Global monitoring variables
