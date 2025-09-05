@@ -60,7 +60,15 @@ class JobApprovalService:
     
     def approve_job(self, job_id: str, approval_data: JobApprovalData, workstation_id: str = None) -> Job:
         """Approve a job with comprehensive validation and business logic"""
+        import time
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        start_time = time.time()
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Starting job approval for {job_id}")
+        
         # Use ValidationService for all validation
+        validation_start = time.time()
         job_result = self.validation.validate_job_exists(job_id)
         if not job_result.is_valid:
             raise ValueError(job_result.error_message)
@@ -76,6 +84,9 @@ class JobApprovalService:
         # Validate numeric inputs
         if approval_data.weight_g <= 0 or approval_data.time_hours <= 0:
             raise ValueError('weight_g and time_hours must be greater than 0')
+        
+        validation_time = (time.time() - validation_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Validation completed in {validation_time:.2f}ms")
         
         # Calculate cost using existing logic
         cost = self._calculate_job_cost(job.material, approval_data.weight_g)
@@ -97,34 +108,71 @@ class JobApprovalService:
             self._apply_authoritative_filename(job, approval_data.authoritative_filename)
         
         # Perform atomic file move from Uploaded to Pending before updating status
+        file_move_start = time.time()
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Starting atomic file move operation for {job_id}")
+        
         from app.services.infrastructure.atomic_file_service import get_atomic_file_service
         atomic_service = get_atomic_file_service()
         file_move_success = atomic_service.atomic_move_authoritative(job, 'PENDING')
         
+        file_move_time = (time.time() - file_move_start) * 1000
+        
         if not file_move_success:
             # Log the error but continue with the approval - file can be fixed later via admin tools
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"File move failed during approval for job {job.id}, continuing with status update")
-        
-        job.status = 'PENDING'
+            logger.warning(f"[APPROVAL-BACKEND-TIMING] File move failed for job {job.id} in {file_move_time:.2f}ms, continuing with status update")
+        else:
+            logger.info(f"[APPROVAL-BACKEND-TIMING] Atomic file move completed successfully in {file_move_time:.2f}ms")
         
         # Save job changes
+        db_start = time.time()
+        job.status = 'PENDING'
+        logger.info(f"[APPROVAL-BACKEND-TIMING] About to add job to session and commit for {job_id}")
+        
         db.session.add(job)
+        
+        commit_start = time.time()
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Starting database commit for {job_id}")
         db.session.commit()
+        commit_end = time.time()
+        
+        commit_time = (commit_end - commit_start) * 1000
+        db_time = (commit_end - db_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Database commit COMPLETED for {job_id} in {commit_time:.2f}ms (total db operation: {db_time:.2f}ms)")
+        
+        # Verify job status was actually updated
+        verify_start = time.time()
+        db.session.refresh(job)
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Job {job_id} status after commit: {job.status}")
+        verify_time = (time.time() - verify_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Status verification completed in {verify_time:.2f}ms")
         
         # Generate confirmation token and send email
+        email_start = time.time()
         token = generate_confirmation_token(job.id)
         frontend_url = os.environ.get('FRONTEND_PUBLIC_URL', 'http://localhost:3000')
         confirmation_url = f"{frontend_url}/confirm/{token}"
         send_approval_email(job, confirmation_url)
         
+        email_time = (time.time() - email_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Email sending completed in {email_time:.2f}ms")
+        
         # Log events with proper attribution
+        events_start = time.time()
         self._log_approval_events(job, approval_data, confirmation_url, workstation_id)
         
+        events_time = (time.time() - events_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Event logging completed in {events_time:.2f}ms")
+        
         # Sync metadata with chosen authoritative file
+        metadata_start = time.time()
         self._sync_authoritative_metadata(job, approval_data.authoritative_filename or job.display_name, 
                                         approval_data.staff_name, 'StaffApproved')
+        
+        metadata_time = (time.time() - metadata_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Metadata sync completed in {metadata_time:.2f}ms")
+        
+        total_time = (time.time() - start_time) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] Total job approval completed in {total_time:.2f}ms")
         
         return job
     
@@ -293,6 +341,12 @@ class JobApprovalService:
         if approval_data.printer_override:
             evt_details['printer_after'] = job.printer
         
+        import logging
+        import time
+        logger = logging.getLogger(__name__)
+        
+        # Event 1: StaffApproved
+        event1_start = time.time()
         evt1 = Event(
             job_id=job.id,
             event_type='StaffApproved',
@@ -301,8 +355,13 @@ class JobApprovalService:
             workstation_id=safe_workstation_id,
         )
         db.session.add(evt1)
+        logger.info(f"[APPROVAL-BACKEND-TIMING] About to commit StaffApproved event for {job.id}")
         db.session.commit()
+        event1_time = (time.time() - event1_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] StaffApproved event commit completed in {event1_time:.2f}ms")
         
+        # Event 2: ApprovalEmailSent
+        event2_start = time.time()
         evt2 = Event(
             job_id=job.id,
             event_type='ApprovalEmailSent',
@@ -311,7 +370,10 @@ class JobApprovalService:
             workstation_id=safe_workstation_id,
         )
         db.session.add(evt2)
+        logger.info(f"[APPROVAL-BACKEND-TIMING] About to commit ApprovalEmailSent event for {job.id}")
         db.session.commit()
+        event2_time = (time.time() - event2_start) * 1000
+        logger.info(f"[APPROVAL-BACKEND-TIMING] ApprovalEmailSent event commit completed in {event2_time:.2f}ms")
     
     def _sync_authoritative_metadata(self, job: Job, filename: str, staff_name: str, event_type: str) -> None:
         """Sync metadata with authoritative file"""

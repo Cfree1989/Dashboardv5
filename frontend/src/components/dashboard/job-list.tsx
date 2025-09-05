@@ -104,8 +104,21 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     return copy;
   }, [state.data.jobs, state.sorting.sortBy, state.sorting.sortDir]);
 
+  // Add ref to prevent concurrent fetches
+  const isFetchingRef = useRef(false);
+  
   // Memoized fetch jobs function
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (bypassCache = false) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current && !bypassCache) {
+      console.log(`⏭️ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Skipping duplicate fetchJobs call`);
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    const fetchStartTime = Date.now();
+    const cacheStatus = bypassCache ? "(BYPASSING CACHE)" : "(using cache)";
+    console.log(`📡 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() started for status: ${filters?.status || 'ALL'} ${cacheStatus}`);
     
     // Always create a fresh controller - don't try to abort existing ones in development
     const controller = new AbortController();
@@ -130,20 +143,31 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (filters?.discipline) params.append('discipline', filters.discipline);
 
       const apiUrl = `/api/v1/jobs?${params.toString()}`;
+      
+      const apiStartTime = Date.now();
+      console.log(`🌐 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Making API request to: ${apiUrl}`);
+      
       const response = await apiClient.request<any[]>(apiUrl, {
         signal: controller.signal
       }, {
-        ttl: state.data.hasLoaded ? 60 * 1000 : 0 // No caching for initial load, cache subsequent loads
+        ttl: bypassCache ? 0 : (state.data.hasLoaded ? 60 * 1000 : 0) // Bypass cache when explicitly requested
       });
 
+      const apiEndTime = Date.now();
+      console.log(`📨 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} API response received in ${apiEndTime - apiStartTime}ms, job count: ${response.length}`);
+
       if (!controller.signal.aborted) {
+        const stateUpdateStart = Date.now();
         setState(prev => {
           const previousJobCount = prev.data.jobs.length;
           const newJobCount = response.length;
           const hadLoaded = prev.data.hasLoaded;
           
+          console.log(`🔄 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Updating state: ${previousJobCount} -> ${newJobCount} jobs, hadLoaded: ${hadLoaded}`);
+          
           // Play sound notification when new jobs appear visually (immediate response)
           if (newJobCount > previousJobCount && hadLoaded) {
+            console.log(`🔊 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Playing sound for new jobs`);
             playNewUploadSound().catch((error) => {
               console.warn('Failed to play dashboard sound:', error);
             });
@@ -156,9 +180,15 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             error: clearErrorState()
           };
         });
+        
+        const stateUpdateEnd = Date.now();
+        const totalFetchTime = Date.now() - fetchStartTime;
+        console.log(`🎯 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} State update completed in ${stateUpdateEnd - stateUpdateStart}ms`);
+        console.log(`✅ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Total fetchJobs() time: ${totalFetchTime}ms`);
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
+        console.error(`❌ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() failed:`, err);
         const newErrorState = updateErrorState(state.error, err);
         setState(prev => ({
           ...prev,
@@ -166,6 +196,9 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           error: newErrorState
         }));
       }
+    } finally {
+      // Always reset fetch guard
+      isFetchingRef.current = false;
     }
   }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
 
@@ -207,10 +240,23 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   // Memoized job mutation handlers
   const handleJobMutation = useCallback(async () => {
+    const mutationStartTime = Date.now();
+    console.log(`🔄 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} handleJobMutation started`);
+    
     if (onJobsMutated) {
+      console.log(`📢 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Calling onJobsMutated() callback...`);
       onJobsMutated();
     }
-    await fetchJobs();
+    
+    const fetchStartTime = Date.now();
+    console.log(`📊 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Starting fetchJobs() call with cache bypass...`);
+    
+    await fetchJobs(true); // Bypass cache for post-operation refreshes
+    
+    const fetchEndTime = Date.now();
+    const totalTime = Date.now() - mutationStartTime;
+    console.log(`✅ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() completed in ${fetchEndTime - fetchStartTime}ms`);
+    console.log(`⏱️ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Total handleJobMutation time: ${totalTime}ms`);
   }, [onJobsMutated, fetchJobs]);
 
   const handleJobUpdate = useCallback(async (jobId: string, updates: any) => {
@@ -273,7 +319,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       <div className="mt-8 text-center">
         <p className="text-red-600 mb-4">{state.error.message}</p>
         <button
-          onClick={fetchJobs}
+          onClick={() => fetchJobs()}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Retry
@@ -337,7 +383,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           <div className="mb-6">
             <ErrorCard
               error={state.error}
-              onRetry={fetchJobs}
+              onRetry={() => fetchJobs()}
               onDismiss={() => setState(prev => ({ ...prev, error: clearErrorState() }))}
             />
           </div>

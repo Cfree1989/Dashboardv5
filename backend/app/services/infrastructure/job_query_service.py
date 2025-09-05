@@ -33,6 +33,21 @@ class JobQueryService:
         Returns:
             List of Job objects matching the filters
         """
+        import logging
+        from app import db
+        logger = logging.getLogger(__name__)
+        
+        # Force database session refresh to see latest committed changes
+        db.session.expire_all()
+        
+        # Try using fresh connection to bypass any session caching
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM job WHERE status = :status"), {"status": filters.status})
+            raw_count = result.scalar()
+            logger.info(f"[JOB-QUERY-DEBUG] Raw SQL count for status={filters.status}: {raw_count}")
+        
+        logger.info(f"[JOB-QUERY-TIMING] Starting query for status={filters.status}")
         query = Job.query
         
         # Apply database-level filters
@@ -45,7 +60,12 @@ class JobQueryService:
         if filters.discipline:
             query = query.filter_by(discipline=filters.discipline)
         
+        import time
+        query_start = time.time()
         jobs = query.all()
+        query_time = (time.time() - query_start) * 1000
+        
+        logger.info(f"[JOB-QUERY-TIMING] Query completed in {query_time:.2f}ms, found {len(jobs)} jobs with status={filters.status}")
         
         # Apply search filter (done in-memory for flexibility)
         if filters.search:
@@ -55,6 +75,7 @@ class JobQueryService:
                 if search_term in job.student_name.lower() 
                 or search_term in job.student_email.lower()
             ]
+            logger.info(f"[JOB-QUERY-TIMING] After search filter, {len(jobs)} jobs remain")
         
         return jobs
     
@@ -68,6 +89,14 @@ class JobQueryService:
         Returns:
             Dictionary mapping status to count
         """
+        import logging
+        from app import db
+        logger = logging.getLogger(__name__)
+        
+        # Force database session refresh to see latest committed changes
+        db.session.expire_all()
+        
+        logger.info(f"[JOB-COUNT-TIMING] Starting job counts query with search={search}")
         query = Job.query
         
         if search:
@@ -80,9 +109,14 @@ class JobQueryService:
             )
         
         # Group by status and count
+        import time
+        query_start = time.time()
         rows = query.with_entities(Job.status, func.count()).group_by(Job.status).all()
+        query_time = (time.time() - query_start) * 1000
         
         # Convert to dictionary
         counts = {status: int(count) for status, count in rows}
+        
+        logger.info(f"[JOB-COUNT-TIMING] Query completed in {query_time:.2f}ms, counts: {counts}")
         
         return counts

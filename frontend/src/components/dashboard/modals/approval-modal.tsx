@@ -110,9 +110,17 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
   const isValid = staffName.trim().length > 0 && !!weightG && !!timeHours && parseFloat(weightG) > 0 && parseFloat(timeHours) > 0;
 
   async function doApprove() {
+    const startTime = Date.now();
+    const jobTimestamp = new Date().toLocaleTimeString();
+    console.log(`🚀 [APPROVAL-TIMING] ${jobTimestamp} Starting approval for job ${jobId}`);
+    
     try {
       setSubmitting(true);
       setError("");
+      
+      const apiStartTime = Date.now();
+      console.log(`📡 [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} Sending API request to backend...`);
+      
       await apiClient.post(`/api/v1/jobs/${jobId}/approve`, {
         staff_name: staffName,
         weight_g: parseFloat(weightG),
@@ -121,14 +129,31 @@ export default function ApprovalModal({ jobId, material, currentPrinter, onClose
         // send only if changed or explicitly set
         printer: printer && printer !== (currentPrinter || '') ? printer : undefined,
       });
+      
+      const apiEndTime = Date.now();
+      console.log(`✅ [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} API request completed in ${apiEndTime - apiStartTime}ms`);
+      
       show('Approval sent');
+      
+      const callbackStartTime = Date.now();
+      console.log(`🔄 [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} Calling onApproved() callback...`);
+      
       onApproved();
+      
+      const callbackEndTime = Date.now();
+      console.log(`🎯 [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} onApproved() callback completed in ${callbackEndTime - callbackStartTime}ms`);
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`⏱️ [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} Total approval process: ${totalTime}ms`);
+      
       // Note: onClose() is now handled by the parent after refresh completes
     } catch (err) {
+      console.error(`❌ [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} Approval failed:`, err);
       setError("Approval failed. Please check inputs and try again.");
     } finally {
       setSubmitting(false);
       setConfirmOpen(false);
+      console.log(`🏁 [APPROVAL-TIMING] ${new Date().toLocaleTimeString()} Modal cleanup completed`);
     }
   }
 

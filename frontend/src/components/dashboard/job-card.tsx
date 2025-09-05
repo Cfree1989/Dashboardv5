@@ -299,11 +299,25 @@ export default function JobCard({
           currentPrinter={job.printer}
           onClose={() => setShowApprovalModal(false)}
           onApproved={async () => {
+            const callbackStartTime = Date.now();
+            console.log(`🔄 [JOB-CARD-TIMING] ${new Date().toLocaleTimeString()} JobCard onApproved callback started for job ${job.id}`);
+            
             // Wait for the job list refresh to complete before closing modal
             if (onApprove) {
+              const approveStartTime = Date.now();
+              console.log(`⚙️ [JOB-CARD-TIMING] ${new Date().toLocaleTimeString()} Calling onApprove(${job.id}) - this should trigger job list refresh...`);
+              
               await onApprove(job.id);
+              
+              const approveEndTime = Date.now();
+              console.log(`✅ [JOB-CARD-TIMING] ${new Date().toLocaleTimeString()} onApprove(${job.id}) completed in ${approveEndTime - approveStartTime}ms`);
             }
+            
+            console.log(`🔒 [JOB-CARD-TIMING] ${new Date().toLocaleTimeString()} Closing approval modal for job ${job.id}`);
             setShowApprovalModal(false);
+            
+            const totalTime = Date.now() - callbackStartTime;
+            console.log(`⏱️ [JOB-CARD-TIMING] ${new Date().toLocaleTimeString()} Total JobCard callback time: ${totalTime}ms`);
           }}
         />
       )}
