@@ -40,13 +40,6 @@ class JobQueryService:
         # Force database session refresh to see latest committed changes
         db.session.expire_all()
         
-        # Try using fresh connection to bypass any session caching
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            result = conn.execute(text("SELECT COUNT(*) FROM job WHERE status = :status"), {"status": filters.status})
-            raw_count = result.scalar()
-            logger.info(f"[JOB-QUERY-DEBUG] Raw SQL count for status={filters.status}: {raw_count}")
-        
         logger.info(f"[JOB-QUERY-TIMING] Starting query for status={filters.status}")
         query = Job.query
         

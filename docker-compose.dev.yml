@@ -120,7 +120,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     # Development: Expose port for direct database access
     # Development: do NOT expose Postgres to host by default (use docker exec to access)
-    # ports: - "127.0.0.1:5432:5432"
+    ports:
+      - "127.0.0.1:5433:5432"
     mem_limit: 512m
     cpus: '0.5'
     deploy:

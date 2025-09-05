@@ -38,7 +38,7 @@ bp = Blueprint('jobs', __name__, url_prefix='/api/v1/jobs')
 orchestration_service = JobOrchestrationService()
 payment_service = PaymentService()
 file_discovery_service = FileDiscoveryService()
-job_query_service = JobQueryService()
+# job_query_service = JobQueryService() # Removed singleton instance
 
 # Job management routes implemented using new service architecture
 # All routes use JobOrchestrationService, ValidationService, and ResponseService 
@@ -57,6 +57,7 @@ def validate_job(job_id):
 @token_required
 def list_jobs():
     """Get filtered list of jobs - simplified via JobQueryService"""
+    job_query_service = JobQueryService() # Create fresh instance per request
     # Build filters from query parameters
     filters = JobFilters(
         status=request.args.get('status'),
@@ -74,6 +75,7 @@ def list_jobs():
 @token_required
 def get_job_counts():
     """Get job counts by status for dashboard tabs - simplified via JobQueryService"""
+    job_query_service = JobQueryService() # Create fresh instance per request
     try:
         search = request.args.get('search')
         counts = job_query_service.get_job_counts(search)

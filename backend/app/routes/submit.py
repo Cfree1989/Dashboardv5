@@ -49,7 +49,7 @@ def _normalize_simple_label(value: str) -> str:
 
 
 @bp.route('', methods=['POST'])
-@limiter.limit("5 per hour")
+@limiter.limit("100 per minute")
 def submit_job():
     try:
         # Validate file presence
