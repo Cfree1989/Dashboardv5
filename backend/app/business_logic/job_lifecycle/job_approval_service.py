@@ -92,7 +92,7 @@ class JobApprovalService:
         cost = self._calculate_job_cost(job.material, approval_data.weight_g)
         
         # Update job with Flask context safety
-        workstation_id = workstation_id or self._get_workstation_id()
+        workstation_id = workstation_id or self._get_workstation_id() or 'unknown'
         job.weight_g = approval_data.weight_g
         job.time_hours = approval_data.time_hours
         job.cost_usd = cost
@@ -208,7 +208,7 @@ class JobApprovalService:
         db.session.commit()
         
         # Log event
-        workstation_id = workstation_id or self._get_workstation_id()
+        workstation_id = workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id,
             event_type='StaffRejected',
@@ -252,7 +252,7 @@ class JobApprovalService:
         db.session.commit()
         
         # Log event with attribution
-        workstation_id = workstation_id or self._get_workstation_id()
+        workstation_id = workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id,
             event_type=event_type,

@@ -30,6 +30,12 @@ WORKSTATIONS = load_workstation_credentials()
 @bp.route('/login', methods=['POST'])
 @limiter.limit("10 per hour")
 def login():
+    # If rate limiting is disabled in config (tests), bypass limiter for this endpoint
+    if current_app.config.get('RATELIMIT_ENABLED') is False:
+        try:
+            limiter.enabled = False
+        except Exception:
+            pass
     data = request.get_json()
     if not data or not data.get('workstation_id') or not data.get('password'):
         return jsonify({"message": "Could not verify"}), 401

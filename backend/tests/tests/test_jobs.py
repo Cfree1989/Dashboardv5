@@ -18,6 +18,24 @@ def create_job(app):
         return job
 
 
+def _auth_headers(token: str):
+    return {'Authorization': f'Bearer {token}', 'X-Correlation-Id': 'test-cid-123'}
+
+
+def _assert_list_and_counts_reflect(client, token, status: str, job_id: str, present: bool):
+    # List by status should include or exclude the job
+    resp_list = client.get(f'/api/v1/jobs?status={status}', headers=_auth_headers(token))
+    assert resp_list.status_code == 200
+    ids = [item['id'] for item in resp_list.get_json()]
+    assert (job_id in ids) is present
+
+    # Counts should reflect the presence accordingly
+    resp_counts = client.get('/api/v1/jobs/counts', headers=_auth_headers(token))
+    assert resp_counts.status_code == 200
+    counts = resp_counts.get_json() or {}
+    assert isinstance(counts, dict)
+
+
 def test_list_jobs_empty(client, token):
     resp = client.get('/api/v1/jobs', headers={'Authorization': f'Bearer {token}'})
     assert resp.status_code == 200
@@ -76,7 +94,7 @@ def test_job_crud(client, token, app):
 def test_approve_job_with_attribution_and_cost(client, token, app):
     job = create_job(app)
     # Add active staff
-    client.post('/api/v1/staff', json={'name': 'Jane Doe'}, headers={'Authorization': f'Bearer {token}'})
+    client.post('/api/v1/staff', json={'name': 'Jane Doe'}, headers=_auth_headers(token))
 
     payload = {
         'staff_name': 'Jane Doe',
@@ -87,7 +105,7 @@ def test_approve_job_with_attribution_and_cost(client, token, app):
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json=payload,
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 200
     data = resp.get_json()
@@ -101,7 +119,7 @@ def test_approve_job_with_attribution_and_cost(client, token, app):
     assert data['printer'] in ['Prusa XL', 'Prusa']  # allow default if validation restricts
 
     # Check event attribution
-    events_resp = client.get(f'/api/v1/jobs/{job.id}/events', headers={'Authorization': f'Bearer {token}'} )
+    events_resp = client.get(f'/api/v1/jobs/{job.id}/events', headers=_auth_headers(token) )
     assert events_resp.status_code == 200
     events = events_resp.get_json()
     approved = next((e for e in events if e['event_type'] == 'StaffApproved'), None)
@@ -115,26 +133,26 @@ def test_approve_requires_active_staff_and_valid_numbers(client, token, app):
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Ghost', 'weight_g': 10, 'time_hours': 1},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 400
 
     # Add inactive staff
     client.post('/api/v1/staff', json={'name': 'Inactive'}, headers={'Authorization': f'Bearer {token}'})
-    client.patch('/api/v1/staff/Inactive', json={'is_active': False}, headers={'Authorization': f'Bearer {token}'})
+    client.patch('/api/v1/staff/Inactive', json={'is_active': False}, headers=_auth_headers(token))
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Inactive', 'weight_g': 10, 'time_hours': 1},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 400
 
     # Add active staff, but invalid numbers
-    client.post('/api/v1/staff', json={'name': 'Active'}, headers={'Authorization': f'Bearer {token}'})
+    client.post('/api/v1/staff', json={'name': 'Active'}, headers=_auth_headers(token))
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Active', 'weight_g': 0, 'time_hours': -1},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 400
 
@@ -145,13 +163,13 @@ def test_approve_cost_minimum_applied_for_small_weight(client, token, app):
     with app.app_context():
         job.material = 'Resin'
         db.session.commit()
-    client.post('/api/v1/staff', json={'name': 'Jane'}, headers={'Authorization': f'Bearer {token}'})
+    client.post('/api/v1/staff', json={'name': 'Jane'}, headers=_auth_headers(token))
 
     # Small weight -> cost below $3, expect minimum $3.00
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Jane', 'weight_g': 5, 'time_hours': 0.5},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 200
     data = resp.get_json()
@@ -172,13 +190,13 @@ def test_approve_rejects_missing_or_unsupported_authoritative_file(client, token
         j.metadata_path = str(storage_dir / 'file_metadata.json')
         db.session.commit()
 
-    client.post('/api/v1/staff', json={'name': 'Staff'}, headers={'Authorization': f'Bearer {token}'})
+    client.post('/api/v1/staff', json={'name': 'Staff'}, headers=_auth_headers(token))
 
     # Unsupported extension
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Staff', 'weight_g': 10, 'time_hours': 1, 'authoritative_filename': 'file.gcode'},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 400
 
@@ -186,7 +204,7 @@ def test_approve_rejects_missing_or_unsupported_authoritative_file(client, token
     resp = client.post(
         f'/api/v1/jobs/{job.id}/approve',
         json={'staff_name': 'Staff', 'weight_g': 10, 'time_hours': 1, 'authoritative_filename': 'missing.3mf'},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 400
 
@@ -194,10 +212,10 @@ def test_approve_rejects_missing_or_unsupported_authoritative_file(client, token
 def test_review_toggle_persists_and_logs_event(client, token, app):
     job = create_job(app)
     # Add active staff
-    client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers={'Authorization': f'Bearer {token}'})
+    client.post('/api/v1/staff', json={'name': 'Reviewer'}, headers=_auth_headers(token))
 
     # Initially unreviewed
-    resp = client.get(f'/api/v1/jobs/{job.id}', headers={'Authorization': f'Bearer {token}'})
+    resp = client.get(f'/api/v1/jobs/{job.id}', headers=_auth_headers(token))
     assert resp.status_code == 200
     assert resp.get_json().get('staff_viewed_at') is None
 
@@ -205,7 +223,7 @@ def test_review_toggle_persists_and_logs_event(client, token, app):
     resp = client.post(
         f'/api/v1/jobs/{job.id}/review',
         json={'reviewed': True, 'staff_name': 'Reviewer'},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 200
     data = resp.get_json()
@@ -215,7 +233,7 @@ def test_review_toggle_persists_and_logs_event(client, token, app):
     resp = client.post(
         f'/api/v1/jobs/{job.id}/review',
         json={'reviewed': False, 'staff_name': 'Reviewer'},
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp.status_code == 200
     data = resp.get_json()
@@ -224,7 +242,7 @@ def test_review_toggle_persists_and_logs_event(client, token, app):
     # Verify events include JobReviewed and JobReviewCleared
     resp_events = client.get(
         f'/api/v1/jobs/{job.id}/events',
-        headers={'Authorization': f'Bearer {token}'}
+        headers=_auth_headers(token)
     )
     assert resp_events.status_code == 200
     events = [e['event_type'] for e in resp_events.get_json()]
@@ -662,3 +680,58 @@ def test_update_notes_requires_active_staff_and_string_notes(client, token, app)
     )
     assert resp.status_code == 200
     assert resp.get_json()['notes'] == ''
+
+
+def test_read_after_write_freshness_on_approve(client, token, app):
+    job = create_job(app)
+    client.post('/api/v1/staff', json={'name': 'Operator'}, headers=_auth_headers(token))
+
+    # Precondition: job is in UPLOADED list
+    _assert_list_and_counts_reflect(client, token, 'UPLOADED', job.id, True)
+
+    # Approve -> moves to PENDING
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/approve',
+        json={'staff_name': 'Operator', 'weight_g': 10, 'time_hours': 1},
+        headers=_auth_headers(token)
+    )
+    assert resp.status_code == 200
+
+    # Immediately after write, UPLOADED should not include, PENDING should include
+    _assert_list_and_counts_reflect(client, token, 'UPLOADED', job.id, False)
+    _assert_list_and_counts_reflect(client, token, 'PENDING', job.id, True)
+
+
+def test_read_after_write_freshness_on_printing_transition(client, token, app, tmp_path):
+    job = create_job(app)
+    client.post('/api/v1/staff', json={'name': 'Operator'}, headers=_auth_headers(token))
+
+    # Prepare storage with files to satisfy atomic file move preconditions
+    os.environ['STORAGE_PATH'] = str(tmp_path)
+    ready_dir = tmp_path / 'ReadyToPrint'
+    ready_dir.mkdir(parents=True, exist_ok=True)
+    (ready_dir / 'file.stl').write_text('model')
+    (ready_dir / 'file_metadata.json').write_text('{}')
+
+    # Move to READYTOPRINT and set correct file paths
+    with app.app_context():
+        j = Job.query.get(job.id)
+        j.status = 'READYTOPRINT'
+        j.file_path = str(ready_dir / 'file.stl')
+        j.metadata_path = str(ready_dir / 'file_metadata.json')
+        db.session.commit()
+
+    # Precondition: job is in READYTOPRINT list
+    _assert_list_and_counts_reflect(client, token, 'READYTOPRINT', job.id, True)
+
+    # Mark printing
+    resp = client.post(
+        f'/api/v1/jobs/{job.id}/mark-printing',
+        json={'staff_name': 'Operator'},
+        headers=_auth_headers(token)
+    )
+    assert resp.status_code == 200
+
+    # Immediately: READYTOPRINT should not include; PRINTING should include
+    _assert_list_and_counts_reflect(client, token, 'READYTOPRINT', job.id, False)
+    _assert_list_and_counts_reflect(client, token, 'PRINTING', job.id, True)

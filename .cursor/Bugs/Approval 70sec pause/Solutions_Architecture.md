@@ -10,8 +10,8 @@
 - Avoid introducing heavy caching layers; keep infra simple.
 
 ## Target-State Architecture
-- Backend (Flask + SQLAlchemy): Session-per-request hygiene with defensive invalidation on read endpoints powering real-time UI.
-- Frontend (Next.js): Post-mutation fetches bypass client cache to guarantee freshness.
+- Backend (Flask + SQLAlchemy): Session-per-request hygiene; optional guarded invalidation toggle for real-time reads.
+- Frontend (Next.js): Centralized post-mutation refetch that bypasses client cache to guarantee freshness.
 - Runtime: Gunicorn workers unchanged; Nginx remains non-caching for API.
 
 ## Design Principles
@@ -21,22 +21,21 @@
 
 ## Key Changes
 - Backend:
-  - Keep defensive `db.session.expire_all()` in `JobQueryService.list_jobs()` and `get_job_counts()`.
-  - Add session teardown hook to ensure session-per-request hygiene:
+  - Session teardown hook ensures session-per-request hygiene:
     - `@app.teardown_request` → `db.session.remove()`
-  - Route-level approval now passes `g.workstation_id` explicitly and logs `[ROUTE-APPROVE]` entries.
+  - Add correlation-id `[RAW-TRACE]` logs across write→list→counts.
+  - Guarded freshness toggle: `FRESH_READ_DEFENSIVE=1` enables `db.session.expire_all()` in `JobQueryService` (default OFF).
 - Frontend:
-  - Ensure `fetchJobs(true)` is called after approval/reject/etc.
-  - Bypass client caches by appending a `_ts` param on bypass and honoring `ttl: 0` correctly in the unified API client.
-  - Set `Cache-Control: no-store, no-cache, must-revalidate` and `cache: 'no-store'` for direct requests.
-  - Optimistic removal: immediately remove approved job from the UPLOADED list locally while the fresh fetch runs.
+  - Centralized `mutateThenRefetch` in `unified-api-client.ts` to refetch counts/list with `ttl: 0` and `cache: 'no-store'`.
+  - Optimistic removal: immediately remove mutated job from current tab while fresh fetch runs.
+  - Unified approach—no `_ts` query param needed when `ttl: 0` is honored.
 - Infrastructure:
   - No Nginx cache; keep `proxy_buffering off` for `/api`.
   - Keep Gunicorn workers (4) as-is.
 
 ## Data Flow (Aligned with Sequence Diagram)
-- Approval (GW2) commits → immediate list/count fetch (GW1) → Session identity map is expired before query → DB returns fresh rows → UI updated.
-- Post-mutation UI calls `fetchJobs(true)` to avoid client cache reuse; `_ts` enforces uniqueness.
+- Approval (GW2) commits → immediate list/count fetch (GW1) → fresh session + optional defensive expire → DB returns fresh rows → UI updated.
+- Post-mutation UI uses `mutateThenRefetch` to avoid cache reuse; `ttl: 0` and `no-store` ensure freshness.
 - Optimistic removal ensures immediate visual consistency before network returns.
 
 ## Risks and Mitigations

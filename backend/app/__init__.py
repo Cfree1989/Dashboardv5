@@ -207,6 +207,11 @@ def create_app():
     if app.config.get('TESTING'):
         app.config.setdefault('MAIL_SUPPRESS_SEND', True)
     
+    # Rate limiting configuration (env-driven so tests can disable easily)
+    ratelimit_enabled_env = os.environ.get('RATELIMIT_ENABLED')
+    if ratelimit_enabled_env is not None:
+        app.config['RATELIMIT_ENABLED'] = ratelimit_enabled_env.lower() not in ('0', 'false', 'no')
+    
     # Setup monitoring and logging
     setup_structured_logging(app)
     setup_performance_monitoring(app)

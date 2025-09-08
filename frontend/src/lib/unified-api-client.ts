@@ -446,6 +446,44 @@ class UnifiedApiClient {
       body: data ? JSON.stringify(data) : undefined,
     }, config);
   }
+
+  /**
+   * Execute a mutation, then refetch counts and the active tab list with fresh data.
+   * Ensures read-after-write consistency on the client without relying on cache-busting params.
+   */
+  async mutateThenRefetch(params: {
+    mutation: () => Promise<any>;
+    listUrl: string; // e.g., `/api/v1/jobs?status=UPLOADED&search=...`
+    refetchCounts?: boolean; // defaults true
+  }): Promise<{ counts?: Record<string, number>; jobs?: any[] }>
+  {
+    const { mutation, listUrl, refetchCounts = true } = params;
+
+    // Run the mutation first
+    await mutation();
+
+    // Refetch counts (ttl: 0) and list (ttl: 0) for freshness
+    const results: { counts?: Record<string, number>; jobs?: any[] } = {};
+    if (refetchCounts) {
+      try {
+        results.counts = await this.request<Record<string, number>>(
+          '/api/v1/jobs/counts',
+          { method: 'GET', cache: 'no-store' },
+          { ttl: 0 }
+        );
+      } catch {}
+    }
+
+    try {
+      results.jobs = await this.request<any[]>(
+        listUrl,
+        { method: 'GET', cache: 'no-store' },
+        { ttl: 0 }
+      );
+    } catch {}
+
+    return results;
+  }
 }
 
 // Export singleton instance

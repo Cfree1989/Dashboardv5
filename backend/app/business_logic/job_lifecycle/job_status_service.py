@@ -65,7 +65,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log event
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id, 
             event_type='JobMarkedPrinting', 
@@ -108,7 +108,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log event
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id, 
             event_type='JobMarkedComplete', 
@@ -166,7 +166,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log event
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id, 
             event_type='JobMarkedPickedUp', 
@@ -211,7 +211,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log failure and admin action
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'unknown'
         evt = Event(
             job_id=job.id, 
             event_type='PrintFailed', 

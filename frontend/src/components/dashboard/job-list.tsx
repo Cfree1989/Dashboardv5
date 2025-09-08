@@ -264,15 +264,69 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
     
     const fetchStartTime = Date.now();
-    console.log(`📊 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Starting fetchJobs() call with cache bypass...`);
-    
-    await fetchJobs(true); // Bypass cache for post-operation refreshes
-    
+    console.log(`📊 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Starting centralized fresh refetch via apiClient...`);
+
+    try {
+      // Build list URL consistent with fetchJobs
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      const qSearch = (filters?.search || '').trim();
+      if (qSearch) params.append('search', qSearch);
+      if (filters?.printer) params.append('printer', filters.printer);
+      if (filters?.discipline) params.append('discipline', filters.discipline);
+      const apiUrl = `/api/v1/jobs?${params.toString()}`;
+
+      // Mutation already happened in modal; run a no-op mutation and refetch list fresh
+      const { jobs } = await apiClient.mutateThenRefetch({
+        mutation: async () => Promise.resolve(),
+        listUrl: apiUrl,
+        refetchCounts: false,
+      });
+
+      if (Array.isArray(jobs)) {
+        setState(prev => ({
+          ...prev,
+          data: { jobs, hasLoaded: true },
+          loading: { ...prev.loading, isFetching: false },
+          error: clearErrorState(),
+        }));
+      } else {
+        // Fallback: fetch list directly with ttl: 0 and update state
+        const fresh = await apiClient.request<any[]>(apiUrl, { method: 'GET', cache: 'no-store' }, { ttl: 0 });
+        setState(prev => ({
+          ...prev,
+          data: { jobs: fresh, hasLoaded: true },
+          loading: { ...prev.loading, isFetching: false },
+          error: clearErrorState(),
+        }));
+      }
+    } catch (err) {
+      console.error(`❌ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} centralized refetch failed:`, err);
+      try {
+        const params = new URLSearchParams();
+        if (filters?.status) params.append('status', filters.status);
+        const qSearch = (filters?.search || '').trim();
+        if (qSearch) params.append('search', qSearch);
+        if (filters?.printer) params.append('printer', filters.printer);
+        if (filters?.discipline) params.append('discipline', filters.discipline);
+        const apiUrl = `/api/v1/jobs?${params.toString()}`;
+        const fresh = await apiClient.request<any[]>(apiUrl, { method: 'GET', cache: 'no-store' }, { ttl: 0 });
+        setState(prev => ({
+          ...prev,
+          data: { jobs: fresh, hasLoaded: true },
+          loading: { ...prev.loading, isFetching: false },
+          error: clearErrorState(),
+        }));
+      } catch (e) {
+        // Last resort: keep existing state and surface error through existing error handling
+      }
+    }
+
     const fetchEndTime = Date.now();
     const totalTime = Date.now() - mutationStartTime;
-    console.log(`✅ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() completed in ${fetchEndTime - fetchStartTime}ms`);
+    console.log(`✅ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} centralized refetch completed in ${fetchEndTime - fetchStartTime}ms`);
     console.log(`⏱️ [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Total handleJobMutation time: ${totalTime}ms`);
-  }, [onJobsMutated, fetchJobs]);
+  }, [onJobsMutated, fetchJobs, filters?.status, filters?.search, filters?.printer, filters?.discipline]);
 
   const handleJobUpdate = useCallback(async (jobId: string, updates: any) => {
     try {

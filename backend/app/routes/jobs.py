@@ -58,6 +58,9 @@ def validate_job(job_id):
 def list_jobs():
     """Get filtered list of jobs - simplified via JobQueryService"""
     job_query_service = JobQueryService() # Create fresh instance per request
+    correlation_id = request.headers.get('X-Correlation-Id') or request.args.get('cid')
+    if correlation_id:
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=list_jobs workstation={getattr(g, 'workstation_id', None)}")
     # Build filters from query parameters
     filters = JobFilters(
         status=request.args.get('status'),
@@ -76,6 +79,9 @@ def list_jobs():
 def get_job_counts():
     """Get job counts by status for dashboard tabs - simplified via JobQueryService"""
     job_query_service = JobQueryService() # Create fresh instance per request
+    correlation_id = request.headers.get('X-Correlation-Id') or request.args.get('cid')
+    if correlation_id:
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=get_job_counts workstation={getattr(g, 'workstation_id', None)}")
     try:
         search = request.args.get('search')
         counts = job_query_service.get_job_counts(search)
@@ -306,7 +312,8 @@ def hard_delete_job(job_id):
 @token_required
 def approve_job(job_id):
     data = request.get_json(silent=True) or {}
-    logger.info(f"[ROUTE-APPROVE] Received approve request for job_id={job_id} from workstation={getattr(g, 'workstation_id', None)}")
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
+    logger.info(f"[ROUTE-APPROVE] cid={correlation_id} Received approve request for job_id={job_id} from workstation={getattr(g, 'workstation_id', None)}")
     try:
         approval_data = JobApprovalData(
             staff_name=data.get('staff_name'),
@@ -317,15 +324,15 @@ def approve_job(job_id):
         )
         # Pass workstation_id explicitly to avoid reliance on request headers in service
         job = orchestration_service.approve_job(job_id, approval_data, getattr(g, 'workstation_id', None))
-        logger.info(f"[ROUTE-APPROVE] Approval completed for job_id={job_id}, new_status={getattr(job, 'status', None)}")
+        logger.info(f"[ROUTE-APPROVE] cid={correlation_id} Approval completed for job_id={job_id}, new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
-        logger.warning(f"[ROUTE-APPROVE] Validation error for job_id={job_id}: {e}")
+        logger.warning(f"[ROUTE-APPROVE] cid={correlation_id} Validation error for job_id={job_id}: {e}")
         return ResponseService.error(str(e))
     except Exception as e:
         # Catch-all with stack for unexpected failures
-        logger.exception(f"[ROUTE-APPROVE] Unexpected error for job_id={job_id}")
+        logger.exception(f"[ROUTE-APPROVE] cid={correlation_id} Unexpected error for job_id={job_id}")
         return ResponseService.error('Approval failed due to server error', status=500)
 
 
@@ -358,6 +365,7 @@ def append_note(job_id):
 @token_required
 def mark_printing(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -368,6 +376,7 @@ def mark_printing(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_printing(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=mark_printing job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -466,6 +475,7 @@ def admin_resend_email(job_id):
 @token_required
 def admin_mark_failed(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -481,6 +491,7 @@ def admin_mark_failed(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name, reason=reason)
         job = orchestration_service.mark_failed(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=admin_mark_failed job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -490,6 +501,7 @@ def admin_mark_failed(job_id):
 @token_required
 def mark_complete(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -500,6 +512,7 @@ def mark_complete(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_complete(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=mark_complete job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -509,6 +522,7 @@ def mark_complete(job_id):
 @token_required
 def mark_picked_up(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -519,6 +533,7 @@ def mark_picked_up(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.mark_picked_up(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=mark_picked_up job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -582,6 +597,7 @@ def review_job(job_id):
 @token_required
 def reject_job(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     try:
         # Create rejection data object
@@ -593,6 +609,7 @@ def reject_job(job_id):
         
         # Use JobLifecycleService to reject job
         job = orchestration_service.reject_job(job_id, rejection_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=reject_job job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
@@ -603,6 +620,7 @@ def reject_job(job_id):
 @token_required
 def revert_completion(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -613,6 +631,7 @@ def revert_completion(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_printing(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=revert_completion job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
@@ -622,6 +641,7 @@ def revert_completion(job_id):
 @token_required
 def revert_pickup(job_id):
     data = request.get_json(silent=True) or {}
+    correlation_id = data.get('cid') or request.headers.get('X-Correlation-Id')
     
     # Validate staff using ValidationService
     staff_result = ValidationService.validate_staff(data.get('staff_name'))
@@ -632,6 +652,7 @@ def revert_pickup(job_id):
 
         transition_data = JobStatusTransitionData(staff_name=staff_result.data.name)
         job = orchestration_service.revert_to_completed(job_id, transition_data)
+        logger.info(f"[RAW-TRACE] cid={correlation_id} route=revert_pickup job_id={job_id} new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
     except ValueError as e:
         return ResponseService.error(str(e))
