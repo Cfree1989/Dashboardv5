@@ -339,6 +339,28 @@ class AtomicFileService:
             metadata_path = self._get_metadata_path(job)
             target_metadata_path = self._get_target_metadata_path(job, target_status)
             
+            # Idempotency guard: if the file is already at the target location, no-op
+            if source_path and target_path and source_path.resolve() == target_path.resolve():
+                logger.info(
+                    "[AtomicFile] Idempotent move detected for job=%s; source already at target=%s",
+                    job.id,
+                    target_status,
+                )
+                # Best-effort metadata refresh to ensure status/file_path are correct
+                try:
+                    if target_metadata_path and target_metadata_path.exists():
+                        with open(target_metadata_path, 'r', encoding='utf-8') as f:
+                            current = json.load(f)
+                        current['status'] = target_status
+                        current['file_path'] = str(target_path)
+                        current['updated_at'] = datetime.now(timezone.utc).isoformat()
+                        with open(target_metadata_path, 'w', encoding='utf-8') as f:
+                            json.dump(current, f, indent=2)
+                        logger.debug("[AtomicFile] Refreshed metadata for idempotent move: %s", target_metadata_path)
+                except Exception as e:
+                    logger.warning("[AtomicFile] Failed to refresh metadata during idempotent move: %s", e)
+                return True
+            
             if not source_path or not target_path:
                 logger.error(f"Invalid file paths for job {job.id}")
                 return False
@@ -410,6 +432,15 @@ class AtomicFileService:
         try:
             source_path = self._get_job_file_path(job)
             target_path = self._get_target_path(job, target_status)
+            
+            # Idempotency guard for legacy path as well
+            if source_path and target_path and source_path.resolve() == target_path.resolve():
+                logger.info(
+                    "[AtomicFile][Legacy] Idempotent move detected for job=%s; already at target=%s",
+                    job.id,
+                    target_status,
+                )
+                return True
             
             if source_path and target_path:
                 target_path.parent.mkdir(parents=True, exist_ok=True)

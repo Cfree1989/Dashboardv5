@@ -428,6 +428,10 @@ class JobOrchestrationService:
         if not job:
             raise ValueError("Job not found")
         
+        # Idempotency: if already confirmed, return current job state without side effects
+        if getattr(job, 'student_confirmed', False):
+            return job
+        
         # Transition to READYTOPRINT + move file/metadata
         atomic_service = get_atomic_file_service()
         success = atomic_service.atomic_move_authoritative(job, 'READYTOPRINT')

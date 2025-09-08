@@ -156,6 +156,7 @@ def confirm_job(token: str):
     try:
         # Use orchestration service for confirmation
         job = orchestration_service.confirm_job_by_token(token)
+        # Always return 200, even if already confirmed (idempotent)
         return ResponseService.success(job.to_dict())
     except ValueError as ve:
         reason = str(ve)
