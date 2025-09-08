@@ -134,13 +134,13 @@ export default function DashboardPage() {
     }
   }, [debouncedSearch]);
 
-  const fetchCounts = useCallback(async () => {
+  const fetchCounts = useCallback(async (bypass = false) => {
     try {
       const data = await apiClient.request<Record<string, number>>(
         '/api/v1/jobs/counts',
         {},
         { 
-          ttl: 30 * 1000, // 30 seconds for counts
+          ttl: bypass ? 0 : 30 * 1000, // allow cache bypass after mutations
           polling: {
             enabled: true,
             interval: 45000, // 45 seconds
@@ -320,7 +320,7 @@ export default function DashboardPage() {
 
           <JobList 
               filters={{ status, search: debouncedSearch }} 
-              onJobsMutated={fetchCounts}
+              onJobsMutated={() => fetchCounts(true)}
               refreshToken={refreshTick}
               onModalOpenChange={setPauseRefresh}
               searchValue={searchValue}

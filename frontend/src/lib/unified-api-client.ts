@@ -462,6 +462,12 @@ class UnifiedApiClient {
     // Run the mutation first
     await mutation();
 
+    // Invalidate any cached job lists/counts to avoid stale reinsertions
+    try {
+      this.clearCache('/api/v1/jobs');
+      this.clearCache('/api/v1/jobs/counts');
+    } catch {}
+
     // Refetch counts (ttl: 0) and list (ttl: 0) for freshness
     const results: { counts?: Record<string, number>; jobs?: any[] } = {};
     if (refetchCounts) {

@@ -214,7 +214,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   // Refresh jobs when refreshToken changes
   useEffect(() => {
     if (refreshToken && state.data.hasLoaded) {
-      fetchJobs();
+      // Bypass cache on auto refresh to avoid stale lists after external mutations
+      fetchJobs(true);
     }
   }, [refreshToken, fetchJobs, state.data.hasLoaded]);
 
