@@ -8,7 +8,7 @@ import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import { ErrorBoundary } from '../error-boundary';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { ErrorCard } from '../ui/error-display';
-import { JobListFilters, JobListState, Job } from '../../types';
+import { JobListFilters, JobListState, Job, JobStatus } from '../../types';
 import { playNewUploadSound } from '../../lib/sound-utils';
 
 export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
@@ -142,6 +142,10 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
 
+      // Cache-busting when bypassing cache to avoid any intermediary caches returning stale data
+      if (bypassCache) {
+        params.append('_ts', String(Date.now()));
+      }
       const apiUrl = `/api/v1/jobs?${params.toString()}`;
       
       const apiStartTime = Date.now();
@@ -239,13 +243,24 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   }, []);
 
   // Memoized job mutation handlers
-  const handleJobMutation = useCallback(async () => {
+  const handleJobMutation = useCallback(async (mutatedJobId?: string) => {
     const mutationStartTime = Date.now();
     console.log(`🔄 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} handleJobMutation started`);
     
     if (onJobsMutated) {
       console.log(`📢 [JOB-LIST-TIMING] ${new Date().toLocaleTimeString()} Calling onJobsMutated() callback...`);
       onJobsMutated();
+    }
+    // Optimistic removal: if we are viewing a filtered list (e.g., UPLOADED) and a job has just
+    // transitioned out of this status (approve/reject/etc), remove it immediately from local state
+    if (mutatedJobId) {
+      setState(prev => ({
+        ...prev,
+        data: {
+          ...prev.data,
+          jobs: prev.data.jobs.filter(j => j.id !== mutatedJobId)
+        }
+      }));
     }
     
     const fetchStartTime = Date.now();

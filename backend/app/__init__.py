@@ -328,6 +328,21 @@ def create_app():
     app.register_blueprint(catalog.bp)
     app.register_blueprint(monitoring.monitoring_bp)
 
+    # Session-per-request hygiene: remove scoped session after each request
+    @app.teardown_request
+    def remove_session(exception=None):  # type: ignore[unused-argument]
+        try:
+            db.session.remove()
+        except Exception as e:
+            # Sampling-based log to avoid excessive noise under load
+            if int(time.time() * 1000) % 100 == 0:
+                app.logger.warning('Session teardown remove() failed', extra={
+                    'extra_fields': {
+                        'error': str(e),
+                        'event': 'session_teardown_failure'
+                    }
+                })
+
     # Initialize seed command
     from . import seed
     seed.init_app(app)

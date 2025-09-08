@@ -71,7 +71,8 @@ class UnifiedApiClient {
     options: RequestInit = {},
     config: RequestConfig = {}
   ): Promise<T> {
-    const ttl = config.ttl || this.getDefaultTTL(url);
+    // Respect explicit ttl=0; avoid falsy fallback
+    const ttl = config.ttl !== undefined ? config.ttl : this.getDefaultTTL(url);
     const maxRetries = config.retries || 0;
     
     // For cached requests with deduplication
@@ -120,7 +121,10 @@ class UnifiedApiClient {
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const response = await fetch(url, this.addAuthHeaders(options));
+        const requestOptions = this.addAuthHeaders(options);
+        // Ensure we bypass any browser/proxy caches for direct (non-cached) requests
+        (requestOptions as any).cache = 'no-store';
+        const response = await fetch(url, requestOptions);
         return await this.processResponse<T>(response, config);
       } catch (error) {
         lastError = error;
@@ -147,6 +151,9 @@ class UnifiedApiClient {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
+        // Defensive: prevent intermediary caches from serving stale content on direct requests
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        Pragma: 'no-cache',
         ...options.headers,
       },
     };

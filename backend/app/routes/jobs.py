@@ -306,7 +306,7 @@ def hard_delete_job(job_id):
 @token_required
 def approve_job(job_id):
     data = request.get_json(silent=True) or {}
-    
+    logger.info(f"[ROUTE-APPROVE] Received approve request for job_id={job_id} from workstation={getattr(g, 'workstation_id', None)}")
     try:
         approval_data = JobApprovalData(
             staff_name=data.get('staff_name'),
@@ -315,12 +315,18 @@ def approve_job(job_id):
             authoritative_filename=data.get('authoritative_filename'),
             printer_override=data.get('printer')
         )
-        
-        job = orchestration_service.approve_job(job_id, approval_data)
+        # Pass workstation_id explicitly to avoid reliance on request headers in service
+        job = orchestration_service.approve_job(job_id, approval_data, getattr(g, 'workstation_id', None))
+        logger.info(f"[ROUTE-APPROVE] Approval completed for job_id={job_id}, new_status={getattr(job, 'status', None)}")
         return ResponseService.success(job.to_dict())
         
     except ValueError as e:
+        logger.warning(f"[ROUTE-APPROVE] Validation error for job_id={job_id}: {e}")
         return ResponseService.error(str(e))
+    except Exception as e:
+        # Catch-all with stack for unexpected failures
+        logger.exception(f"[ROUTE-APPROVE] Unexpected error for job_id={job_id}")
+        return ResponseService.error('Approval failed due to server error', status=500)
 
 
 @bp.route('/<job_id>/notes', methods=['POST'])

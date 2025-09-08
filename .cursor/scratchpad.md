@@ -625,6 +625,31 @@ const fetchJobs = useCallback(async (bypassCache = false) => {
 
 ## **Key Challenges and Analysis**
 
+### Planner: Global Read-After-Write Consistency (Context7)
+
+- Answer: Apply the same read-after-write consistency pattern to every job state transition that affects dashboard lists and counts (approve/reject, move to ReadyToPrint, start Printing, complete, mark PaidPickedUp, archive/restore). With session-per-request teardown in place, backend freshness is covered across all transitions; the client must centrally bypass cache after any mutation.
+
+- Backend (Context7-aligned):
+  - Keep `@app.teardown_request → db.session.remove()` (verified) to ensure a fresh session/identity map per request.
+  - Stage 1: Retain defensive `db.session.expire_all()` in `JobQueryService.list_jobs()` and `get_job_counts()` while adding regression tests (see below).
+  - Stage 2: After tests pass in staging, remove `expire_all()` and gate with env `FRESH_READ_DEFENSIVE=1` for quick rollback if needed.
+  - Ensure write endpoints return canonical state (use `db.session.flush()`/`db.session.refresh(obj)` when the response needs authoritative fields).
+  - Optional later: Add ETag/If-None-Match on list endpoints for efficiency (not required for correctness).
+
+- Frontend:
+  - Create a centralized `mutateThenRefetch` in `frontend/src/lib/unified-api-client.ts` that: executes the mutation; then refetches `/api/v1/jobs/counts` and the active tab `/api/v1/jobs?...` with `ttl: 0` and `cache: 'no-store'` (no `_ts` needed); exposes options to refetch specific tabs when a mutation moves a job across lists.
+  - Update all job mutations (approve, reject, move to ReadyToPrint, start Printing, complete, mark Paid, archive/restore) to call `mutateThenRefetch` and keep optimistic removal from the current tab.
+
+- Tests (critical transitions, ≤ 2–3s visibility window):
+  - UPLOADED → PENDING, PENDING → READYTOPRINT, READYTOPRINT → PRINTING, PRINTING → COMPLETED, COMPLETED → PAIDPICKEDUP, ANY → REJECTED.
+  - For each: perform mutation; immediately GET `/api/v1/jobs?status=<affected>` and `/api/v1/jobs/counts`; assert the list/counts reflect the change.
+
+- Observability:
+  - Add correlation id across mutation and subsequent reads; log `[RAW-TRACE]` with route, worker id, timings for approve→list→counts sequences.
+
+- Success criteria:
+  - Read-after-write holds for all transitions; UI updates within ≤ 2–3s; no measurable extra DB load after `expire_all()` removal.
+
 ### **React Hooks Violation Analysis**
 
 **Technical Root Cause**: 
@@ -688,6 +713,15 @@ export default function SubmissionForm() {
 2. **Add Prevention**: Note hooks-at-top-level rule for future component development
 
 ## High-level Task Breakdown
+
+### Read-After-Write Generalization (Planner → Executor-ready)
+
+1. Implement `mutateThenRefetch` in `unified-api-client.ts` with `ttl: 0`, `cache: 'no-store'`; support refetch of active tab and counts. Success: all job mutations use it.
+2. Replace per-component `fetchJobs(true)` calls with the centralized helper in `job-list.tsx`/related components. Success: single code path for post-mutation refresh.
+3. Add integration tests for the six critical transitions listed above. Success: lists and counts reflect changes within ≤ 2–3s.
+4. Add correlation id logging in `backend/app/routes/jobs.py` (write, list, counts) to trace mutation→read flows. Success: logs joinable across requests/workers.
+5. Remove `expire_all()` from `JobQueryService` after tests pass; guard with `FRESH_READ_DEFENSIVE` flag for rollback. Success: no regressions under load.
+6. Update `Solutions_Architecture.md` to reflect centralized client refresh and reduced backend defensiveness. Success: doc matches implemented behavior.
 
 ### **Docker Hub Image Listing Implementation Plan**
 
@@ -804,7 +838,7 @@ export default function SubmissionForm() {
 
 ### **NEW: Broken Files Diagnostic Plan (BFROS)** 🩻
 
-**Context**: Immediately after generating 10 test jobs, System Health reported 14 “Broken Files”. We need to determine why freshly-created jobs are already considered broken.
+**Context**: Immediately after generating 10 test jobs, System Health reported 14 "Broken Files". We need to determine why freshly-created jobs are already considered broken.
 
 **Goal**: Identify and eliminate the root cause so that newly-created jobs never appear in Broken Files audit.
 
@@ -1388,3 +1422,38 @@ Based on code analysis and historical context, this appears to be a **multi-laye
 
 *Last Updated: Current curation session*  
 *Document Status: Curated and organized for production readiness*
+
+---
+
+## Current Status / Progress Tracking (Executor)
+- Completed backend review of approval and listing flows (routes, services, session config).
+- Verified no Nginx/API caching; prod uses Gunicorn (4 workers).
+- Authored Root_Cause_Analysis.md and Sequence_Diagram.md outlining issue and fix.
+
+## Executor's Feedback or Assistance Requests
+- None needed at this time. If desired, I can implement `@app.teardown_request` with `db.session.remove()` to ensure session-per-request hygiene.
+
+## Lessons (New)
+- SQLAlchemy identity map can serve stale entities across requests in multi-worker setups without explicit expiry or session removal. Defensive `db.session.expire_all()` in read-paths that power real-time UI prevents stale reads.
+
+---
+
+## Current Status / Progress Tracking (Executor) — Debug 2
+- Created `Solutions_Architecture.md`, `Technical_Design_Specs.md`, `Integration_Deployment_Plan.md` based on RCA and sequence diagram.
+- Incorporated Context7-backed notes on SQLAlchemy Session identity map and expiration.
+
+## Lessons (New)
+- SQLAlchemy Session is an identity map (not a query cache). For read-after-write freshness in multi-worker servers, use session-per-request teardown (`db.session.remove()`), and defensive `expire_all()` for real-time list/count endpoints. (Context7: /sqlalchemy/sqlalchemy)
+
+## Current Status / Progress Tracking (Executor) — Stale Read Remediation
+- Added Flask teardown hook in `backend/app/__init__.py` to enforce session-per-request (`db.session.remove()`), with sampling-based warning log on failures.
+- Verified `JobQueryService.list_jobs()` and `get_job_counts()` defensively call `db.session.expire_all()`.
+- Verified frontend post-mutation path calls `fetchJobs(true)` and `JobCard` awaits refresh before closing modal.
+- Verified Nginx `/api` has `proxy_buffering off` to avoid API response buffering.
+- Created `cline-tasks.md` to document the action plan and checked off completed items.
+
+## Executor's Feedback or Assistance Requests
+- None. Ready for manual validation: approve job and observe < 2–3s UI update in UPLOADED list and counts.
+
+## Lessons (New)
+- Session-per-request is essential under multi-worker servers. Even with `expire_on_commit=False`, removing the scoped session on teardown prevents identity-map staleness across requests. Combine with targeted `expire_all()` on real-time read paths and client-side cache bypass after mutations for consistent read-after-write behavior.
