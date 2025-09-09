@@ -400,9 +400,10 @@ class AtomicFileService:
                         with open(target_metadata_path, 'r', encoding='utf-8') as f:
                             metadata = json.load(f)
                         
-                        # Update metadata to match database
+                        # Update metadata to match database (use absolute resolved path for parity with audit)
                         metadata['status'] = target_status
-                        metadata['file_path'] = str(target_path)
+                        from pathlib import Path as _Path
+                        metadata['file_path'] = str(_Path(target_path).resolve())
                         metadata['updated_at'] = dt.now(tz.utc).isoformat()
                         
                         # Save updated metadata
@@ -470,9 +471,10 @@ class AtomicFileService:
                         with open(target_metadata_path, 'r', encoding='utf-8') as f:
                             metadata = json.load(f)
                         
-                        # Update metadata to match database
+                        # Update metadata to match database (use absolute resolved path for parity with audit)
                         metadata['status'] = target_status
-                        metadata['file_path'] = str(target_path)
+                        from pathlib import Path as _Path
+                        metadata['file_path'] = str(_Path(target_path).resolve())
                         metadata['updated_at'] = dt.now(tz.utc).isoformat()
                         
                         # Save updated metadata

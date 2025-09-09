@@ -307,9 +307,10 @@ def repair_metadata():
                 with open(meta_path, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 
-                # Update status and file path
+                # Update status and file path (absolute resolved for audit parity)
                 meta['status'] = job.status
-                meta['file_path'] = job.file_path
+                from pathlib import Path as _Path
+                meta['file_path'] = str(_Path(job.file_path).resolve()) if getattr(job, 'file_path', None) else None
                 meta['updated_at'] = datetime.now(timezone.utc).isoformat()
                 
                 # Save updated metadata
@@ -360,9 +361,10 @@ def repair_location():
                 with open(job.metadata_path, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 
-                # Update status and file path
+                # Update status and file path (absolute resolved for audit parity)
                 meta['status'] = job.status
-                meta['file_path'] = job.file_path
+                from pathlib import Path as _Path
+                meta['file_path'] = str(_Path(job.file_path).resolve()) if getattr(job, 'file_path', None) else None
                 meta['updated_at'] = datetime.now(timezone.utc).isoformat()
                 
                 # Save updated metadata

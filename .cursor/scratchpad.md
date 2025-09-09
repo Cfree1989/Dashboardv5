@@ -1429,12 +1429,15 @@ Based on code analysis and historical context, this appears to be a **multi-laye
 - Completed backend review of approval and listing flows (routes, services, session config).
 - Verified no Nginx/API caching; prod uses Gunicorn (4 workers).
 - Authored Root_Cause_Analysis.md and Sequence_Diagram.md outlining issue and fix.
+ - Performed DB wipe via `scripts/clear_all_data_fast.py`; seeded base staff only; verification: jobs=0, events=0, payments=0; staff=7.
 
 ## Executor's Feedback or Assistance Requests
 - None needed at this time. If desired, I can implement `@app.teardown_request` with `db.session.remove()` to ensure session-per-request hygiene.
 
 ## Lessons (New)
 - SQLAlchemy identity map can serve stale entities across requests in multi-worker setups without explicit expiry or session removal. Defensive `db.session.expire_all()` in read-paths that power real-time UI prevents stale reads.
+
+ - PowerShell piping with Docker Compose: avoid `| cat` (alias for `Get-Content`) when executing `docker compose exec` commands; it expects file input and can error on piped process output. Use the command without piping, or pipe to `Out-String`/`Out-Host` if capture is needed.
 
 ---
 

@@ -177,8 +177,11 @@ def _sync_metadata_content(job: Job, authoritative_filename: str, staff_name: st
     if meta.get('display_name') != job.display_name:
         meta['display_name'] = job.display_name
         changed = True
-    if meta.get('file_path') != job.file_path:
-        meta['file_path'] = job.file_path
+    # Normalize to absolute resolved path for audit parity
+    from pathlib import Path as _Path
+    resolved_path = job.file_path and str(_Path(job.file_path).resolve())
+    if meta.get('file_path') != resolved_path:
+        meta['file_path'] = resolved_path
         changed = True
     
     meta['updated_at'] = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()

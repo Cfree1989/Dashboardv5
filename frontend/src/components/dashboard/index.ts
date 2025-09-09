@@ -7,5 +7,3 @@ export { JobCardDetails } from './job-card-details';
 // Main Job Card Component (Refactored)
 export { default as JobCard } from './job-card';
 
-// Original Job Card (Archived - available as backup if needed)
-export { default as JobCardOriginal } from './job-card-original-backup';
