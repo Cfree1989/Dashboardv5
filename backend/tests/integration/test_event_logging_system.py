@@ -1,3 +1,168 @@
+# type: ignore
+import pytest
+import json
+from datetime import datetime, timezone
+from app import db
+from app.models.event import Event
+from app.models.job import Job
+from app.models.staff import Staff
+from app.services.event_service import log_event, JOB_SPECIFIC_EVENTS, SYSTEM_EVENTS
+from app.services.catalog_service import CatalogService
+
+
+def create_test_job(job_id, **kwargs):
+    """Helper function to create a test job with required fields."""
+    defaults = {
+        'student_name': 'Test Student',
+        'student_email': 'test@example.com',
+        'discipline': 'Engineering',
+        'class_number': '101',
+        'original_filename': 'test.stl',
+        'display_name': 'Test Model',
+        'file_path': '/test/path/test.stl',
+        'metadata_path': '/test/path/test_metadata.json',
+        'printer': 'Prusa MK4S',
+        'color': 'True Black',
+        'material': 'Filament',
+        'status': 'UPLOADED'
+    }
+    defaults.update(kwargs)
+    return Job(id=job_id, **defaults)
+
+
+class TestEventLoggingSystem:
+    """Comprehensive test suite for the event logging system fix."""
+
+    def test_event_model_supports_nullable_job_id(self, app):
+        with app.app_context():
+            system_event = Event(
+                job_id=None,
+                event_type='CatalogUpdated',
+                details={'test': 'data'},
+                triggered_by='admin_user',
+                workstation_id='workstation_1'
+            )
+            db.session.add(system_event)
+            db.session.commit()
+            assert system_event.id is not None
+            assert system_event.job_id is None
+            assert system_event.event_type == 'CatalogUpdated'
+
+            job = create_test_job('test_job_123')
+            db.session.add(job)
+            db.session.commit()
+            job_event = Event(
+                job_id=job.id,
+                event_type='JobCreated',
+                details={'test': 'data'},
+                triggered_by='student_user',
+                workstation_id='workstation_2'
+            )
+            db.session.add(job_event)
+            db.session.commit()
+            assert job_event.id is not None
+            assert job_event.job_id == job.id
+            assert job_event.event_type == 'JobCreated'
+
+    def test_event_service_validation_job_specific_events(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError, match="job_id is required for job-specific event type"):
+                log_event('JobCreated', details={'test': 'data'}, triggered_by='test_user')
+
+            job = create_test_job('test_job_456')
+            db.session.add(job)
+            db.session.commit()
+            log_event('JobCreated', details={'test': 'data'}, triggered_by='test_user', job_id=job.id)
+            event = Event.query.filter_by(event_type='JobCreated', job_id=job.id).first()
+            assert event is not None
+            assert event.job_id == job.id
+            assert event.triggered_by == 'test_user'
+
+    def test_event_service_validation_system_events(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError, match="job_id should be None for system event type"):
+                log_event('CatalogUpdated', details={'test': 'data'}, triggered_by='test_user', job_id='some_job_id')
+            log_event('CatalogUpdated', details={'test': 'data'}, triggered_by='test_user')
+            event = Event.query.filter_by(event_type='CatalogUpdated').first()
+            assert event is not None
+            assert event.job_id is None
+            assert event.triggered_by == 'test_user'
+
+    def test_event_service_invalid_event_types(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError, match="Invalid event type"):
+                log_event('InvalidEventType', details={'test': 'data'}, triggered_by='test_user')
+
+    def test_event_service_default_parameters(self, app):
+        with app.app_context():
+            from flask import g
+            g.workstation_id = 'default_workstation'
+            log_event('CatalogUpdated', details={'test': 'data'})
+            event = Event.query.filter_by(event_type='CatalogUpdated').first()
+            assert event is not None
+            assert event.triggered_by == 'default_workstation'
+            assert event.workstation_id == 'default_workstation'
+
+    def test_admin_functions_with_system_events(self, client, token):
+        response = client.post(
+            '/api/v1/admin/error-monitoring/clear',
+            json={'staff_name': 'admin_user'},
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        with client.application.app_context():
+            event = Event.query.filter_by(event_type='ErrorMonitoringCleared').first()
+            assert event is not None
+            assert event.job_id is None
+            assert event.triggered_by == 'admin_user'
+            assert event.details['cleared_by'] == 'admin_user'
+
+    def test_catalog_service_system_events(self, app):
+        with app.app_context():
+            CatalogService.seed_catalog_if_missing()
+            event = Event.query.filter_by(event_type='CatalogSeeded').first()
+            assert event is not None
+            assert event.job_id is None
+            assert event.triggered_by == 'system'
+            catalog = CatalogService.get_catalog()
+            assert catalog is not None
+
+    def test_event_queries_with_mixed_event_types(self, app):
+        with app.app_context():
+            job = create_test_job('test_job_789')
+            db.session.add(job)
+            db.session.commit()
+            log_event('JobCreated', details={'test': 'job_data'}, triggered_by='student_user', job_id=job.id)
+            log_event('CatalogUpdated', details={'test': 'system_data'}, triggered_by='admin_user')
+            all_events = Event.query.order_by(Event.timestamp.desc()).all()
+            assert len(all_events) >= 2
+            job_events = Event.query.filter(Event.job_id == job.id).all()
+            assert len(job_events) == 1
+            assert job_events[0].event_type == 'JobCreated'
+            system_events = Event.query.filter(Event.job_id.is_(None)).all()
+            assert len(system_events) >= 1
+            assert any(event.event_type == 'CatalogUpdated' for event in system_events)
+
+    def test_event_serialization_with_null_job_id(self, app):
+        with app.app_context():
+            log_event('CatalogUpdated', details={'test': 'data'}, triggered_by='test_user')
+            event = Event.query.filter_by(event_type='CatalogUpdated').first()
+            event_dict = event.to_dict()
+            assert event_dict['job_id'] is None
+            assert event_dict['event_type'] == 'CatalogUpdated'
+            assert event_dict['triggered_by'] == 'test_user'
+            assert 'timestamp' in event_dict
+            assert 'details' in event_dict
+
+    def test_event_type_classification_completeness(self, app):
+        with app.app_context():
+            for event_type in JOB_SPECIFIC_EVENTS:
+                with pytest.raises(ValueError, match="job_id is required"):
+                    log_event(event_type, details={'test': 'data'}, triggered_by='test_user')
+            for event_type in SYSTEM_EVENTS:
+                with pytest.raises(ValueError, match="job_id should be None"):
+                    log_event(event_type, details={'test': 'data'}, triggered_by='test_user', job_id='some_job_id')
+
 import pytest
 import json
 from datetime import datetime, timezone
