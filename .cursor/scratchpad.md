@@ -1460,3 +1460,150 @@ Based on code analysis and historical context, this appears to be a **multi-laye
 
 ## Lessons (New)
 - Session-per-request is essential under multi-worker servers. Even with `expire_on_commit=False`, removing the scoped session on teardown prevents identity-map staleness across requests. Combine with targeted `expire_all()` on real-time read paths and client-side cache bypass after mutations for consistent read-after-write behavior.
+
+## Key Challenges and Analysis
+
+### Planner: BFROS — Sound trigger should fire only for truly new jobs (Context7)
+
+- Symptom (working backwards): Sound plays on tab/filter changes and other non-new-upload scenarios.
+- Desired behavior: Play sound exactly once when a newly uploaded job first appears on the dashboard; never on initial load, tab switches, or filter/search changes.
+
+Possible sources (5–7):
+- Length-delta detection: Uses list size increase (`newJobCount > previousJobCount` in `frontend/src/components/dashboard/job-list.tsx`) instead of new-ID detection.
+- No durable memory of seen jobs: Without a persisted set of seen uploaded job IDs, longer lists after filter/tab changes look like "new".
+- First-load/rehydration edge: `hasLoaded` guard may still allow spurious triggers after remounts or cache bypasses.
+- Filter/search effects: Changing search/printer/discipline increases matches without any new uploads.
+- Cache interplay: Switching cached vs fresh responses can reorder/expand results transiently.
+- StrictMode/multi-instance races: Double-render or temporary parallel mounts can briefly diverge counts.
+- Cross-tab coupling: Triggering from non-UPLOADED lists ties sound to view state rather than true first appearance.
+
+Most likely causes (top 2):
+- Length-based detection instead of set-difference on job IDs.
+- Lack of page-level memory (store) of seen uploaded job IDs across tab/filter changes.
+
+Logging plan to validate (before code changes):
+- Instrument `JobList.fetchJobs()` when `status === UPLOADED`:
+  - Log `[SOUND-TRIGGER] status=<tab> hadLoaded=<bool> prevCount=<n> newCount=<n> reason=<baseline|tab-change|search-change|new-ids> newIdsCount=<n>`.
+  - Compute `currentIds` from API response and diff against a page-level `seenUploadedJobIds`; log a small sample of `newIds`.
+  - Log guards: `isFirstBaseline`, `statusChanged`, `searchChanged`, `cacheBypass`.
+- Expectation: tab/search changes with no new uploads → `newIdsCount = 0`, SUPPRESS; true new upload on UPLOADED → `newIdsCount > 0`, PLAY.
+
+Minimal correction design (post-validation):
+- Persist `seenUploadedJobIds` and `soundBaselineEstablished` in `useDashboardStore` (Zustand) so memory survives tab switches/remounts. Context7: refs/effects guidance—keep side effects in Effects and persistent data in stores; refs are stable per render but reset on remount.
+- Establish baseline on first successful UPLOADED fetch (record IDs, don't play).
+- Trigger only when `status === UPLOADED`, baseline established, `newIds.size > 0`, and not due to filter/status changes; then merge `newIds` into `seenUploadedJobIds` and call `playNewUploadSound()`.
+- Guards: suppress on initial load, tab switches, search/printer/discipline changes, and cache/rehydration transitions.
+
+Success criteria:
+- Zero false positives on tab/status/search changes and on initial load.
+- One sound per unique job ID upon first appearance in UPLOADED after baseline.
+- No audio readiness regressions (user gesture), no duplicates across refreshes.
+
+Executor-ready tasks:
+- Extend `useDashboardStore` with `seenUploadedJobIds: Set<string>` and `soundBaselineEstablished: boolean`.
+- Instrument `JobList.fetchJobs()` with the logs above; compute `newIds = currentIds − seenUploadedJobIds` when `status === UPLOADED`.
+- Implement guards and trigger rule; update the store with `newIds` after play.
+- Add tests: no sound on tab/filter changes; sound on real new upload; no duplicates per job.
+
+Open question for user:
+- Should the sound play if the user is not on the UPLOADED tab when a new upload arrives, or only when it appears in the visible UPLOADED list?
+
+### Planner: Global Read-After-Write Consistency (Context7)
+
+### Decision Update: Global cross-page sound requirement
+
+- User requirement: Play the sound even if not on the UPLOADED tab or the dashboard page.
+- Implication: Detection must run globally (root layout), not tied to JobList visibility. Audio initialization must also be global.
+
+Plan adjustments:
+- Mount a lightweight global watcher component in `frontend/src/app/layout.tsx` that:
+  - Initializes audio via `initDashboardAudio` on first user interaction anywhere in the app (click/keydown/touchstart), not just on the dashboard page.
+  - Polls for newly uploaded jobs independently of current view. Prefer an IDs-based approach over counts: fetch a small recent slice of UPLOADED jobs and diff IDs against a store-level `seenUploadedJobIds`.
+  - Establishes a baseline once per session; only plays when truly new IDs appear thereafter. Merge new IDs into the store to prevent duplicates.
+- Deduplicate triggers: remove or disable JobList-based length-delta trigger to avoid double sounds; keep JobList logging for observability.
+- Keep polling interval modest (e.g., 15–30s). If we later add push (SSE/WebSocket), the watcher can switch to push without changing sound logic.
+
+Success criteria (global):
+- Sound plays for a brand-new upload even when the user is on other pages within the app.
+- No sounds on navigation, tab/status switches, or filter changes.
+- No duplicate sounds for the same job across refresh cycles.
+
+### Remediation Plan: Transition from Old to New Sound System
+
+**Current State Analysis:**
+- **Old System**: Length-based trigger in `JobList.fetchJobs()` comparing `newJobCount > previousJobCount`
+- **Problems**: False positives on tab/filter changes, tied to dashboard page visibility, no cross-page capability
+- **Audio Infrastructure**: `sound-utils.ts` with `playNewUploadSound()` function is solid and reusable
+
+**Transition Strategy:**
+
+**Phase 1: Store Infrastructure (5 minutes)**
+- Extend `useDashboardStore` with:
+  - `seenUploadedJobIds: Set<string>` - persistent memory of seen job IDs across sessions
+  - `soundBaselineEstablished: boolean` - tracks if we've established baseline without playing sound
+  - `lastUploadedBaselineAt?: string` - timestamp of last baseline establishment
+
+**Phase 2: Global Watcher Component (15 minutes)**
+- Create `GlobalUploadWatcher` component in `frontend/src/app/layout.tsx`:
+  - **Audio Initialization**: Move from dashboard page to global scope, trigger on any user interaction
+  - **Polling Logic**: 30-second interval polling `/api/v1/jobs?status=UPLOADED&limit=50`
+  - **ID Diff Algorithm**: `newIds = currentIds - seenUploadedJobIds`
+  - **Baseline Establishment**: First successful fetch records IDs without playing sound
+  - **Sound Trigger**: Only when `newIds.size > 0` after baseline established
+  - **State Updates**: Merge `newIds` into `seenUploadedJobIds` after playing
+
+**Phase 3: Legacy System Retirement (5 minutes)**
+- **Disable Old Trigger**: Comment out or remove length-based sound logic in `JobList.fetchJobs()`
+- **Preserve Logging**: Keep `[FETCH-JOBS-TIMING]` logs for observability but remove sound calls
+- **Audio Cleanup**: Remove dashboard-specific audio initialization from `dashboard/page.tsx`
+
+**Phase 4: Testing & Validation (10 minutes)**
+- **False Positive Tests**: Navigate between tabs, change filters, search - no sounds should play
+- **True Positive Tests**: Submit new job, verify sound plays regardless of current page/tab
+- **Duplicate Prevention**: Refresh page, verify same job doesn't trigger sound again
+- **Cross-Page Tests**: Submit job while on admin/analytics pages, verify sound plays
+
+**Technical Implementation Details:**
+
+**Store Extensions:**
+```typescript
+// In useDashboardStore
+seenUploadedJobIds: Set<string>
+soundBaselineEstablished: boolean
+lastUploadedBaselineAt?: string
+```
+
+**Global Watcher Logic:**
+```typescript
+// Polling with ID diff
+const currentIds = new Set(response.map(job => job.id))
+const newIds = new Set([...currentIds].filter(id => !seenUploadedJobIds.has(id)))
+
+if (newIds.size > 0 && soundBaselineEstablished) {
+  await playNewUploadSound()
+  // Merge newIds into seenUploadedJobIds
+}
+```
+
+**Legacy Cleanup:**
+- Remove from `JobList.fetchJobs()`: length comparison and `playNewUploadSound()` call
+- Remove from `dashboard/page.tsx`: audio initialization useEffect
+- Keep `sound-utils.ts` unchanged - it's the reusable audio infrastructure
+
+**Risk Mitigation:**
+- **Gradual Rollout**: Implement global watcher first, test thoroughly, then disable old system
+- **Fallback Safety**: Keep old system commented (not deleted) until new system validated
+- **Audio State**: Ensure global audio initialization doesn't conflict with existing dashboard audio
+- **Performance**: 30-second polling is lightweight; can be reduced to 15s if needed
+
+**Success Metrics:**
+- Zero false positives on tab/filter changes
+- Sound plays for new uploads regardless of current page
+- No duplicate sounds for same job across sessions
+- Audio initialization works from any page in the app
+- No performance degradation from global polling
+
+**Rollback Plan:**
+- If issues arise, uncomment old JobList trigger and disable global watcher
+- Store extensions are additive and won't break existing functionality
+- Audio infrastructure remains unchanged and backward compatible

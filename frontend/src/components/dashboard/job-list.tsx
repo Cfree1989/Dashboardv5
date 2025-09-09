@@ -9,7 +9,6 @@ import { ErrorBoundary } from '../error-boundary';
 import { createErrorState, updateErrorState, clearErrorState } from '../../lib/error-handling';
 import { ErrorCard } from '../ui/error-display';
 import { JobListFilters, JobListState, Job, JobStatus } from '../../types';
-import { playNewUploadSound } from '../../lib/sound-utils';
 
 export default function JobList({ filters, onJobsMutated, refreshToken, onModalOpenChange, searchValue, onSearchInput, setIsJobOperation, expandSignal, collapseSignal, onToggleExpandCollapse }: { 
   filters?: JobListFilters, 
@@ -168,14 +167,6 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           const hadLoaded = prev.data.hasLoaded;
           
           console.log(`🔄 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Updating state: ${previousJobCount} -> ${newJobCount} jobs, hadLoaded: ${hadLoaded}`);
-          
-          // Play sound notification when new jobs appear visually (immediate response)
-          if (newJobCount > previousJobCount && hadLoaded) {
-            console.log(`🔊 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Playing sound for new jobs`);
-            playNewUploadSound().catch((error) => {
-              console.warn('Failed to play dashboard sound:', error);
-            });
-          }
           
           return {
             ...prev,

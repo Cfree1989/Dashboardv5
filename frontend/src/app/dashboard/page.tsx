@@ -5,7 +5,6 @@ import JobList from '../../components/dashboard/job-list';
 import { StatusTabs } from '../../components/dashboard/status-tabs';
 
 import { getLegacyToken } from '../../lib/auth';
-import { initDashboardAudio } from '../../lib/sound-utils';
 import { apiClient } from '../../lib/unified-api-client';
 import { useRef } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
@@ -74,37 +73,6 @@ export default function DashboardPage() {
   // Use currentStatus instead of status
   const status = currentStatus;
 
-  // Initialize audio on page load - requires user interaction for browser autoplay policy
-  useEffect(() => {
-    const initAudio = async () => {
-      await initDashboardAudio();
-    };
-    
-    // Set up user interaction handler for audio activation
-    const handleUserInteraction = async (event: Event) => {
-      const success = await initDashboardAudio();
-      if (success) {
-        // Remove listeners once audio is successfully initialized
-        document.removeEventListener('click', handleUserInteraction);
-        document.removeEventListener('keydown', handleUserInteraction);
-        document.removeEventListener('touchstart', handleUserInteraction);
-      }
-    };
-    
-    // Try to initialize immediately (will fail due to autoplay policy, but sets up context)
-    initAudio();
-    
-    // Set up multiple event listeners to catch any user interaction
-    document.addEventListener('click', handleUserInteraction);
-    document.addEventListener('keydown', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-    
-    return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
-  }, []);
 
   // Debounce search input
   useEffect(() => {

@@ -8,6 +8,15 @@ let audioContext: AudioContext | null = null;
 let audioReady: boolean = false;
 let userInteractionDetected: boolean = false;
 
+// Current volume/variant are provided by the sound store via setters below
+let currentVolume: number = 0.3;
+let currentVariant: 'chime' | 'beep' | 'bell' | 'tone' | 'ping' | 'double' | 'triad' | 'siren' = 'chime';
+
+export function configureSound({ volume, variant }: { volume?: number; variant?: 'chime' | 'beep' | 'bell' | 'tone' | 'ping' | 'double' | 'triad' | 'siren' }) {
+  if (typeof volume === 'number') currentVolume = Math.max(0, Math.min(1, volume));
+  if (variant) currentVariant = variant;
+}
+
 /**
  * Initialize the audio context (required for modern browsers)
  * Returns the context but doesn't guarantee it's ready to play
@@ -80,14 +89,87 @@ export async function playNewUploadSound(): Promise<void> {
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
     
-    // Configure the sound - pleasant two-tone notification
-    oscillator.frequency.setValueAtTime(800, ctx.currentTime); // Start at 800Hz
-    oscillator.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1); // Rise to 1200Hz
-    
-    // Configure volume envelope
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05); // Fade in
-    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3); // Fade out
+    // Configure the sound based on variant
+    const start = ctx.currentTime;
+    switch (currentVariant) {
+      case 'beep':
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(1000, start);
+        break;
+      case 'bell':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(600, start);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, start + 0.12);
+        break;
+      case 'tone':
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(900, start);
+        oscillator.frequency.linearRampToValueAtTime(900, start + 0.2);
+        break;
+      case 'ping':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1200, start);
+        break;
+      case 'double':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(900, start);
+        // Schedule quick second blip via separate oscillator
+        setTimeout(() => {
+          try {
+            const o2 = ctx.createOscillator();
+            const g2 = ctx.createGain();
+            o2.type = 'sine';
+            o2.frequency.setValueAtTime(1100, ctx.currentTime);
+            g2.gain.setValueAtTime(0, ctx.currentTime);
+            g2.gain.linearRampToValueAtTime(Math.max(0.0, Math.min(1.0, currentVolume)) * 0.8, ctx.currentTime + 0.02);
+            g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
+            o2.connect(g2); g2.connect(ctx.destination);
+            o2.start(ctx.currentTime + 0.12);
+            o2.stop(ctx.currentTime + 0.3);
+          } catch {}
+        }, 0);
+        break;
+      case 'triad':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(660, start);
+        // Add quick stacked tones
+        setTimeout(() => {
+          try {
+            const freqs = [660, 880, 1100];
+            freqs.forEach((f, i) => {
+              const o = ctx.createOscillator();
+              const g = ctx.createGain();
+              o.type = 'sine';
+              o.frequency.setValueAtTime(f, ctx.currentTime);
+              g.gain.setValueAtTime(0, ctx.currentTime);
+              g.gain.linearRampToValueAtTime(Math.max(0.0, Math.min(1.0, currentVolume)) * 0.5, ctx.currentTime + 0.02);
+              g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+              o.connect(g); g.connect(ctx.destination);
+              o.start(ctx.currentTime + 0.03 * i);
+              o.stop(ctx.currentTime + 0.23 + 0.03 * i);
+            });
+          } catch {}
+        }, 0);
+        break;
+      case 'siren':
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(700, start);
+        oscillator.frequency.linearRampToValueAtTime(1200, start + 0.15);
+        oscillator.frequency.linearRampToValueAtTime(700, start + 0.3);
+        break;
+      case 'chime':
+      default:
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, start);
+        oscillator.frequency.exponentialRampToValueAtTime(1200, start + 0.1);
+        break;
+    }
+
+    // Configure volume envelope using currentVolume
+    const peak = Math.max(0.0, Math.min(1.0, currentVolume));
+    gainNode.gain.setValueAtTime(0, start);
+    gainNode.gain.linearRampToValueAtTime(peak, start + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, start + 0.3);
     
     // Start and stop the sound
     oscillator.start(ctx.currentTime);
@@ -105,7 +187,7 @@ export async function playNewUploadSound(): Promise<void> {
 async function playFallbackSound(): Promise<void> {
   try {
     const audio = new Audio();
-    audio.volume = 0.3;
+    audio.volume = Math.max(0.0, Math.min(1.0, currentVolume));
     
     // Create a simple beep sound using data URL (short beep tone)
     const sampleRate = 8000;
@@ -135,11 +217,38 @@ async function playFallbackSound(): Promise<void> {
     writeString(36, 'data');
     view.setUint32(40, samples * 2, true);
     
-    // Generate tone data
+    // Generate tone data (variant approximations)
     for (let i = 0; i < samples; i++) {
       const t = i / sampleRate;
-      const frequency = 800 + (400 * t / duration); // Rising tone from 800Hz to 1200Hz
-      const amplitude = Math.sin(2 * Math.PI * frequency * t) * (1 - t / duration) * 0.3; // Fade out
+      let frequency = 800 + (400 * t / duration);
+      switch (currentVariant) {
+        case 'beep':
+          frequency = 1000;
+          break;
+        case 'bell':
+          frequency = 600 + (600 * t / duration);
+          break;
+        case 'tone':
+          frequency = 900;
+          break;
+        case 'ping':
+          frequency = 1200;
+          break;
+        case 'double':
+          frequency = t < duration / 2 ? 900 : 1100;
+          break;
+        case 'triad':
+          frequency = [660, 880, 1100][Math.floor((t / duration) * 3)] || 660;
+          break;
+        case 'siren':
+          frequency = 700 + 500 * Math.abs(Math.sin(2 * Math.PI * (t / duration)));
+          break;
+        case 'chime':
+        default:
+          frequency = 800 + (400 * t / duration);
+          break;
+      }
+      const amplitude = Math.sin(2 * Math.PI * frequency * t) * (1 - t / duration) * currentVolume;
       const sample = Math.max(-1, Math.min(1, amplitude));
       view.setInt16(44 + i * 2, sample * 32767, true);
     }

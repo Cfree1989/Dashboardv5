@@ -1,5 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useSoundStore } from "../../store";
+import type { SoundVariant } from "../../store/types";
+import { initDashboardAudio, configureSound, testSound } from "../../lib/sound-utils";
 
 type SystemInfo = {
   version: string;
@@ -10,8 +13,7 @@ type SystemInfo = {
 };
 
 export function AdminSettingsPanel() {
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [soundVolume, setSoundVolume] = useState(50);
+  const { soundEnabled, volume, variant, setSoundEnabled, setVolume, setVariant } = useSoundStore();
   const [environmentBanner, setEnvironmentBanner] = useState("");
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,7 +42,7 @@ export function AdminSettingsPanel() {
           staff_name: 'admin', // This should come from auth context
           sound: {
             enabled: soundEnabled,
-            volume: soundVolume
+            volume: Math.round((volume || 0) * 100)
           },
           environment_banner: environmentBanner
         }),
@@ -70,20 +72,53 @@ export function AdminSettingsPanel() {
         </div>
         <div className="p-5 space-y-4">
           <label className="inline-flex items-center gap-2 text-sm text-gray-800">
-            <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
+            <input type="checkbox" checked={!!soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
             Enable background sound notifications
           </label>
           {soundEnabled && (
-            <div className="space-y-1">
-              <label className="text-sm text-gray-700">Volume: {soundVolume}%</label>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={soundVolume}
-                onChange={(e) => setSoundVolume(Number(e.target.value))}
-                className="w-full"
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-700">Volume: {Math.round((volume || 0) * 100)}%</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round((volume || 0) * 100)}
+                  onChange={(e) => setVolume(Number(e.target.value) / 100)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-700 block mb-1">Sound Variant</label>
+                <select
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                  value={variant}
+                  onChange={(e) => setVariant(e.target.value as SoundVariant)}
+                >
+                  <option value="chime">Chime</option>
+                  <option value="beep">Beep</option>
+                  <option value="bell">Bell</option>
+                  <option value="tone">Tone</option>
+                  <option value="ping">Ping</option>
+                  <option value="double">Double</option>
+                  <option value="triad">Triad</option>
+                  <option value="siren">Siren</option>
+                </select>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  disabled={!soundEnabled}
+                  onClick={async () => {
+                    await initDashboardAudio();
+                    configureSound({ volume, variant });
+                    await testSound();
+                  }}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Test Sound
+                </button>
+              </div>
             </div>
           )}
         </div>

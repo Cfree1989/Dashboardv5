@@ -31,6 +31,11 @@ export const useDashboardStore = create<DashboardStore>()(
         currentStatus: JobStatus.UPLOADED,
         counts: {},
 
+        // Sound notification state
+        seenUploadedJobIds: new Set<string>(),
+        soundBaselineEstablished: false,
+        lastUploadedBaselineAt: undefined,
+
         // Search actions
         setSearchValue: (value: string) => {
           set({ searchValue: value });
@@ -118,6 +123,29 @@ export const useDashboardStore = create<DashboardStore>()(
           } finally {
             setRefreshing(false);
           }
+        },
+
+        // Sound notification actions
+        initializeUploadSoundBaseline: (ids: string[], timestamp: string) => {
+          set({
+            seenUploadedJobIds: new Set<string>(ids),
+            soundBaselineEstablished: true,
+            lastUploadedBaselineAt: timestamp,
+          });
+        },
+        addSeenUploadedJobIds: (ids: string[]) => {
+          set((state) => {
+            const merged = new Set<string>(state.seenUploadedJobIds);
+            for (const id of ids) merged.add(id);
+            return { seenUploadedJobIds: merged } as Partial<DashboardStore>;
+          });
+        },
+        resetUploadSoundState: () => {
+          set({
+            seenUploadedJobIds: new Set<string>(),
+            soundBaselineEstablished: false,
+            lastUploadedBaselineAt: undefined,
+          });
         },
       })
     ),

@@ -41,6 +41,11 @@ export interface DashboardState {
   // Data state
   currentStatus: string;
   counts: Record<string, number>;
+  
+  // Sound notification state
+  seenUploadedJobIds: Set<string>;
+  soundBaselineEstablished: boolean;
+  lastUploadedBaselineAt?: string;
 }
 
 export interface DashboardActions {
@@ -66,9 +71,31 @@ export interface DashboardActions {
   
   // Combined actions
   refreshData: () => Promise<void>;
+  
+  // Sound notification actions
+  initializeUploadSoundBaseline: (ids: string[], timestamp: string) => void;
+  addSeenUploadedJobIds: (ids: string[]) => void;
+  resetUploadSoundState: () => void;
 }
 
 export interface DashboardStore extends DashboardState, DashboardActions {}
+
+// Sound configuration store types
+export type SoundVariant = 'chime' | 'beep' | 'bell' | 'tone' | 'ping' | 'double' | 'triad' | 'siren';
+
+export interface SoundState {
+  soundEnabled: boolean;
+  volume: number; // 0.0 - 1.0
+  variant: SoundVariant;
+}
+
+export interface SoundActions {
+  setSoundEnabled: (enabled: boolean) => void;
+  setVolume: (volume: number) => void;
+  setVariant: (variant: SoundVariant) => void;
+}
+
+export interface SoundStore extends SoundState, SoundActions {}
 
 // Modal Management Store Types
 export type ModalType = 

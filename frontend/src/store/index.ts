@@ -8,6 +8,7 @@ export { useAuthStore } from './slices/auth-store';
 export { useDashboardStore } from './slices/dashboard-store';
 export { useModalStore } from './slices/modal-store';
 export { useJobOperationsStore } from './slices/job-operations-store';
+export { useSoundStore } from './slices/sound-store';
 
 // Export store utilities and hooks
 export * from './utils';
