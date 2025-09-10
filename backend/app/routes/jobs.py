@@ -286,8 +286,18 @@ def set_attention(job_id):
     data = request.get_json(silent=True) or {}
     val = bool(data.get('needs_attention'))
     job.needs_attention = val
+    logger.info(f"[ATTN-API] job_id={job.id} set needs_attention={val}")
+    # Mirror to metadata for immediate consistency in audits (best-effort)
+    try:
+      meta = _load_metadata(job)
+      if meta.get('needs_attention') != val:
+        meta['needs_attention'] = val
+        _save_metadata(job, meta)
+    except Exception:
+      pass
     db.session.add(job)
     db.session.commit()
+    logger.info(f"[ATTN-API] job_id={job.id} committed needs_attention={job.needs_attention}")
     return ResponseService.success(job.to_dict())
 
 

@@ -118,19 +118,26 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
 
   // Add ref to prevent concurrent fetches
   const isFetchingRef = useRef(false);
+  // Sequence id for fetches to prevent duplicate logs in Strict Mode
+  const fetchSeqRef = useRef(0);
+  const loggedUpdateFetchSeqRef = useRef<number | null>(null);
+  const loggedNoChangeFetchSeqRef = useRef<number | null>(null);
+  // Simple debouncing for mutation events
+  const lastMutatedEventRef = useRef<{ key: string; at: number } | null>(null);
   
   // Memoized fetch jobs function
-  const fetchJobs = useCallback(async (bypassCache = false) => {
+  const fetchJobs = useCallback(async (bypassCache = false, origin: string = 'unknown') => {
+    const fetchSeq = ++fetchSeqRef.current;
     // Prevent concurrent fetches (even when bypassing cache)
     if (isFetchingRef.current) {
-      console.log(`⏭️ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Skipping duplicate fetchJobs call (already fetching)`);
+      console.log(`⏭️ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Skipping duplicate fetchJobs call (already fetching) [origin: ${origin}]`);
       return;
     }
     
     isFetchingRef.current = true;
     const fetchStartTime = Date.now();
     const cacheStatus = bypassCache ? "(BYPASSING CACHE)" : "(using cache)";
-    console.log(`📡 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() started for status: ${filters?.status || 'ALL'} ${cacheStatus}`);
+    console.log(`📡 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() started for status: ${filters?.status || 'ALL'} ${cacheStatus} [origin: ${origin}]`);
     
     // Always create a fresh controller - don't try to abort existing ones in development
     const controller = new AbortController();
@@ -162,7 +169,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       const apiUrl = `/api/v1/jobs?${params.toString()}`;
       
       const apiStartTime = Date.now();
-      console.log(`🌐 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Making API request to: ${apiUrl}`);
+      console.log(`🌐 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Making API request to: ${apiUrl} [origin: ${origin}]`);
       
       const response = await apiClient.request<any[]>(apiUrl, {
         signal: controller.signal
@@ -171,7 +178,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       });
 
       const apiEndTime = Date.now();
-      console.log(`📨 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} API response received in ${apiEndTime - apiStartTime}ms, job count: ${response.length}`);
+      console.log(`📨 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} API response received in ${apiEndTime - apiStartTime}ms, job count: ${response.length} [origin: ${origin}]`);
 
       if (!controller.signal.aborted) {
         const stateUpdateStart = Date.now();
@@ -180,11 +187,43 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           const newJobCount = response.length;
           const hadLoaded = prev.data.hasLoaded;
           
-          console.log(`🔄 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Updating state: ${previousJobCount} -> ${newJobCount} jobs, hadLoaded: ${hadLoaded}`);
+          if (loggedUpdateFetchSeqRef.current !== fetchSeq) {
+            console.log(`🔄 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Updating state: ${previousJobCount} -> ${newJobCount} jobs, hadLoaded: ${hadLoaded} [origin: ${origin}]`);
+            loggedUpdateFetchSeqRef.current = fetchSeq;
+          }
           
+          // Use fresh API response data directly - JobCard handles its own state sync
+          const merged = response;
+
+          // If nothing material changed, avoid re-render churn
+          const sameLength = prev.data.jobs.length === merged.length;
+          let noChanges = sameLength;
+          if (noChanges) {
+            for (let i = 0; i < merged.length; i++) {
+              const mj = merged[i] as any;
+              const pj = prev.data.jobs[i] as any;
+              if (!pj || pj.id !== mj.id || pj.needs_attention !== mj.needs_attention || pj.is_unreviewed !== mj.is_unreviewed) {
+                noChanges = false;
+                break;
+              }
+            }
+          }
+
+          if (noChanges && hadLoaded) {
+            if (loggedNoChangeFetchSeqRef.current !== fetchSeq) {
+              console.log(`🛑 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} No changes detected; skipping state update [origin: ${origin}]`);
+              loggedNoChangeFetchSeqRef.current = fetchSeq;
+            }
+            return {
+              ...prev,
+              loading: { loading: false, isFetching: false },
+              error: clearErrorState()
+            };
+          }
+
           return {
             ...prev,
-            data: { jobs: response, hasLoaded: true },
+            data: { jobs: merged, hasLoaded: true },
             loading: { loading: false, isFetching: false },
             error: clearErrorState()
           };
@@ -192,12 +231,12 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
         
         const stateUpdateEnd = Date.now();
         const totalFetchTime = Date.now() - fetchStartTime;
-        console.log(`🎯 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} State update completed in ${stateUpdateEnd - stateUpdateStart}ms`);
-        console.log(`✅ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Total fetchJobs() time: ${totalFetchTime}ms`);
+        console.log(`🎯 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} State update completed in ${stateUpdateEnd - stateUpdateStart}ms [origin: ${origin}]`);
+        console.log(`✅ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Total fetchJobs() time: ${totalFetchTime}ms [origin: ${origin}]`);
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
-        console.error(`❌ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() failed:`, err);
+        console.error(`❌ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} fetchJobs() failed [origin: ${origin}]:`, err);
         const newErrorState = updateErrorState(state.error, err);
         setState(prev => ({
           ...prev,
@@ -211,18 +250,41 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
     }
   }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, needsAttention]);
 
-  // Fetch jobs when filters change
+  // Fetch jobs when filters change / on mount
   useEffect(() => {
-    fetchJobs();
+    fetchJobs(false, 'effect:mount-or-filters-change');
   }, [fetchJobs]);
 
-  // Listen for simple mutation event to refresh list
+  // Listen for mutation event to refresh list with debounce to coalesce bursts
   useEffect(() => {
-    const handler = () => fetchJobs(true);
+    let timer: NodeJS.Timeout | null = null;
+    const handler = (evt: Event) => {
+      const detail: any = (evt as any).detail || {};
+      const reason = detail?.reason || 'unknown';
+      const jobId = detail?.jobId || 'unknown';
+      const key = `${reason}:${jobId}`;
+      const now = Date.now();
+
+      // Only debounce identical events within 200ms (much shorter window)
+      // This prevents rapid duplicate events while allowing legitimate state changes
+      if (lastMutatedEventRef.current && lastMutatedEventRef.current.key === key && (now - lastMutatedEventRef.current.at) < 200) {
+        console.log(`🚫 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} duplicate jobs:mutated ignored (${key})`);
+        return;
+      }
+      lastMutatedEventRef.current = { key, at: now };
+
+      console.log(`⚡ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} dashboard:jobs:mutated event received (debounced) reason=${reason} jobId=${jobId}`);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        fetchJobs(true, 'event:dashboard:jobs:mutated');
+        timer = null;
+      }, 150);
+    };
     if (typeof window !== 'undefined') {
       window.addEventListener('dashboard:jobs:mutated', handler);
     }
     return () => {
+      if (timer) clearTimeout(timer);
       if (typeof window !== 'undefined') {
         window.removeEventListener('dashboard:jobs:mutated', handler);
       }
@@ -233,7 +295,8 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   useEffect(() => {
     if (refreshToken && state.data.hasLoaded) {
       // Bypass cache on auto refresh to avoid stale lists after external mutations
-      fetchJobs(true);
+      console.log(`🔁 [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} refreshToken changed -> triggering fetch [token: ${refreshToken}]`);
+      fetchJobs(true, 'tick:refreshToken');
     }
   }, [refreshToken, fetchJobs, state.data.hasLoaded]);
 
@@ -408,7 +471,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       <div className="mt-8 text-center">
         <p className="text-red-600 mb-4">{state.error.message}</p>
         <button
-          onClick={() => fetchJobs()}
+          onClick={() => fetchJobs(false, 'ui:retry')}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Retry
@@ -455,7 +518,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
                 checked={needsAttention}
                 onChange={(e) => {
                   setNeedsAttention(e.target.checked);
-                  fetchJobs(true);
+                  fetchJobs(true, 'checkbox:needsAttention');
                 }}
               />
               Needs Attention
@@ -484,7 +547,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
           <div className="mb-6">
             <ErrorCard
               error={state.error}
-              onRetry={() => fetchJobs()}
+              onRetry={() => fetchJobs(false, 'ui:error-card-retry')}
               onDismiss={() => setState(prev => ({ ...prev, error: clearErrorState() }))}
             />
           </div>

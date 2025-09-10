@@ -39,10 +39,8 @@ class JobQueryService:
         from app import db
         logger = logging.getLogger(__name__)
         
-        # Force database session refresh to see latest committed changes (guarded)
-        import os
-        if os.environ.get('FRESH_READ_DEFENSIVE', '0') in ('1', 'true', 'True'):
-            db.session.expire_all()
+        # Force database session refresh to see latest committed changes
+        db.session.expire_all()
         
         logger.info(f"[JOB-QUERY-TIMING] Starting query for status={filters.status}")
         query = Job.query
@@ -92,10 +90,8 @@ class JobQueryService:
         from app import db
         logger = logging.getLogger(__name__)
         
-        # Force database session refresh to see latest committed changes (guarded)
-        import os
-        if os.environ.get('FRESH_READ_DEFENSIVE', '0') in ('1', 'true', 'True'):
-            db.session.expire_all()
+        # Force database session refresh to see latest committed changes
+        db.session.expire_all()
         
         logger.info(f"[JOB-COUNT-TIMING] Starting job counts query with search={search}")
         query = Job.query

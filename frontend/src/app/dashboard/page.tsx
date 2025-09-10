@@ -172,6 +172,7 @@ export default function DashboardPage() {
         fetchCounts().then(() => {
           // Small delay to ensure counts are processed before job list refresh
           setTimeout(() => {
+            console.log(`⏲️ [DASH-REFRESH] ${new Date().toLocaleTimeString()} auto interval tick -> incrementRefreshTick()`);
             incrementRefreshTick();
           }, 500); // Half second delay to ensure proper sequencing
         });
@@ -211,6 +212,7 @@ export default function DashboardPage() {
     const ts = new Date().toLocaleTimeString();
     setLastUpdated(ts);
     try { localStorage.setItem('lastUpdated', ts); } catch {}
+    console.log(`🔄 [DASH-REFRESH] ${new Date().toLocaleTimeString()} manual refresh -> incrementRefreshTick()`);
     incrementRefreshTick();
     await fetchCounts(); // ensure tab counts update immediately
     await new Promise(resolve => setTimeout(resolve, 300));

@@ -85,9 +85,14 @@ export default function JobCard({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // Local UI state for instant responsiveness
+  // Simple local state that syncs with job prop
   const [attention, setAttention] = useState<boolean>(job.needs_attention === true);
   const [viewCleared, setViewCleared] = useState<boolean>(false);
+
+  // Keep local state in sync with job prop changes
+  useEffect(() => {
+    setAttention(job.needs_attention === true);
+  }, [job.needs_attention]);
 
   const { show } = useToast();
   const isUnreviewed = currentStatus === JobStatus.UPLOADED && (job.is_unreviewed === true) && !viewCleared;
@@ -219,13 +224,8 @@ export default function JobCard({
                 method: 'PATCH',
                 body: JSON.stringify({ needs_attention: next })
               });
-              // Trigger parent refresh if available
-              if (typeof window !== 'undefined') {
-                // naive: reload current list via event; parent JobList listens to refresh tick
-                const evt = new CustomEvent('dashboard:jobs:mutated');
-                window.dispatchEvent(evt);
-              }
             } catch {
+              // Revert on error
               setAttention(prev => !prev);
             }
           }}
@@ -376,7 +376,9 @@ export default function JobCard({
                     await apiClient.request(`/api/v1/jobs/${job.id}/mark-viewed`, { method: 'PATCH' });
                     setViewCleared(true);
                     if (typeof window !== 'undefined') {
-                      const evt = new CustomEvent('dashboard:jobs:mutated');
+                      const reason = 'open-file:mark-viewed';
+                      console.log(`📣 [JOBS-MUTATED] ${new Date().toLocaleTimeString()} dispatch dashboard:jobs:mutated (${reason}) for job ${job.id}`);
+                      const evt = new CustomEvent('dashboard:jobs:mutated', { detail: { reason, jobId: job.id } });
                       window.dispatchEvent(evt);
                     }
                   } catch {}

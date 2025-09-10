@@ -1430,6 +1430,29 @@ Based on code analysis and historical context, this appears to be a **multi-laye
 - Verified no Nginx/API caching; prod uses Gunicorn (4 workers).
 - Authored Root_Cause_Analysis.md and Sequence_Diagram.md outlining issue and fix.
  - Performed DB wipe via `scripts/clear_all_data_fast.py`; seeded base staff only; verification: jobs=0, events=0, payments=0; staff=7.
+- **FIXED: "Needs Attention" Button State Override Issue** ✅
+  - **Root Cause**: JobCard local `attention` state was being overridden by JobList's state merging logic
+  - **Problem**: State merging in JobList looked at old server data instead of JobCard's local state
+  - **Final Solution**: Simplified to pure optimistic updates - local state only syncs on job ID changes (new jobs)
+  - **Key Insight**: Don't sync local state with prop changes during active user interactions
+  - **Files Modified**: `job-card.tsx` (pure optimistic updates), `job-list.tsx` (simplified state merging)
+  - **Result**: "Needs attention" button now responds immediately and maintains state correctly
+
+- **FIXED: "Every Other Click" Issue with BFROS Analysis** ✅
+  - **BFROS Root Cause**: Debouncing logic in JobList was preventing rapid attention toggles
+  - **Problem**: 1000ms debounce window treated `attention:on` and `attention:off` as duplicates
+  - **Evidence**: Logs showed "duplicate jobs:mutated ignored" for legitimate state changes
+  - **Solution**: Reduced debounce window from 1000ms to 200ms for attention events
+  - **Files Modified**: `job-list.tsx` (debouncing logic)
+  - **Result**: Button now responds to every click without being blocked by debouncing
+
+- **SIMPLIFIED: Removed Over-Engineering** ✅
+  - **Problem**: Simple toggle button had become overly complex with multiple state layers
+  - **Solution**: Stripped back to basic optimistic updates with simple error handling
+  - **Removed**: Concurrent call prevention, complex logging, event dispatching, debouncing complexity
+  - **Kept**: Simple local state that syncs with job props, basic error reversion
+  - **Files Modified**: `job-card.tsx` (simplified), `job-list.tsx` (cleaned up)
+  - **Result**: Much simpler, more maintainable code for a basic UI interaction
 
 ## Executor's Feedback or Assistance Requests
 - None needed at this time. If desired, I can implement `@app.teardown_request` with `db.session.remove()` to ensure session-per-request hygiene.
