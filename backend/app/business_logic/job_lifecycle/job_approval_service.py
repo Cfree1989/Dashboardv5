@@ -126,6 +126,12 @@ class JobApprovalService:
         # Save job changes
         db_start = time.time()
         job.status = 'PENDING'
+        # Auto-clear unreviewed when leaving UPLOADED via approval
+        try:
+            if hasattr(job, 'is_unreviewed'):
+                job.is_unreviewed = False
+        except Exception:
+            pass
         logger.info(f"[APPROVAL-BACKEND-TIMING] About to add job to session and commit for {job_id}")
         
         db.session.add(job)
@@ -202,6 +208,12 @@ class JobApprovalService:
         job.status = 'REJECTED'
         job.reject_reasons = reasons
         job.last_updated_by = rejection_data.staff_name
+        # Auto-clear unreviewed when leaving UPLOADED via rejection
+        try:
+            if hasattr(job, 'is_unreviewed'):
+                job.is_unreviewed = False
+        except Exception:
+            pass
         
         # Save job changes
         db.session.add(job)

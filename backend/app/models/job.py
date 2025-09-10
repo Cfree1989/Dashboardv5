@@ -40,6 +40,9 @@ class Job(db.Model):
     staff_viewed_at = db.Column(db.DateTime, nullable=True)
     last_updated_by = db.Column(db.String(100), nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    # Review/Attention Flags
+    is_unreviewed = db.Column(db.Boolean, default=True)
+    needs_attention = db.Column(db.Boolean, default=False)
 
     # Locking fields
     locked_by = db.Column(db.String(100), nullable=True)
@@ -81,6 +84,8 @@ class Job(db.Model):
             'reject_reasons': self.reject_reasons,
             'last_updated_by': self.last_updated_by,
             'notes': self.notes,
+            'is_unreviewed': bool(self.is_unreviewed) if self.is_unreviewed is not None else False,
+            'needs_attention': bool(self.needs_attention) if self.needs_attention is not None else False,
             'created_at': self.created_at.replace(tzinfo=timezone.utc).isoformat(),
             'updated_at': self.updated_at.replace(tzinfo=timezone.utc).isoformat(),
             'locked_by': self.locked_by,

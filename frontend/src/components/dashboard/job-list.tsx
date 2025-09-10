@@ -38,6 +38,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       sortDir: 'desc',
     },
   });
+  const [needsAttention, setNeedsAttention] = useState<boolean>(false);
 
   const router = useRouter();
   const controllerRef = useRef<AbortController | null>(null);
@@ -65,6 +66,18 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       return [];
     }
     const copy = [...state.data.jobs];
+    // If viewing Uploaded, group: Unreviewed first -> Needs Attention -> others
+    if ((filters?.status || '') === JobStatus.UPLOADED) {
+      copy.sort((a, b) => {
+        const aUn = a.is_unreviewed === true ? 1 : 0;
+        const bUn = b.is_unreviewed === true ? 1 : 0;
+        if (aUn !== bUn) return bUn - aUn; // unreviewed first
+        const aNa = a.needs_attention === true ? 1 : 0;
+        const bNa = b.needs_attention === true ? 1 : 0;
+        if (aNa !== bNa) return bNa - aNa; // then attention
+        return 0;
+      });
+    }
     copy.sort((a, b) => {
       let aVal: any = (a as any)[state.sorting.sortBy];
       let bVal: any = (b as any)[state.sorting.sortBy];
@@ -108,9 +121,9 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
   
   // Memoized fetch jobs function
   const fetchJobs = useCallback(async (bypassCache = false) => {
-    // Prevent concurrent fetches
-    if (isFetchingRef.current && !bypassCache) {
-      console.log(`⏭️ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Skipping duplicate fetchJobs call`);
+    // Prevent concurrent fetches (even when bypassing cache)
+    if (isFetchingRef.current) {
+      console.log(`⏭️ [FETCH-JOBS-TIMING] ${new Date().toLocaleTimeString()} Skipping duplicate fetchJobs call (already fetching)`);
       return;
     }
     
@@ -140,6 +153,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (qSearch) params.append('search', qSearch);
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
+      if (needsAttention) params.append('needs_attention', 'true');
 
       // Cache-busting when bypassing cache to avoid any intermediary caches returning stale data
       if (bypassCache) {
@@ -195,11 +209,24 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       // Always reset fetch guard
       isFetchingRef.current = false;
     }
-  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline]);
+  }, [filters?.status, filters?.search, filters?.printer, filters?.discipline, needsAttention]);
 
   // Fetch jobs when filters change
   useEffect(() => {
     fetchJobs();
+  }, [fetchJobs]);
+
+  // Listen for simple mutation event to refresh list
+  useEffect(() => {
+    const handler = () => fetchJobs(true);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('dashboard:jobs:mutated', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('dashboard:jobs:mutated', handler);
+      }
+    };
   }, [fetchJobs]);
 
   // Refresh jobs when refreshToken changes
@@ -266,6 +293,7 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
       if (qSearch) params.append('search', qSearch);
       if (filters?.printer) params.append('printer', filters.printer);
       if (filters?.discipline) params.append('discipline', filters.discipline);
+      if (filters?.needs_attention === true) params.append('needs_attention', 'true');
       const apiUrl = `/api/v1/jobs?${params.toString()}`;
 
       // Mutation already happened in modal; run a no-op mutation and refetch list fresh
@@ -419,7 +447,19 @@ export default function JobList({ filters, onJobsMutated, refreshToken, onModalO
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                checked={needsAttention}
+                onChange={(e) => {
+                  setNeedsAttention(e.target.checked);
+                  fetchJobs(true);
+                }}
+              />
+              Needs Attention
+            </label>
             <button
               onClick={onToggleExpandCollapse}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { useToast } from "../ui/toast";
 import ReviewModal from './modals/review-modal';
 import RejectionModal from './modals/rejection-modal';
@@ -85,9 +85,12 @@ export default function JobCard({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [openFileModal, setOpenFileModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Local UI state for instant responsiveness
+  const [attention, setAttention] = useState<boolean>(job.needs_attention === true);
+  const [viewCleared, setViewCleared] = useState<boolean>(false);
 
   const { show } = useToast();
-  const isUnreviewed = currentStatus === JobStatus.UPLOADED && !job.staff_viewed_at;
+  const isUnreviewed = currentStatus === JobStatus.UPLOADED && (job.is_unreviewed === true) && !viewCleared;
   const detailsSectionId = `details-section-${job.id}`;
   
 
@@ -195,11 +198,41 @@ export default function JobCard({
   return (
     <div
       className={`
-        bg-white rounded-xl shadow-sm border transition-all card-hover
+        bg-white rounded-xl shadow-sm border transition-all card-hover relative
         ${isUnreviewed ? "border-orange-400 shadow-orange-100 animate-pulse-subtle" : "border-gray-200 hover:border-gray-300"}
         ${isLocked ? "opacity-50 pointer-events-none" : ""}
       `}
     >
+      {/* Top-right icon button */}
+      <div className="absolute top-2 right-2 z-10">
+        <button
+          type="button"
+          className={`p-1.5 rounded-full focus-ring btn-transition ${attention ? 'bg-orange-500 text-white' : (isUnreviewed ? 'bg-orange-100 text-orange-700 animate-pulse-subtle' : 'bg-gray-100 text-gray-500 hover:text-gray-700')}`}
+          title={attention ? 'Needs attention' : (isUnreviewed ? 'Unreviewed' : 'Mark needs attention')}
+          aria-label={attention ? 'Needs attention' : (isUnreviewed ? 'Unreviewed' : 'Mark needs attention')}
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              const next = !attention;
+              setAttention(next);
+              await apiClient.request(`/api/v1/jobs/${job.id}/attention`, {
+                method: 'PATCH',
+                body: JSON.stringify({ needs_attention: next })
+              });
+              // Trigger parent refresh if available
+              if (typeof window !== 'undefined') {
+                // naive: reload current list via event; parent JobList listens to refresh tick
+                const evt = new CustomEvent('dashboard:jobs:mutated');
+                window.dispatchEvent(evt);
+              }
+            } catch {
+              setAttention(prev => !prev);
+            }
+          }}
+        >
+          <AlertTriangle className="w-4 h-4" />
+        </button>
+      </div>
       <div className="p-4">
         {/* Job Header Component */}
         <JobCardHeader
@@ -339,6 +372,13 @@ export default function JobCard({
                 onClick={async (e) => {
                   try {
                     await apiClient.post(`/api/v1/jobs/${job.id}/log-file-open`, {});
+                    // Clear unreviewed on Open File
+                    await apiClient.request(`/api/v1/jobs/${job.id}/mark-viewed`, { method: 'PATCH' });
+                    setViewCleared(true);
+                    if (typeof window !== 'undefined') {
+                      const evt = new CustomEvent('dashboard:jobs:mutated');
+                      window.dispatchEvent(evt);
+                    }
                   } catch {}
                   setTimeout(() => {
                     setOpenFileModal(false);

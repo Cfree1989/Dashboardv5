@@ -62,11 +62,20 @@ def list_jobs():
     if correlation_id:
         logger.info(f"[RAW-TRACE] cid={correlation_id} route=list_jobs workstation={getattr(g, 'workstation_id', None)}")
     # Build filters from query parameters
+    def _parse_bool(val: str | None) -> bool | None:
+        if val is None:
+            return None
+        v = val.strip().lower()
+        if v in ('1', 'true', 't', 'yes', 'y', 'on'): return True
+        if v in ('0', 'false', 'f', 'no', 'n', 'off'): return False
+        return None
+
     filters = JobFilters(
         status=request.args.get('status'),
         search=request.args.get('search'),
         printer=request.args.get('printer'),
-        discipline=request.args.get('discipline')
+        discipline=request.args.get('discipline'),
+        needs_attention=_parse_bool(request.args.get('needs_attention'))
     )
     
     # Use JobQueryService to get filtered jobs
@@ -251,6 +260,35 @@ def log_file_open(job_id):
     db.session.add(evt)
     db.session.commit()
     return jsonify({'message': 'logged'}), 200
+
+
+@bp.route('/<job_id>/mark-viewed', methods=['PATCH'])
+@token_required
+def mark_viewed(job_id):
+    """Clear unreviewed flag when a file is opened from the UI."""
+    job = orchestration_service.get_job_by_id(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    # Only meaningful in Uploaded, but safe to clear regardless
+    job.is_unreviewed = False
+    db.session.add(job)
+    db.session.commit()
+    return ResponseService.success(job.to_dict())
+
+
+@bp.route('/<job_id>/attention', methods=['PATCH'])
+@token_required
+def set_attention(job_id):
+    """Toggle needs_attention flag."""
+    job = orchestration_service.get_job_by_id(job_id)
+    if not job:
+        abort(404, description='Job not found')
+    data = request.get_json(silent=True) or {}
+    val = bool(data.get('needs_attention'))
+    job.needs_attention = val
+    db.session.add(job)
+    db.session.commit()
+    return ResponseService.success(job.to_dict())
 
 
 @bp.route('/<job_id>/notes', methods=['PATCH'])

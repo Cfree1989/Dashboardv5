@@ -94,6 +94,15 @@ class JobAdminService:
         # Update job
         job.status = new_status
         job.last_updated_by = status_change_data.staff_name
+        # Auto flag rules for unreviewed when crossing Uploaded boundary
+        try:
+            if hasattr(job, 'is_unreviewed'):
+                if new_status == 'UPLOADED':
+                    job.is_unreviewed = True
+                elif before == 'UPLOADED' and new_status != 'UPLOADED':
+                    job.is_unreviewed = False
+        except Exception:
+            pass
         
         # Move files only if mapping exists for the target status
         if new_status in STATUS_TO_DIR:
@@ -144,6 +153,12 @@ class JobAdminService:
         
         before = job.status
         job.status = 'ARCHIVED'
+        # Leaving Uploaded via archive clears unreviewed
+        try:
+            if hasattr(job, 'is_unreviewed') and before == 'UPLOADED':
+                job.is_unreviewed = False
+        except Exception:
+            pass
         
         # Move file/metadata to Archived and sync metadata
         atomic_service = get_atomic_file_service()

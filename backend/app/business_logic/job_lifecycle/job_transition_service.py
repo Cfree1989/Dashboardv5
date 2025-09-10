@@ -54,6 +54,15 @@ class JobTransitionService:
         # Update job
         job.status = new_status
         job.last_updated_by = staff_name
+        # Auto flag rules for unreviewed when crossing Uploaded boundary
+        try:
+            if hasattr(job, 'is_unreviewed'):
+                if new_status == 'UPLOADED':
+                    job.is_unreviewed = True
+                elif previous_status == 'UPLOADED' and new_status != 'UPLOADED':
+                    job.is_unreviewed = False
+        except Exception:
+            pass
         
         # Handle status-specific logic
         if new_status in ['PRINTING', 'COMPLETED', 'PAIDPICKEDUP']:

@@ -47,6 +47,9 @@ export interface Job {
   payment?: Payment;
   locked_by?: string;
   locked_until?: string;
+  // New flags for UI glow & attention
+  is_unreviewed?: boolean;
+  needs_attention?: boolean;
 }
 
 /**
@@ -83,6 +86,7 @@ export interface JobListFilters {
   search?: string;
   printer?: string;
   discipline?: string;
+  needs_attention?: boolean;
 }
 
 /**

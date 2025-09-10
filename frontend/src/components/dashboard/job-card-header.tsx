@@ -72,36 +72,15 @@ export function JobCardHeader({
         </div>
       )}
 
-      {/* NEW badge and review button */}
-      {currentStatus === JobStatus.UPLOADED && isUnreviewed && (
-        <div className="flex items-center justify-between mb-3">
+      {/* Top-right attention/unreviewed icon */}
+      <div className="flex items-center justify-between mb-3">
+        {currentStatus === JobStatus.UPLOADED && isUnreviewed ? (
           <span className="bg-orange-200 text-orange-900 text-xs font-semibold px-2 py-1 rounded-full">NEW</span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onMarkReviewed}
-                disabled={isMarkingReviewed}
-                className="text-xs text-gray-500 hover:text-gray-700 flex items-center disabled:opacity-50 focus-ring btn-transition"
-                title="Mark as reviewed (hides NEW badge)"
-                aria-label="Mark as reviewed (hides NEW badge)"
-              >
-                {isMarkingReviewed ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent mr-1"></div>
-                    Marking...
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3 h-3 mr-1" />
-                    Reviewed
-                  </>
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Marks this job as reviewed (hides NEW badge)</TooltipContent>
-          </Tooltip>
-        </div>
-      )}
+        ) : (
+          <span className="invisible select-none text-xs px-2 py-1">&nbsp;</span>
+        )}
+        {/* Right icon shown/controlled by parent card via CSS overlay; placeholder here for spacing */}
+      </div>
 
       {/* Job title and age */}
       <div className="flex justify-between items-start mb-3">

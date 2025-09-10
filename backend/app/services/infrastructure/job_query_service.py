@@ -13,11 +13,13 @@ from app.models.job import Job
 class JobFilters:
     """Filter parameters for job queries"""
     def __init__(self, status: Optional[str] = None, search: Optional[str] = None, 
-                 printer: Optional[str] = None, discipline: Optional[str] = None):
+                 printer: Optional[str] = None, discipline: Optional[str] = None,
+                 needs_attention: Optional[bool] = None):
         self.status = status
         self.search = search
         self.printer = printer
         self.discipline = discipline
+        self.needs_attention = needs_attention
 
 
 class JobQueryService:
@@ -54,6 +56,8 @@ class JobQueryService:
         
         if filters.discipline:
             query = query.filter_by(discipline=filters.discipline)
+        if filters.needs_attention is True:
+            query = query.filter_by(needs_attention=True)
         
         import time
         query_start = time.time()
