@@ -194,9 +194,29 @@ class AnalyticsService(IAnalyticsService):
         
         printer_utilization = dict(printer_counts)
         
-        # Material consumption
-        filament_g = sum(j.weight_g or 0 for j in jobs if j.material == 'filament')
-        resin_g = sum(j.weight_g or 0 for j in jobs if j.material == 'resin')
+        # Material consumption should be based on Payments within the date window
+        # Sum grams by material using Payment.paid_ts and associated Job.material
+        filament_g = 0.0
+        resin_g = 0.0
+        payments_in_range = Payment.query.filter(
+            Payment.paid_ts >= date_range.start,
+            Payment.paid_ts <= date_range.end
+        ).all()
+        for p in payments_in_range:
+            job = Job.query.get(p.job_id)
+            if not job:
+                continue
+            # Apply filters if specified
+            if filters.printer and getattr(job, 'printer', None) != filters.printer:
+                continue
+            if filters.discipline and getattr(job, 'discipline', None) != filters.discipline:
+                continue
+            mat = (getattr(job, 'material', None) or 'filament').strip().lower()
+            grams = float(getattr(p, 'grams', 0) or 0)
+            if mat == 'resin':
+                resin_g += grams
+            else:
+                filament_g += grams
         
         # Queue age buckets
         buckets = self._calculate_queue_age_buckets(jobs)

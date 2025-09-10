@@ -322,6 +322,8 @@ class AtomicFileService:
     
     def __init__(self):
         self.lock_service = get_file_lock_service()
+        # Do not cache file configuration for the service; STORAGE_PATH can change per request/test
+        # Keep a benign attribute for backward compatibility, but always fetch fresh config when needed
         self.file_config = get_file_configuration_service()
         
     def atomic_move_authoritative(self, job, target_status: str) -> bool:
@@ -564,7 +566,9 @@ class AtomicFileService:
             return None
             
         # Use centralized path management
-        return self.file_config.get_job_file_path(source_path.name, target_status)
+        # Always use fresh file configuration to respect dynamic STORAGE_PATH
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service as _cfg
+        return _cfg().get_job_file_path(source_path.name, target_status)
         
     def _get_metadata_path(self, job) -> Optional[Path]:
         """Get the metadata path for a job."""
@@ -584,12 +588,14 @@ class AtomicFileService:
             base_filename = metadata_path.name[:-len('_metadata.json')]
         else:
             base_filename = metadata_path.stem
-        return self.file_config.get_job_metadata_path(base_filename, target_status)
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service as _cfg
+        return _cfg().get_job_metadata_path(base_filename, target_status)
         
     def _get_storage_root_from_path(self, file_path: Path) -> Path:
         """Infer storage root from an existing file path."""
         # Use centralized storage root
-        return self.file_config.get_storage_root()
+        from app.services.infrastructure.file_configuration_service import get_file_configuration_service as _cfg
+        return _cfg().get_storage_root()
 
 # Global service instance
 _atomic_file_service = None

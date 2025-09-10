@@ -900,8 +900,17 @@ _file_config_service = None
 
 
 def get_file_configuration_service() -> FileConfigurationService:
-    """Get the global file configuration service instance"""
+    """Get the global file configuration service instance, refreshing if env changed."""
     global _file_config_service
+    desired_root = os.environ.get('STORAGE_PATH', 'storage')
     if _file_config_service is None:
         _file_config_service = FileConfigurationService()
+    else:
+        try:
+            current_root = str(_file_config_service.get_storage_root())
+        except Exception:
+            current_root = None
+        # If STORAGE_PATH changed since last creation, rebuild the service
+        if current_root != desired_root:
+            _file_config_service = FileConfigurationService()
     return _file_config_service

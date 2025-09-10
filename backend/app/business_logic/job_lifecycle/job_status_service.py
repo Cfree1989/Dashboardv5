@@ -263,7 +263,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log specific and admin events
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'system'
         evt1 = Event(
             job_id=job.id, 
             event_type='AdminForceConfirm', 
@@ -314,7 +314,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log event
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'system'
         evt = Event(
             job_id=job.id, 
             event_type='JobRevertedToPrinting', 
@@ -358,7 +358,7 @@ class JobStatusService:
         db.session.commit()
         
         # Log event
-        workstation_id = transition_data.workstation_id or self._get_workstation_id()
+        workstation_id = transition_data.workstation_id or self._get_workstation_id() or 'system'
         evt = Event(
             job_id=job.id, 
             event_type='JobRevertedToCompleted', 

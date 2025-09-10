@@ -1607,3 +1607,83 @@ if (newIds.size > 0 && soundBaselineEstablished) {
 - If issues arise, uncomment old JobList trigger and disable global watcher
 - Store extensions are additive and won't break existing functionality
 - Audio infrastructure remains unchanged and backward compatible
+
+### Planner: Final Spec — Unreviewed Glow & Needs Attention (Dashboard Jobs)
+
+Decision summary (confirmed with user):
+- Use a single top-right icon with two meanings and clear visuals.
+- Unreviewed is automatic and only visible in `Uploaded`. Needs Attention is manual and visible in all tabs.
+- Clearing rules: Clicking `Open File` clears unreviewed; any status change out of `Uploaded` (approve, reject, archive) also clears unreviewed.
+- Re-glow rule: If a job returns to `Uploaded` from any other status, set unreviewed back to true.
+- Iconography: Exclamation icon (lucide-react). Visuals:
+  - Unreviewed: subtle card glow + outline exclamation icon.
+  - Needs Attention: solid/highlighted exclamation (no card glow).
+  - Off: no icon and no glow.
+- Scope: Global flags (not per-user). No audit trail.
+
+Behavior specification
+- Unreviewed (Uploaded only):
+  - Default true for new jobs created in `Uploaded`.
+  - Cleared by: (a) clicking `Open File`, (b) status transition `Uploaded → {Pending, Rejected, Archived}`.
+  - Re-enabled by: any transition back to `Uploaded` (e.g., restore/redo) → set true.
+  - Never shown outside `Uploaded`.
+- Needs Attention (all tabs):
+  - Manual toggle via the same top-right icon.
+  - Persists across status changes, until manually turned off.
+  - Independent from unreviewed.
+- Visual priority:
+  - In `Uploaded`: show Needs Attention icon if on; else if unreviewed true → show glow + outline exclamation; else nothing.
+  - Outside `Uploaded`: only Needs Attention may show.
+
+Data model
+- Add to `Job`:
+  - `is_unreviewed: bool` (default true)
+  - `needs_attention: bool` (default false)
+- Migration/backfill:
+  - Set `is_unreviewed=true` for existing `Uploaded` jobs, else `false`.
+  - `needs_attention=false` everywhere.
+
+Backend API and rules
+- Include both flags in existing job list/detail responses.
+- Endpoints:
+  - `PATCH /api/v1/jobs/<id>/mark-viewed` → sets `is_unreviewed=false` (idempotent).
+  - `PATCH /api/v1/jobs/<id>/attention` body `{ needs_attention: boolean }` (idempotent).
+- Auto-clear/auto-enable rules in status transitions:
+  - On transition from `Uploaded` to any other status: set `is_unreviewed=false`.
+  - On transition into `Uploaded` from any status: set `is_unreviewed=true`.
+- Note: Needs Attention never auto-toggles during transitions.
+
+Frontend UI and events
+- `JobCard` (Uploaded tab only):
+  - Card glow + outline exclamation when `is_unreviewed=true` and `needs_attention=false`.
+  - Solid/highlighted exclamation when `needs_attention=true` (no card glow).
+  - No icon/glow otherwise.
+- `JobCard` (other tabs):
+  - Show solid/highlighted exclamation only when `needs_attention=true`.
+- Top-right icon behavior:
+  - Click toggles `needs_attention` via API, then refresh using existing `mutateThenRefetch`.
+- `Open File` button behavior:
+  - Call `mark-viewed` (fire-and-forget acceptable) before invoking the protocol handler; then normal flow.
+
+Sorting and filtering
+- Uploaded tab sort priority: Unreviewed first → Needs Attention → Others; within groups preserve current secondary sort (e.g., newest first).
+- Add a global filter chip: “Needs Attention”.
+
+Success criteria
+- New jobs in `Uploaded` always glow until `Open File` is clicked or the job leaves `Uploaded`.
+- Returning to `Uploaded` re-enables the glow automatically.
+- Needs Attention can be toggled in any tab; persists across moves; visually distinct without card glow.
+- No audit trail required; only two booleans control visuals.
+
+Notes & risks
+- We clear unreviewed on `Open File` click regardless of external slicer success (unreliable to detect); this prevents forgotten glows.
+- All endpoints must be idempotent; transitions enforce server-side consistency if the UI event is missed.
+- Icon: use `lucide-react` exclamation (e.g., TriangleAlert) with Tailwind classes for glow/solid styles.
+
+Executor-ready implementation tasks (concise)
+1) DB & model: add `is_unreviewed`, `needs_attention` to `Job`; create migration; backfill.
+2) Backend routes: add `PATCH /jobs/<id>/mark-viewed` and `PATCH /jobs/<id>/attention` (auth + validation consistent with existing patterns).
+3) Services: enforce auto-clear/auto-enable in status transition methods.
+4) Frontend UI: update `JobCard` icon/glow visuals and click handler; call `mark-viewed` from `Open File` flow; wire `mutateThenRefetch`.
+5) Sorting/filter: Uploaded tab grouping; global “Needs Attention” filter.
+6) Tests: integration for (a) new job glows; (b) open file clears; (c) approve/reject/archive clears; (d) move back to Uploaded re-glows; (e) needs-attention persists across statuses.

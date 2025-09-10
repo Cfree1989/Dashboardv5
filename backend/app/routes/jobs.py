@@ -457,7 +457,7 @@ def admin_change_status(job_id):
 
 @bp.route('/<job_id>/admin/resend-email', methods=['POST'])
 @token_required
-@limiter.limit("1 per hour")
+@limiter.limit("1 per hour", key_func=lambda: f"resend:{request.view_args.get('job_id')}")
 def admin_resend_email(job_id):
     data = request.get_json(silent=True) or {}
     
@@ -469,7 +469,9 @@ def admin_resend_email(job_id):
         
         # Use JobLifecycleService to resend email
         result = orchestration_service.resend_approval_email(job_id, resend_data)
-        return ResponseService.success(result)
+        # Explicitly return 200 with success payload
+        resp = ResponseService.success(result)
+        return resp
         
     except ValueError as e:
         return ResponseService.error(str(e))
